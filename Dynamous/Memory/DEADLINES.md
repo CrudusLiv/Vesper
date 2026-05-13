@@ -10,5 +10,3 @@ To push a row to Google Calendar, leave it as-is. To opt out, prefix with `nogca
 
 ## Active
 
-- 2025-04-07 — DIP209_Capstone_Project — Technical Documentation Submission
-- 2025-04-07 — DIP209 — Technical Documentation Submission
