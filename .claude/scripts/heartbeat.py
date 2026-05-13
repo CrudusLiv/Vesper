@@ -26,7 +26,7 @@ sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts" / "integrations"))
 import _env  # noqa: F401, E402 -- side effect: loads .env into os.environ so notify can read DISCORD_BOT_TOKEN
 
-from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot  # noqa: E402
+from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, discord_ping  # noqa: E402
 # Deadlines are now sourced from inbox classification (project documents
 # mentioning dated milestones), not Gmail/Calendar.
 from security import sanitize  # noqa: E402
@@ -142,6 +142,18 @@ def main() -> int:
         notify.send("Due within 24h", imminent.format_body(urgent), priority="urgent")
     if soon:
         notify.send("Due within 48h", imminent.format_body(soon), priority="high")
+
+    # Section 2: Discord ping toast scan.
+    user_id = os.environ.get("DISCORD_USER_ID")
+    if user_id:
+        db_path = PROJECT_DIR / ".claude" / "data" / "discord_cache.db"
+        state_path = PROJECT_DIR / ".claude" / "data" / "discord_last_tick.json"
+        try:
+            for ping in discord_ping.scan_pings(db_path, user_id=user_id, state_path=state_path):
+                title, body = discord_ping.format_toast(ping)
+                toast.show(title, body)
+        except Exception as exc:
+            print(f"discord_ping scan failed: {exc}", file=sys.stderr)
 
     curr = snapshot.build_snapshot()
     prev = snapshot.load_state()
