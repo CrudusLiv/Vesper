@@ -56,6 +56,9 @@ def success_check(note_path: Path) -> bool:
     frontmatter_block = parts[1]
     body = parts[2]
     for line in frontmatter_block.splitlines():
+        if line and line[0] in (" ", "\t"):
+            # YAML continuation line (block scalar or folded value) — skip.
+            continue
         stripped = line.strip()
         if not stripped:
             continue
