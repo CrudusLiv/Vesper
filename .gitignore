@@ -1,6 +1,7 @@
 # Environment
 .env
 .venv/
+*.token.json
 
 # OS
 .DS_Store
@@ -10,9 +11,16 @@ Thumbs.db
 .claude/data/
 *.db
 
+# Vault transient state
+Dynamous/Memory/inbox/_processed/
+
 # Python
 __pycache__/
 *.pyc
 
 # Generated plans
 .agent/
+
+# Plan 2026-05-13: new heartbeat state files
+.claude/data/discord_last_tick.json
+.claude/data/gcal_synced.json
