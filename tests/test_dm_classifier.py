@@ -122,11 +122,12 @@ def _self_row(id_, content, created_at):
     }
 
 
-def test_scan_and_route_ignores_messages_past_24h(tmp_path):
+def test_scan_and_route_ignores_messages_past_24h(tmp_vault):
     """A self-DM older than 24h must NOT be processed, even if seen-state is
     empty (this is what caused the 8x duplication: each tick reaped the seen
     entry, scan_and_route had no SQL cutoff, so it re-imported every time)."""
     m = _import_module()
+    tmp_path = tmp_vault.parent.parent  # tmp_vault is tmp_path/Dynamous/Memory
     db = tmp_path / "cache.db"
     now = 1_000_000.0
     _seed_self_dms(db, [
@@ -138,11 +139,12 @@ def test_scan_and_route_ignores_messages_past_24h(tmp_path):
     assert counts == {"note": 1, "finance": 0, "chit-chat": 0}
 
 
-def test_scan_and_route_skips_already_seen(tmp_path):
+def test_scan_and_route_skips_already_seen(tmp_vault):
     """A self-DM already in seen_message_ids must not be re-processed even
     when it's inside the 24h window."""
     import json
     m = _import_module()
+    tmp_path = tmp_vault.parent.parent
     db = tmp_path / "cache.db"
     now = 1_000_000.0
     _seed_self_dms(db, [_self_row("a", "note: dedupe me", now - 100)])
