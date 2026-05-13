@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import time
 from datetime import datetime, timedelta, timezone
@@ -22,6 +23,7 @@ from typing import Optional
 
 KL = timezone(timedelta(hours=8))
 SEEN_TTL_SEC = 24 * 3600
+_MENTION_RE = re.compile(r"<@!?(\d+)>")
 
 
 def _load_state(path: Path) -> dict:
@@ -95,11 +97,20 @@ def scan_pings(
     return new_pings
 
 
-def format_toast(ping: dict) -> tuple[str, str]:
+def _humanize_mentions(content: str, user_id: Optional[str]) -> str:
+    """Replace `<@id>` tokens with readable text — the recipient becomes `@you`,
+    other IDs collapse to `@user` since we don't have a name mapping here."""
+    def repl(m: re.Match) -> str:
+        return "@you" if user_id and m.group(1) == user_id else "@user"
+    return _MENTION_RE.sub(repl, content)
+
+
+def format_toast(ping: dict, *, user_id: Optional[str] = None) -> tuple[str, str]:
     """Render (title, body) for winotify."""
     sender = ping.get("author_name") or "unknown"
     channel = "DM" if ping.get("is_dm") else (ping.get("channel_name") or "channel")
     title = f"Discord ping from {sender}"
     content = (ping.get("content") or "").strip().replace("\n", " ")
-    body = f"{channel}: {content[:120]}"
+    cleaned = _humanize_mentions(content, user_id).strip()
+    body = f"{channel}: {cleaned[:120]}" if cleaned else f"{channel}: (mention)"
     return title, body

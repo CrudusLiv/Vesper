@@ -150,7 +150,7 @@ def main() -> int:
         state_path = PROJECT_DIR / ".claude" / "data" / "discord_last_tick.json"
         try:
             for ping in discord_ping.scan_pings(db_path, user_id=user_id, state_path=state_path):
-                title, body = discord_ping.format_toast(ping)
+                title, body = discord_ping.format_toast(ping, user_id=user_id)
                 toast.show(title, body)
         except Exception as exc:
             print(f"discord_ping scan failed: {exc}", file=sys.stderr)

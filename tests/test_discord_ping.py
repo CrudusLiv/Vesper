@@ -98,3 +98,42 @@ def test_state_file_trims_old_ids(tmp_path):
     dp.scan_pings(db, user_id="999", state_path=state_path, now=1100.0 + 25 * 3600)
     state = json.loads(state_path.read_text(encoding="utf-8"))
     assert state["seen_message_ids"] == []
+
+
+def test_format_toast_humanizes_self_mention():
+    """Body should replace `<@self_id>` with `@you`, not show the raw ID."""
+    dp = _import_module()
+    ping = {
+        "author_name": "alice", "is_dm": 0, "channel_name": "general",
+        "content": "<@999> look at this",
+    }
+    title, body = dp.format_toast(ping, user_id="999")
+    assert title == "Discord ping from alice"
+    assert "<@999>" not in body
+    assert "@you" in body
+    assert "look at this" in body
+
+
+def test_format_toast_handles_bare_mention():
+    """A content of only `<@self_id>` should still produce a non-empty body."""
+    dp = _import_module()
+    ping = {
+        "author_name": "bob", "is_dm": 0, "channel_name": "dev",
+        "content": "<@999>",
+    }
+    _, body = dp.format_toast(ping, user_id="999")
+    assert "999" not in body
+    assert body.startswith("dev:")
+
+
+def test_format_toast_other_mentions_become_user():
+    """Mentions for other IDs collapse to `@user`."""
+    dp = _import_module()
+    ping = {
+        "author_name": "alice", "is_dm": 0, "channel_name": "general",
+        "content": "<@111> and <@999> see this",
+    }
+    _, body = dp.format_toast(ping, user_id="999")
+    assert "<@111>" not in body
+    assert "@user" in body
+    assert "@you" in body
