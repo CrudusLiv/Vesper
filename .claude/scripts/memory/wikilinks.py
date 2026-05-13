@@ -22,6 +22,12 @@ from pathlib import Path
 RELATED_BEGIN = "<!-- related:begin -->"
 RELATED_END = "<!-- related:end -->"
 
+# Category roots whose direct subfolders are independent subjects/projects,
+# not assessment-like groupings. We DO NOT cross sibling links across these
+# boundaries — otherwise `lectures/DIP215/x.md` links to `lectures/Kotlin/y.md`,
+# which floods the graph with cross-course noise.
+_CATEGORY_ROOTS = {"lectures", "projects", "research"}
+
 
 def add_sibling_wikilinks(file_path: Path) -> None:
     """Refresh the Related section in `file_path` and every sibling."""
@@ -50,9 +56,14 @@ def _siblings_for(file_path: Path) -> list[Path]:
                 if p.is_file() and p != file_path:
                     found.add(p)
     # Also include the parent-folder neighbours of file_path's own subfolder
-    # (so a note inside Assessment_2/ sees notes inside Assessment_3/).
+    # (so a note inside Assessment_2/ sees notes inside Assessment_3/). Skip
+    # when grandparent is a category root — see _CATEGORY_ROOTS docstring.
     grandparent = folder.parent
-    if grandparent != folder and grandparent.exists():
+    if (
+        grandparent != folder
+        and grandparent.exists()
+        and grandparent.name not in _CATEGORY_ROOTS
+    ):
         for sub in grandparent.iterdir():
             if not sub.is_dir() or sub == folder:
                 continue

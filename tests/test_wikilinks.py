@@ -87,3 +87,32 @@ def test_self_link_skipped(tmp_path):
     # Only one note in folder — should produce no Related block at all.
     wl.add_sibling_wikilinks(a)
     assert "[[a]]" not in a.read_text(encoding="utf-8")
+
+
+def test_category_root_blocks_cross_course_links(tmp_path):
+    """A note in lectures/DIP215/ must NOT link to lectures/Kotlin/."""
+    wl = _import_wikilinks()
+    dip215 = tmp_path / "lectures" / "DIP215" / "static_methods.md"
+    kotlin = tmp_path / "lectures" / "Kotlin" / "functions.md"
+    _write_note(dip215)
+    _write_note(kotlin)
+    wl.add_sibling_wikilinks(dip215)
+    text_dip = dip215.read_text(encoding="utf-8")
+    text_kt = kotlin.read_text(encoding="utf-8")
+    assert "[[functions]]" not in text_dip
+    assert "[[static_methods]]" not in text_kt
+
+
+def test_project_assessment_links_preserved(tmp_path):
+    """projects/DIP209/Assessment_2/ should still see Assessment_3/ — the
+    subject folder (DIP209) is NOT a category root, so traversal allowed."""
+    wl = _import_wikilinks()
+    a = tmp_path / "projects" / "DIP209" / "Assessment_2" / "spec.md"
+    b = tmp_path / "projects" / "DIP209" / "Assessment_3" / "report.md"
+    _write_note(a)
+    _write_note(b)
+    wl.add_sibling_wikilinks(a)
+    text_a = a.read_text(encoding="utf-8")
+    text_b = b.read_text(encoding="utf-8")
+    assert "[[report]]" in text_a
+    assert "[[spec]]" in text_b
