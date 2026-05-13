@@ -31,6 +31,7 @@ PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolv
 
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 from integrations import vault_fs  # noqa: E402
+from memory import wikilinks  # noqa: E402
 
 VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 LECTURES = VAULT / "lectures"
@@ -260,7 +261,7 @@ def _process_one(src: Path) -> dict | None:
         return None
 
     note_path = _write_note(src, doc_type, name, subcategory, date, note_md)
-    _refresh_sibling_links(note_path)
+    wikilinks.add_sibling_wikilinks(note_path)
     # Section 4: move src into _processed/ first so the carve-out applies,
     # then delete iff the written note passes the success check.
     processed_dir = src.parent / "_processed"
@@ -423,31 +424,11 @@ def _extract_title(note_md: str) -> str | None:
 
 DAILY = VAULT / "daily"
 
-# Marker fence so the Related section can be rewritten in place every time
-# a new sibling is added, without nuking the rest of the note.
-RELATED_BEGIN = "<!-- related:begin -->"
-RELATED_END = "<!-- related:end -->"
-
 # Daily logs use a chronological chain (prev/next) rather than full sibling
 # linking -- a year of daily notes all linked to each other is graph noise.
 TIMELINE_BEGIN = "<!-- timeline:begin -->"
 TIMELINE_END = "<!-- timeline:end -->"
 DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.md$")
-
-
-def _refresh_sibling_links(note_path: Path) -> None:
-    """Rewrite the ## Related section in every note in the same folder so the
-    graph view links each pair. Hub-and-spoke per folder."""
-    folder = note_path.parent
-    siblings = sorted(p for p in folder.glob("*.md") if p.is_file())
-    if len(siblings) < 2:
-        # Nothing to link to yet. Strip any stale Related block on the lone
-        # note so it doesn't sit there empty.
-        _write_related(note_path, [])
-        return
-    for note in siblings:
-        others = [p for p in siblings if p != note]
-        _write_related(note, others)
 
 
 def refresh_daily_timeline() -> None:
@@ -482,20 +463,4 @@ def _write_timeline(note: Path, prev: Path | None, nxt: Path | None) -> None:
     if nxt:
         parts.append(f"[[{nxt.stem}]] →")
     block = f"\n\n{TIMELINE_BEGIN}\n## Timeline\n{' · '.join(parts)}\n{TIMELINE_END}\n"
-    note.write_text(text.rstrip() + block, encoding="utf-8")
-
-
-def _write_related(note: Path, others: list[Path]) -> None:
-    text = note.read_text(encoding="utf-8")
-    # Strip any existing Related block.
-    begin = text.find(RELATED_BEGIN)
-    if begin != -1:
-        end = text.find(RELATED_END, begin)
-        if end != -1:
-            text = (text[:begin] + text[end + len(RELATED_END):]).rstrip() + "\n"
-    if not others:
-        note.write_text(text, encoding="utf-8")
-        return
-    links = "\n".join(f"- [[{p.stem}]]" for p in others)
-    block = f"\n\n{RELATED_BEGIN}\n## Related\n{links}\n{RELATED_END}\n"
     note.write_text(text.rstrip() + block, encoding="utf-8")
