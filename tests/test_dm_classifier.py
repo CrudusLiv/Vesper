@@ -64,7 +64,7 @@ def test_routing_note_appends_to_daily(tmp_vault):
     m = _import_module()
     msg = {"id": "2", "content": "idea: try FastEmbed", "created_at": 1700000000.0}
     m.route(msg, label="note")
-    expected = tmp_vault / "daily" / "2023-11-14.md"
+    expected = tmp_vault / "daily" / "2023-11-15.md"
     assert expected.exists()
     body = expected.read_text(encoding="utf-8")
     assert "## Captured" in body
@@ -76,5 +76,5 @@ def test_routing_chitchat_discards(tmp_vault):
     msg = {"id": "3", "content": "lol", "created_at": 1700000000.0}
     m.route(msg, label="chit-chat")
     # No daily file should have been written for this label.
-    expected = tmp_vault / "daily" / "2023-11-14.md"
+    expected = tmp_vault / "daily" / "2023-11-15.md"
     assert not expected.exists()

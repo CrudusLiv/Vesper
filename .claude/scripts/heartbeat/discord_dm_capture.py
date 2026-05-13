@@ -24,7 +24,7 @@ from typing import Optional
 
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
 VAULT = PROJECT_DIR / "Dynamous" / "Memory"
-KL = timezone.utc  # Use UTC for consistent file naming across timezones
+KL = timezone(timedelta(hours=8))
 
 _FINANCE_RE = re.compile(r"(?:^|(?<=\s))(?:rm|usd|myr|\$)\s*\d+", re.IGNORECASE)
 _FINANCE_KEYWORDS = re.compile(
