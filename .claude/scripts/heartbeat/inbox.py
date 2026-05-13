@@ -59,16 +59,25 @@ first few thousand chars of a document, decide whether it is:
   decisions, status.
 
 Also extract:
-- name: top-level category folder. PRESERVE ORIGINAL CASING.
-    - For lecture: subject code exactly as printed (DIP209, MATH202, CS101).
-    - For project: subject code ONLY if one is present in the filename or
-      content (DIP209, CS101). If no subject code, use a short name from
-      the filename (e.g. "MSc_Project").
+- name: top-level category folder. The SUBJECT or COURSE that owns this
+  material -- NOT a concept covered within it. A lecture about "Threads"
+  belongs under "Operating_Systems" (the course), not "Threads" (the
+  topic). "Iteration", "Loops", "Pointers", "Functions" are concepts
+  inside a course -- never folder names.
+    - For lecture: subject code or course name (DIP209, MATH202,
+      "Operating_Systems", "Kotlin"). Preserve casing exactly as it
+      appears in the source.
+    - For project: subject code if present (DIP209, CS101); else a short
+      name from the filename (e.g. "MSc_Project").
     - NEVER lowercase. NEVER use hyphens unless the source uses them.
-    - If the document mentions MULTIPLE subject codes and one of them
-      appears in the "Existing categories" list in the user message,
-      PREFER that one (and return it in the casing used in that list).
-      This keeps related material under one folder instead of splitting it.
+
+  STRICT CATEGORY RULE: You MUST pick a name from the "Existing
+  categories" list whenever the document plausibly belongs under one
+  of them -- judged by subject codes mentioned in the source, course
+  names referenced, OR the topic clearly being part of that subject's
+  standard curriculum. Only invent a new category name when no existing
+  category is a reasonable parent. When in doubt, prefer an existing
+  category over creating a new one.
 - subcategory: optional subfolder under name. ONLY for projects.
     - If the source is "Assignment 2" / "Project 1" / "Coursework 3" /
       "Assessment 2" etc., return "Assignment_2" / "Project_1" /
@@ -302,9 +311,14 @@ def _process_one(src: Path) -> dict | None:
 
 def _classify(filename: str, peek_text: str) -> dict | None:
     existing = _existing_categories()
+    existing_list = ", ".join(existing) if existing else "(none yet)"
     existing_block = (
-        f"Existing categories (prefer these when the document mentions a code "
-        f"that matches one of these, case-insensitive):\n{', '.join(existing) or '(none yet)'}\n\n"
+        "Existing categories -- you MUST pick one of these unless the "
+        "document is clearly outside ALL of their scopes. A lecture about a "
+        "concept (Threads, Iteration, Loops, Functions, etc.) goes under "
+        "the COURSE that teaches that concept; do NOT create a new folder "
+        "named after the concept.\n"
+        f"{existing_list}\n\n"
     )
     prompt = (
         existing_block
