@@ -26,7 +26,7 @@ sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts" / "integrations"))
 import _env  # noqa: F401, E402 -- side effect: loads .env into os.environ so notify can read DISCORD_BOT_TOKEN
 
-from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, discord_ping  # noqa: E402
+from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, discord_ping, discord_dm_capture  # noqa: E402
 # Deadlines are now sourced from inbox classification (project documents
 # mentioning dated milestones), not Gmail/Calendar.
 from security import sanitize  # noqa: E402
@@ -154,6 +154,25 @@ def main() -> int:
                 toast.show(title, body)
         except Exception as exc:
             print(f"discord_ping scan failed: {exc}", file=sys.stderr)
+
+    # Section 3: classify and route self-DMs to the capture bot.
+    if user_id:
+        try:
+            bot_channel = (PROJECT_DIR / ".claude" / "data" / "discord_dm_channel.txt").read_text(encoding="utf-8").strip() or None
+        except OSError:
+            bot_channel = None
+        try:
+            counts = discord_dm_capture.scan_and_route(
+                db_path,
+                user_id=user_id,
+                state_path=state_path,
+                bot_dm_channel_id=bot_channel,
+            )
+            total = counts["note"] + counts["finance"]
+            if total:
+                print(f"DM capture: {counts['note']} notes, {counts['finance']} finance, {counts['chit-chat']} discarded")
+        except Exception as exc:
+            print(f"discord_dm_capture failed: {exc}", file=sys.stderr)
 
     curr = snapshot.build_snapshot()
     prev = snapshot.load_state()
