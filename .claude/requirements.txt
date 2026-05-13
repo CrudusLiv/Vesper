@@ -1,0 +1,24 @@
+# All Python deps for the Second Brain (.claude/) tooling.
+# Install with: py -m pip install -r .claude/requirements.txt
+
+# Phase 2: hooks (PreCompact + SessionEnd distillation)
+anthropic>=0.40.0
+
+# Phase 3: hybrid RAG memory search
+fastembed>=0.4.0
+sqlite-vec>=0.1.6
+
+# Phase 4: integrations
+discord.py>=2.3
+PyGithub>=2.1
+google-api-python-client>=2.100
+google-auth-oauthlib>=1.2
+google-auth-httplib2>=0.2
+python-pptx>=0.6
+pypdf>=4.0
+
+# Plan 2026-05-13: Windows toast for Discord pings
+winotify>=1.1.0
+
+# Plan 2026-05-13: test framework (first tests in project)
+pytest>=8.0
