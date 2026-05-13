@@ -89,3 +89,67 @@ def test_routing_chitchat_discards(tmp_vault):
     # No daily file should have been written for this label.
     expected = tmp_vault / "daily" / "2023-11-15.md"
     assert not expected.exists()
+
+
+def _seed_self_dms(db_path, rows):
+    import sqlite3
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("""
+        CREATE TABLE messages (
+            id TEXT PRIMARY KEY, channel_id TEXT, channel_name TEXT,
+            guild_id TEXT, guild_name TEXT, is_dm INTEGER, author_id TEXT,
+            author_name TEXT, is_self INTEGER, is_bot INTEGER,
+            content TEXT, created_at REAL, fetched_at REAL
+        )
+    """)
+    for r in rows:
+        conn.execute(
+            "INSERT INTO messages VALUES (:id, :channel_id, :channel_name, "
+            ":guild_id, :guild_name, :is_dm, :author_id, :author_name, "
+            ":is_self, :is_bot, :content, :created_at, :fetched_at)",
+            r,
+        )
+    conn.commit()
+    conn.close()
+
+
+def _self_row(id_, content, created_at):
+    return {
+        "id": id_, "channel_id": "ch1", "channel_name": "DM",
+        "guild_id": None, "guild_name": None, "is_dm": 1,
+        "author_id": "999", "author_name": "me", "is_self": 1, "is_bot": 0,
+        "content": content, "created_at": created_at, "fetched_at": created_at + 1,
+    }
+
+
+def test_scan_and_route_ignores_messages_past_24h(tmp_path):
+    """A self-DM older than 24h must NOT be processed, even if seen-state is
+    empty (this is what caused the 8x duplication: each tick reaped the seen
+    entry, scan_and_route had no SQL cutoff, so it re-imported every time)."""
+    m = _import_module()
+    db = tmp_path / "cache.db"
+    now = 1_000_000.0
+    _seed_self_dms(db, [
+        _self_row("old", "note: ancient idea", now - 25 * 3600),
+        _self_row("new", "note: fresh idea", now - 300),
+    ])
+    state_path = tmp_path / "state.json"
+    counts = m.scan_and_route(db, user_id="999", state_path=state_path, now=now)
+    assert counts == {"note": 1, "finance": 0, "chit-chat": 0}
+
+
+def test_scan_and_route_skips_already_seen(tmp_path):
+    """A self-DM already in seen_message_ids must not be re-processed even
+    when it's inside the 24h window."""
+    import json
+    m = _import_module()
+    db = tmp_path / "cache.db"
+    now = 1_000_000.0
+    _seed_self_dms(db, [_self_row("a", "note: dedupe me", now - 100)])
+    state_path = tmp_path / "state.json"
+    state_path.write_text(
+        json.dumps({"last_tick": None, "seen_message_ids": [{"id": "a", "t": now - 100}]}),
+        encoding="utf-8",
+    )
+    counts = m.scan_and_route(db, user_id="999", state_path=state_path, now=now)
+    assert counts == {"note": 0, "finance": 0, "chit-chat": 0}

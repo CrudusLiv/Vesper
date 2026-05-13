@@ -25,6 +25,9 @@ from typing import Optional
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
 VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 KL = timezone(timedelta(hours=8))
+# Bounds how far back the self-DM scan looks. Matches discord_ping's window
+# since they share the seen_message_ids state and that state's TTL.
+SEEN_TTL_SEC = 24 * 3600
 
 _FINANCE_RE = re.compile(r"(?:^|(?<=\s))(?:rm|usd|myr|\$)\s*\d+", re.IGNORECASE)
 _FINANCE_KEYWORDS = re.compile(
@@ -96,12 +99,18 @@ def scan_and_route(
     user_id: str,
     state_path: Path,
     bot_dm_channel_id: Optional[str] = None,
+    now: Optional[float] = None,
 ) -> dict[str, int]:
     """Find new self-DMs sent to the capture bot, classify, and route.
 
     Shares state_path with discord_ping (seen_message_ids covers both).
-    bot_dm_channel_id, if provided, restricts the scan to that channel."""
+    bot_dm_channel_id, if provided, restricts the scan to that channel.
+    Only self-DMs from the last SEEN_TTL_SEC are considered -- older ones
+    are ignored to match the shared seen-state TTL and avoid re-processing
+    history each time scan_pings reaps an entry."""
     import json
+    if now is None:
+        now = time.time()
     state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {
         "last_tick": None, "seen_message_ids": [],
     }
@@ -110,12 +119,13 @@ def scan_and_route(
     if not db_path.exists():
         return {"note": 0, "finance": 0, "chit-chat": 0}
 
+    cutoff = now - SEEN_TTL_SEC
     sql = """
         SELECT id, channel_id, content, created_at
         FROM messages
-        WHERE is_dm = 1 AND is_self = 1
+        WHERE is_dm = 1 AND is_self = 1 AND created_at >= ?
     """
-    params: list[str] = []
+    params: list = [cutoff]
     if bot_dm_channel_id:
         sql += " AND channel_id = ?"
         params.append(bot_dm_channel_id)
