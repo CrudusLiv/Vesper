@@ -31,68 +31,34 @@ _FINANCE_KEYWORDS = re.compile(
     r"\b(spent|paid|earned|expense|income|salary|invoice)\b",
     re.IGNORECASE,
 )
-_CHIT_CHAT_ALLOWLIST = {
-    "lol", "ok", "okay", "nice", "hi", "hey", "yo", "test", "y", "n",
-    "sure", "k", "yep", "nope", "haha", "hmm", "thx", "ty",
-}
-# Standalone money words that ARE ambiguous (LLM should decide).
-_AMBIGUOUS_TOKENS = {"cost", "cash", "money"}
+# Explicit opt-in: only count as a note if the message starts with one of
+# these markers. Everything else is treated as chit-chat and discarded.
+_NOTE_PREFIX_RE = re.compile(
+    r"^\s*note(?:\s+to\s+self)?\s*[:\-—]?\s+\S",
+    re.IGNORECASE,
+)
 
 
-def classify_rule_based(content: str) -> Optional[str]:
-    """Return 'note' | 'finance' | 'chit-chat', or None if ambiguous."""
+def classify_rule_based(content: str) -> str:
+    """Return 'note' | 'finance' | 'chit-chat'. Deterministic — no None."""
     if not content:
         return "chit-chat"
     text = content.strip()
-    lowered = text.lower()
 
-    # Currency symbol or money-pattern → finance.
-    if _FINANCE_RE.search(text):
-        return "finance"
-    if _FINANCE_KEYWORDS.search(text):
+    # Currency symbol or money keyword → finance.
+    if _FINANCE_RE.search(text) or _FINANCE_KEYWORDS.search(text):
         return "finance"
 
-    # Length-based + allowlist chit-chat.
-    if len(text) < 10:
-        # If the entire short message is an ambiguous money token, escalate.
-        if lowered in _AMBIGUOUS_TOKENS:
-            return None
-        if lowered in _CHIT_CHAT_ALLOWLIST:
-            return "chit-chat"
-        # Strip trailing punctuation/whitespace then re-check the allowlist
-        # so "nice!" or "ok." still classify as chit-chat.
-        stripped_punct = lowered.rstrip("!?.,;: ")
-        if stripped_punct in _CHIT_CHAT_ALLOWLIST:
-            return "chit-chat"
-        if not any(c.isalnum() for c in text):
-            return "chit-chat"
-        # Default short messages → chit-chat.
-        return "chit-chat"
-
-    return "note"
-
-
-def classify_with_llm(content: str) -> str:
-    """LLM fallback for ambiguous content. Returns one of the three labels."""
-    from heartbeat import llm
-    system = (
-        "Classify the message into one of: note, finance, chit-chat.\n"
-        "- finance: mentions money, spending, earning, currency.\n"
-        "- chit-chat: short, reactive, low-content.\n"
-        "- note: substantive idea, reminder, or thought.\n"
-        "Output one word only."
-    )
-    result = (llm.call(content, system_prompt=system, model="haiku", timeout=15) or "note").strip().lower()
-    if result not in ("note", "finance", "chit-chat"):
+    # Explicit "note" / "note to self" prefix → note.
+    if _NOTE_PREFIX_RE.match(text):
         return "note"
-    return result
+
+    # Everything else is chit-chat and discarded.
+    return "chit-chat"
 
 
 def classify(content: str) -> str:
-    label = classify_rule_based(content)
-    if label is None:
-        label = classify_with_llm(content)
-    return label
+    return classify_rule_based(content)
 
 
 def _append(target: Path, header: str, body: str) -> None:

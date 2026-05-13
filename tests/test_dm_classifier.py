@@ -27,25 +27,36 @@ def test_money_keyword_routes_to_finance():
     assert m.classify_rule_based("paid the rent") == "finance"
 
 
-def test_short_chit_chat():
+def test_chit_chat_default():
+    """Anything without an explicit marker falls through to chit-chat."""
     m = _import_module()
     assert m.classify_rule_based("lol") == "chit-chat"
-    assert m.classify_rule_based("ok") == "chit-chat"
-    assert m.classify_rule_based("hey") == "chit-chat"
-    assert m.classify_rule_based("nice!") == "chit-chat"
+    assert m.classify_rule_based("hey what's up") == "chit-chat"
+    assert m.classify_rule_based("idea: try using FastEmbed") == "chit-chat"
+    assert m.classify_rule_based("reminder: ask supervisor about scope") == "chit-chat"
+    assert m.classify_rule_based("cost") == "chit-chat"
 
 
-def test_substantive_default_to_note():
+def test_note_prefix_routes_to_note():
+    """Only messages with explicit 'note' / 'note to self' prefix are kept."""
     m = _import_module()
-    assert m.classify_rule_based("idea: try using FastEmbed for offline embeddings") == "note"
-    assert m.classify_rule_based("reminder: ask supervisor about scope") == "note"
+    assert m.classify_rule_based("note: pick up groceries") == "note"
+    assert m.classify_rule_based("Note to self: revisit FastEmbed perf") == "note"
+    assert m.classify_rule_based("note - swap to discord webhooks") == "note"
+    assert m.classify_rule_based("NOTE try the new approach") == "note"
 
 
-def test_ambiguous_returns_none():
-    """Short message with money keyword — needs LLM fallback."""
+def test_note_prefix_requires_content():
+    """The 'note' marker alone, without trailing content, is chit-chat."""
     m = _import_module()
-    # 'cost' alone in a very short string is ambiguous (could be cost of effort).
-    assert m.classify_rule_based("cost") is None
+    assert m.classify_rule_based("note") == "chit-chat"
+    assert m.classify_rule_based("note:") == "chit-chat"
+
+
+def test_finance_beats_note_prefix():
+    """If the message has a money signal, finance wins even with 'note' prefix."""
+    m = _import_module()
+    assert m.classify_rule_based("note: RM 25 for lunch") == "finance"
 
 
 def test_routing_finance_appends_to_monthly_file(tmp_vault):
@@ -62,13 +73,13 @@ def test_routing_finance_appends_to_monthly_file(tmp_vault):
 
 def test_routing_note_appends_to_daily(tmp_vault):
     m = _import_module()
-    msg = {"id": "2", "content": "idea: try FastEmbed", "created_at": 1700000000.0}
+    msg = {"id": "2", "content": "note: try FastEmbed", "created_at": 1700000000.0}
     m.route(msg, label="note")
     expected = tmp_vault / "daily" / "2023-11-15.md"
     assert expected.exists()
     body = expected.read_text(encoding="utf-8")
     assert "## Captured" in body
-    assert "idea: try FastEmbed" in body
+    assert "note: try FastEmbed" in body
 
 
 def test_routing_chitchat_discards(tmp_vault):
