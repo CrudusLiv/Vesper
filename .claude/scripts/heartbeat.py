@@ -26,7 +26,7 @@ sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts" / "integrations"))
 import _env  # noqa: F401, E402 -- side effect: loads .env into os.environ so notify can read DISCORD_BOT_TOKEN
 
-from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, discord_ping, discord_dm_capture  # noqa: E402
+from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, discord_ping, discord_dm_capture, gcal_sync  # noqa: E402
 # Deadlines are now sourced from inbox classification (project documents
 # mentioning dated milestones), not Gmail/Calendar.
 from security import sanitize  # noqa: E402
@@ -173,6 +173,14 @@ def main() -> int:
                 print(f"DM capture: {counts['note']} notes, {counts['finance']} finance, {counts['chit-chat']} discarded")
         except Exception as exc:
             print(f"discord_dm_capture failed: {exc}", file=sys.stderr)
+
+    # Section 6: push new DEADLINES.md rows and gcal: tags to Google Calendar.
+    try:
+        new_events = gcal_sync.run()
+        if new_events:
+            print(f"GCal sync: created {new_events} event(s)")
+    except Exception as exc:
+        print(f"gcal_sync failed: {exc}", file=sys.stderr)
 
     curr = snapshot.build_snapshot()
     prev = snapshot.load_state()
