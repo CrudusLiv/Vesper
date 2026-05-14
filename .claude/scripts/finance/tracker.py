@@ -33,9 +33,13 @@ KL = timezone(timedelta(hours=8))
 
 # Leading number, then a single word category, then optional free-text note.
 # The category captures \w+ which excludes spaces -- "lunch with mom" cannot
-# be a category, only a note.
+# be a category, only a note. A leading connector word ("50 for travel pass")
+# is skipped so the next real word becomes the category.
 EXPENSE_RE = re.compile(
-    r"^\s*(?P<amount>\d+(?:\.\d{1,2})?)\s+(?P<category>[A-Za-z][\w-]*)\s*(?P<note>.*)$"
+    r"^\s*(?P<amount>\d+(?:\.\d{1,2})?)\s+"
+    r"(?:(?:for|on|at|to|of|in)\s+)?"
+    r"(?P<category>[A-Za-z][\w-]*)\s*(?P<note>.*)$",
+    re.IGNORECASE,
 )
 
 

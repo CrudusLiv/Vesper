@@ -12,10 +12,6 @@ Usage:
     py query.py github pr-list [<repo>]
     py query.py github diff <repo> <sha>
 
-    py query.py gmail unread [--max 25]
-    py query.py gmail recent [--days 7] [--max 25]
-    py query.py gmail thread <thread_id>
-
     py query.py gcal upcoming [--days 14]
 
     py query.py vault inbox
@@ -35,7 +31,6 @@ from integrations import (  # noqa: E402
     discord_int,
     gcal_int,
     github_int,
-    gmail_int,
     registry,
     vault_fs,
 )
@@ -43,7 +38,6 @@ from integrations import (  # noqa: E402
 DISPATCH = {
     "discord": discord_int.handle_query,
     "github": github_int.handle_query,
-    "gmail": gmail_int.handle_query,
     "gcal": gcal_int.handle_query,
     "vault": vault_fs.handle_query,
 }

@@ -56,12 +56,6 @@ INTEGRATIONS: list[Integration] = [
         notes="Set GITHUB_ASSIGNMENT_REPOS=owner/repo1,owner/repo2 to scope code review.",
     ),
     Integration(
-        name="gmail",
-        description="Gmail (read-only) -- list and read messages",
-        requires_files=[GOOGLE_CREDS],
-        notes="OAuth2: place credentials.json at .claude/data/google_credentials.json. Token cached after first run.",
-    ),
-    Integration(
         name="gcal",
         description="Google Calendar (read-only) -- upcoming events",
         requires_files=[GOOGLE_CREDS],

@@ -95,6 +95,23 @@ def run_bot() -> int:
             _store_message(message, self_id_holder["id"])
         except Exception as exc:
             print(f"on_message error: {exc}", file=sys.stderr)
+            return
+        # Immediately capture self-DMs to the vault without waiting for the heartbeat.
+        is_dm = message.guild is None
+        is_self = self_id_holder["id"] and str(message.author.id) == self_id_holder["id"]
+        if is_dm and is_self:
+            try:
+                import sys as _sys
+                _sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
+                from heartbeat import discord_dm_capture
+                created_ts = message.created_at.replace(tzinfo=timezone.utc).timestamp()
+                discord_dm_capture.route_and_mark({
+                    "id": str(message.id),
+                    "content": message.content,
+                    "created_at": created_ts,
+                })
+            except Exception as exc:
+                print(f"inline dm_capture error: {exc}", file=sys.stderr)
 
     client.run(token)
     return 0

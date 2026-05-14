@@ -6,10 +6,10 @@
 
 ## 1. About You
 
-- **Name:** ___
-- **Role/Title:** ___
-- **What I do daily** (1-2 sentences): ___
-- **Timezone:** ___
+- **Name:** CrudusLiv
+- **Role/Title:** Software Developer
+- **What I do daily** (1-2 sentences): I am a Computer Science student, I will be starting classesi in June. Till then i am unemployed.
+- **Timezone:** UTC +8:00 Kuala Lumpur
 
 ---
 
@@ -17,13 +17,13 @@
 
 Check every platform you actively use and fill in the specific tool:
 
-- [ ] Email (e.g., Gmail, Outlook): ___
-- [ ] Calendar (e.g., Google Calendar, Outlook Calendar): ___
-- [ ] Task Management (e.g., Asana, Linear, Todoist, Jira): ___
-- [ ] Chat/Messaging (e.g., Slack, Discord, Teams): ___
-- [ ] Notes/Documents (e.g., Notion, Obsidian, Google Docs): ___
+- [X] Email (e.g., Gmail, Outlook): Gmail, Outlook (for University)
+- [X] Calendar (e.g., Google Calendar, Outlook Calendar): Google Calendar
+- [X] Task Management (e.g., Asana, Linear, Todoist, Jira): Obsidian
+- [X] Chat/Messaging (e.g., Slack, Discord, Teams): Discord
+- [X] Notes/Documents (e.g., Notion, Obsidian, Google Docs): Obsidian
 - [ ] Cloud Storage (e.g., Google Drive, Dropbox, OneDrive): ___
-- [ ] Code Hosting (e.g., GitHub, GitLab): ___
+- [X] Code Hosting (e.g., GitHub, GitLab): GitHub
 - [ ] Community (e.g., Circle, Discord server, Mighty Networks): ___
 - [ ] CRM (e.g., HubSpot, Salesforce, Pipedrive): ___
 - [ ] Other: ___
@@ -43,11 +43,10 @@ Examples:
 
 **My list:**
 
-1. ___
-2. ___
-3. ___
-4. ___
-5. ___
+1. Track deadlines and remind me before they're due for assignments
+2. Summarize and make notes of my powerpoints and pdf files when i upload them after each lesson
+3. Keep my notes organized and searchable.
+4. Do Initial code review for all my assignments that i will be doing for my degree as i upload them to GitHub
 
 ---
 
@@ -56,7 +55,7 @@ Examples:
 How bold should your agent be? Pick one:
 
 - [ ] **Observer** - Notify only, never take action
-- [ ] **Advisor** - Draft things for my review, but never send or post
+- [X] **Advisor** - Draft things for my review, but never send or post
 - [ ] **Assistant** - Act on low-risk items (log notes, organize files), ask for high-risk
 - [ ] **Partner** - Act autonomously on most things, ask only for irreversible actions
 
@@ -66,12 +65,12 @@ How bold should your agent be? Pick one:
 
 What should your agent NEVER do without explicit permission?
 
-- [ ] Send emails or messages on my behalf
-- [ ] Post to social media
+- [X] Send emails or messages on my behalf
+- [X] Post to social media
 - [ ] Modify files outside the memory vault
-- [ ] Access financial data or make purchases
-- [ ] Delete anything
-- [ ] Other: ___
+- [X] Access financial data or make purchases
+- [X] Delete anything
+- [X] Other: Send messages on Discord
 
 ---
 
@@ -79,11 +78,11 @@ What should your agent NEVER do without explicit permission?
 
 What types of knowledge matter most to you? Check all that apply and add your own:
 
-- [ ] Meeting notes and decisions
-- [ ] Project status and progress
+- [X] Lecture notes and decisions
+- [X] Project status and progress
 - [ ] Client/customer information
-- [ ] Research and learning notes
-- [ ] Personal goals and habits
+- [X] Research and learning notes
+- [X] Personal goals and habits
 - [ ] Content ideas and drafts
 - [ ] Team context (who does what, preferences, timezones)
 - [ ] Other: ___
@@ -92,9 +91,9 @@ What types of knowledge matter most to you? Check all that apply and add your ow
 
 ## 7. Infrastructure
 
-- **Operating System:** [ ] Windows [ ] macOS [ ] Linux
-- **Deployment:** [ ] Local only [ ] Local + cloud server (VPS)
-- **Existing tools I already have set up:** ___
+- **Operating System:** [X] Windows [ ] macOS [ ] Linux
+- **Deployment:** [X] Local only [ ] Local + cloud server (VPS)
+- **Existing tools I already have set up:** I have not previosuly used obsidian. Gmail, Outlook and Discord are ready to integrate. GitHub account is active.
 
   (e.g., "I already use Obsidian", "I have a DigitalOcean droplet", "I'm comfortable with the terminal")
 
@@ -104,9 +103,9 @@ What types of knowledge matter most to you? Check all that apply and add your ow
 
 Rank your top 3 integrations to build first (from your answers in Section 2):
 
-1. ___
-2. ___
-3. ___
+1. Discord
+2. GitHub
+3. Gmail
 
 ---
 
