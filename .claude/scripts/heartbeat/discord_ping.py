@@ -73,6 +73,7 @@ def scan_pings(
             SELECT id, channel_name, is_dm, author_id, author_name, content, created_at
             FROM messages
             WHERE created_at >= ?
+              AND is_bot = 0
               AND (
                 (is_dm = 1 AND is_self = 0)
                 OR (is_dm = 0 AND content LIKE ?)

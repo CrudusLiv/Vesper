@@ -122,6 +122,7 @@ def main() -> int:
             f"{label}: {bucket}",
             f"{summary['title']}\nsaved to {rel}",
             priority="normal",
+            toast=True,
         )
         print(f"{label} ({summary['source']}) -> {rel}")
         inbox_deadlines.extend(summary.get("deadlines") or [])
@@ -139,9 +140,9 @@ def main() -> int:
     # deadlines surface immediately.
     urgent, soon = imminent.scan()
     if urgent:
-        notify.send("Due within 24h", imminent.format_body(urgent), priority="urgent")
+        notify.send("Due within 24h", imminent.format_body(urgent), priority="urgent", toast=True)
     if soon:
-        notify.send("Due within 48h", imminent.format_body(soon), priority="high")
+        notify.send("Due within 48h", imminent.format_body(soon), priority="high", toast=True)
 
     # Section 2: Discord ping toast scan.
     user_id = os.environ.get("DISCORD_USER_ID")
@@ -151,7 +152,14 @@ def main() -> int:
         try:
             for ping in discord_ping.scan_pings(db_path, user_id=user_id, state_path=state_path):
                 title, body = discord_ping.format_toast(ping, user_id=user_id)
-                toast.show(title, body)
+                try:
+                    toast.show(title, body)
+                except Exception as exc:
+                    print(f"discord_ping toast failed: {exc}", file=sys.stderr)
+                try:
+                    notify.send(title, body, priority="high")
+                except Exception as exc:
+                    print(f"discord_ping DM failed: {exc}", file=sys.stderr)
         except Exception as exc:
             print(f"discord_ping scan failed: {exc}", file=sys.stderr)
 

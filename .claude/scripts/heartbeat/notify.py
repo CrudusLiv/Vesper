@@ -1,8 +1,8 @@
 """Notifications: Discord DM to CrudusLiv, console fallback.
 
 The Second Brain pushes everything (reminders, deadlines, summaries, drafts) to
-a single Discord DM channel so it lives where CrudusLiv already is. Windows
-Toast is intentionally not used -- DM scrollback is the persistent record.
+a single Discord DM channel so it lives where CrudusLiv already is. Toast is
+opt-in per call via `toast=True`; DM is always the primary surface.
 
 Env required:
     DISCORD_BOT_TOKEN  -- bot in CrudusLiv's DMs (already shared with the
@@ -35,13 +35,20 @@ PRIORITY_BADGES = {
 }
 
 
-def send(title: str, body: str, priority: str = "normal") -> None:
+def send(title: str, body: str, priority: str = "normal", toast: bool = False) -> None:
     token = os.environ.get("DISCORD_BOT_TOKEN")
     user_id = os.environ.get("DISCORD_USER_ID")
     if token and user_id:
-        if _send_discord_dm(token, user_id, title, body, priority):
-            return
-    _send_console(title, body, priority)
+        if not _send_discord_dm(token, user_id, title, body, priority):
+            _send_console(title, body, priority)
+    else:
+        _send_console(title, body, priority)
+    if toast:
+        try:
+            from heartbeat import toast as toast_module
+            toast_module.show(title, body)
+        except Exception as exc:
+            print(f"[notify] toast piggyback failed: {exc}", file=sys.stderr)
 
 
 def _send_discord_dm(token: str, user_id: str, title: str, body: str, priority: str) -> bool:
