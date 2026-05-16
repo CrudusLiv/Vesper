@@ -10,6 +10,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from security import guardrails, sanitize  # noqa: E402
 
+PROJECT_DIR = Path(__file__).resolve().parents[3]
+SOUL_PATH = (PROJECT_DIR / "Dynamous" / "Memory" / "SOUL.md").as_posix()
+
 # (label, tool_name, tool_input, expected_verdict)
 CASES: list[tuple[str, str, dict, str]] = [
     ("benign Read",          "Read",  {"file_path": "D:/foo.txt"},                                                   "pass"),
@@ -29,7 +32,7 @@ CASES: list[tuple[str, str, dict, str]] = [
     ("DROP TABLE",           "Bash",  {"command": "sqlite3 db.db \"DROP TABLE messages\""},                          "fail"),
     ("git rm",               "Bash",  {"command": "git rm foo.py"},                                                  "fail"),
     ("UPPERCASE rm",         "Bash",  {"command": "RM -RF foo"},                                                     "fail"),
-    ("Read Memory file",     "Read",  {"file_path": "D:/GitHub/second-brain-starter/Dynamous/Memory/SOUL.md"},       "pass"),
+    ("Read Memory file",     "Read",  {"file_path": SOUL_PATH},                                                      "pass"),
     ("Write Memory log",     "Write", {"file_path": "Dynamous/Memory/daily/foo.md", "content": "note"},              "pass"),
 ]
 
