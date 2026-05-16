@@ -1,0 +1,32 @@
+# Environment
+.env
+.venv/
+*.token.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code state
+.claude/data/
+*.db
+
+# Personal vault — kept local-only, never committed.
+# (Was untracked on 2026-05-16; previously lived in this repo.)
+Dynamous/Memory/
+
+# Python
+__pycache__/
+*.pyc
+
+# Generated plans
+.agent/
+
+# Plan 2026-05-13: new heartbeat state files
+.claude/data/discord_last_tick.json
+.claude/data/gcal_synced.json
+
+# Local-only state (do not commit)
+.claude/settings.local.json
+.claude/chat/
+Dynamous/Memory/.obsidian/

@@ -1,0 +1,201 @@
+"""Discord integration -- read-only bot + SQLite cache + CLI query.
+
+ARCHITECTURE
+============
+The bot is a long-running process (Phase 9 schedules it via Task Scheduler).
+It listens on `on_message` and writes every DM and server message into a
+SQLite cache. CLI subcommands query that cache, never the live API -- fast,
+offline-safe, rate-limit-proof.
+
+SECURITY
+========
+This module DOES NOT expose a `send_message()` function. Per USER.md, the
+agent is forbidden from sending Discord messages. The only carve-out is
+Phase 7's DM chat, which lives in `.claude/chat/`. Do not add `send_*`
+functions here.
+
+Run the bot:    py discord_int.py        (or: py query.py discord bot)
+Query cache:    py query.py discord recent
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sqlite3
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+import _env  # noqa: F401, E402  -- loads .env
+
+PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
+CACHE_DB = PROJECT_DIR / ".claude" / "data" / "discord_cache.db"
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS messages (
+    id           TEXT PRIMARY KEY,
+    channel_id   TEXT NOT NULL,
+    channel_name TEXT,
+    guild_id     TEXT,
+    guild_name   TEXT,
+    is_dm        INTEGER NOT NULL,
+    author_id    TEXT NOT NULL,
+    author_name  TEXT,
+    is_self      INTEGER NOT NULL,
+    is_bot       INTEGER NOT NULL,
+    content      TEXT,
+    created_at   REAL NOT NULL,
+    fetched_at   REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_msg_created ON messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_msg_dm      ON messages(is_dm);
+"""
+
+
+def _connect() -> sqlite3.Connection:
+    CACHE_DB.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(CACHE_DB))
+    conn.row_factory = sqlite3.Row
+    conn.executescript(SCHEMA)
+    return conn
+
+
+# ---------- Bot (long-running) ----------
+
+def run_bot() -> int:
+    token = os.environ.get("DISCORD_BOT_TOKEN")
+    if not token:
+        print("DISCORD_BOT_TOKEN not set in .env", file=sys.stderr)
+        return 1
+    try:
+        import discord
+    except ImportError:
+        print("discord.py not installed: py -m pip install -r .claude/requirements.txt", file=sys.stderr)
+        return 1
+
+    intents = discord.Intents.default()
+    intents.message_content = True
+    intents.dm_messages = True
+    intents.guilds = True
+
+    client = discord.Client(intents=intents)
+    self_id_holder: dict = {"id": None}
+
+    @client.event
+    async def on_ready() -> None:
+        self_id_holder["id"] = str(client.user.id) if client.user else None
+        print(f"Connected as {client.user} (id={self_id_holder['id']})")
+
+    @client.event
+    async def on_message(message) -> None:
+        try:
+            _store_message(message, self_id_holder["id"])
+        except Exception as exc:
+            print(f"on_message error: {exc}", file=sys.stderr)
+            return
+        # Immediately capture self-DMs to the vault without waiting for the heartbeat.
+        is_dm = message.guild is None
+        is_self = self_id_holder["id"] and str(message.author.id) == self_id_holder["id"]
+        if is_dm and is_self:
+            try:
+                import sys as _sys
+                _sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
+                from heartbeat import discord_dm_capture
+                created_ts = message.created_at.replace(tzinfo=timezone.utc).timestamp()
+                discord_dm_capture.route_and_mark({
+                    "id": str(message.id),
+                    "content": message.content,
+                    "created_at": created_ts,
+                })
+            except Exception as exc:
+                print(f"inline dm_capture error: {exc}", file=sys.stderr)
+
+    client.run(token)
+    return 0
+
+
+def _store_message(message, self_id: str | None) -> None:
+    is_dm = 1 if message.guild is None else 0
+    is_self = 1 if self_id and str(message.author.id) == self_id else 0
+    is_bot = 1 if getattr(message.author, "bot", False) else 0
+    channel_name = getattr(message.channel, "name", None) or "DM"
+    guild_id = str(message.guild.id) if message.guild else None
+    guild_name = message.guild.name if message.guild else None
+    created_ts = message.created_at.replace(tzinfo=timezone.utc).timestamp()
+    conn = _connect()
+    try:
+        conn.execute(
+            """INSERT OR REPLACE INTO messages
+               (id, channel_id, channel_name, guild_id, guild_name, is_dm,
+                author_id, author_name, is_self, is_bot, content,
+                created_at, fetched_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                str(message.id), str(message.channel.id), channel_name,
+                guild_id, guild_name, is_dm,
+                str(message.author.id), str(message.author),
+                is_self, is_bot, message.content,
+                created_ts, time.time(),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# ---------- Cache queries ----------
+
+def recent(hours: int = 24, limit: int = 50, dms_only: bool = False) -> list[dict]:
+    if not CACHE_DB.exists():
+        return []
+    cutoff = time.time() - hours * 3600
+    where = "created_at >= ? AND is_self = 0 AND is_bot = 0"
+    params: list = [cutoff]
+    if dms_only:
+        where += " AND is_dm = 1"
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            f"SELECT * FROM messages WHERE {where} ORDER BY created_at DESC LIMIT ?",
+            params + [limit],
+        ).fetchall()
+    finally:
+        conn.close()
+    return [dict(r) for r in rows]
+
+
+# ---------- CLI ----------
+
+def handle_query(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="query.py discord")
+    parser.add_argument("subcommand", choices=["recent", "dms", "bot"])
+    parser.add_argument("--hours", type=int, default=24)
+    parser.add_argument("--limit", type=int, default=50)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+
+    if args.subcommand == "bot":
+        return run_bot()
+
+    rows = recent(hours=args.hours, limit=args.limit, dms_only=(args.subcommand == "dms"))
+
+    if args.json:
+        print(json.dumps(rows, indent=2, ensure_ascii=False, default=str))
+        return 0
+    if not rows:
+        print(f"(no {'DMs' if args.subcommand == 'dms' else 'messages'} in the last {args.hours}h)")
+        return 0
+    for r in rows:
+        when = datetime.fromtimestamp(r["created_at"]).strftime("%Y-%m-%d %H:%M")
+        loc = r["channel_name"] if r["is_dm"] else f"{r['guild_name']}#{r['channel_name']}"
+        body = (r["content"] or "")[:200]
+        print(f"{when}  {loc}  <{r['author_name']}>")
+        print(f"    {body}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(run_bot())
