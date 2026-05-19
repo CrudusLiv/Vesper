@@ -1,18 +1,58 @@
-/* Dashboard card styling for HOME.md (cssclasses: dashboard) */
+/* ── Custom properties ─────────────────────────────────────────────────────── */
+.dashboard { --db-accent: #a371f7; --db-dim: #7c3aed; --db-card: var(--background-secondary); }
 
-.dashboard .dataview.dataview-error { display: none; }
+/* ── Grid layout ────────────────────────────────────────────────────────────── */
+.db-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+.db-col  { display: flex; flex-direction: column; gap: 8px; }
 
-/* Card block around each dataviewjs output */
-.dashboard .block-language-dataviewjs {
-  border: 1px solid var(--background-modifier-border);
+/* ── Cards ──────────────────────────────────────────────────────────────────── */
+.db-card {
+  background: var(--db-card);
   border-radius: 8px;
   padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
 }
 
-/* Urgency colours for the deadlines table */
-.dashboard td:first-child { font-size: 1.1em; }
+/* ── Focus hero ─────────────────────────────────────────────────────────────── */
+.db-focus {
+  border-left: 3px solid var(--db-accent);
+  background: rgba(163,113,247,.08);
+  border-radius: 0 8px 8px 0;
+}
 
-/* Progress bar monospace */
-.dashboard code { font-family: var(--font-monospace); letter-spacing: -0.02em; }
+/* ── Metric chips ───────────────────────────────────────────────────────────── */
+.db-chip {
+  border-top: 2px solid var(--db-accent);
+  background: var(--background-primary);
+  border-radius: 6px;
+}
+
+/* ── Progress bars ──────────────────────────────────────────────────────────── */
+.db-bar-fill { background: linear-gradient(90deg, var(--db-accent), var(--db-dim)); border-radius: 2px; }
+.db-bar-cat  { background: var(--db-accent); opacity: .85; border-radius: 2px; }
+
+/* ── Schedule ───────────────────────────────────────────────────────────────── */
+.db-time { color: var(--text-muted); font-size: 0.7rem; width: 38px; flex-shrink: 0; }
+
+/* ── Section labels ─────────────────────────────────────────────────────────── */
+.db-label {
+  font-size: 0.65rem;
+  letter-spacing: .1em;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+/* ── Vault graph container ──────────────────────────────────────────────────── */
+.db-graph { height: 120px; border-radius: 6px; overflow: hidden; }
+
+/* ── Strip card border from outer dataviewjs block (cards are rendered inside) ─ */
+.dashboard .block-language-dataviewjs {
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+
+/* ── Suppress Dataview errors ───────────────────────────────────────────────── */
+.dashboard .dataview.dataview-error { display: none; }
