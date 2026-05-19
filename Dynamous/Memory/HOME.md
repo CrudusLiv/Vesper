@@ -44,17 +44,23 @@ if (futureDeadlines.length > 0) {
 }
 
 // ── TODAY'S TASKS ─────────────────────────────────────────────────────────────
-const allTasks = dv.pages().file.tasks.where(t => !t.completed);
+const TASK_EXCLUDE = ["HABITS", "HEARTBEAT", "SOUL", "DEADLINES", "PROJECTS", "MEMORY", "HOME", "state/", ".obsidian"];
+const allTasks = dv.pages()
+  .where(p => !TASK_EXCLUDE.some(x => p.file.path.includes(x)))
+  .file.tasks.where(t => !t.completed);
 const topTasks = [...allTasks.sort(t => t.due?.ts ?? Number.MAX_SAFE_INTEGER, "asc")].slice(0, 5);
 function dotColor(t) {
   if (!t.due) return "#a371f7";
   const diff = (t.due.ts - now.getTime()) / 864e5;
   return diff < 0 ? "#f85149" : diff < 1 ? "#d29922" : "#a371f7";
 }
+function cleanText(raw) {
+  return String(raw).replace(/\[.*?\]/g,"").replace(/\*\*(.+?)\*\*/g,"$1").replace(/_([^_]+)_/g,"$1").trim();
+}
 const taskRows = topTasks.map(t =>
   `<div style="display:flex;align-items:center;gap:7px;background:var(--background-primary);border-radius:4px;padding:5px 8px">` +
   `<div style="width:5px;height:5px;border-radius:50%;background:${dotColor(t)};flex-shrink:0"></div>` +
-  `<span style="font-size:0.8em">${String(t.text).replace(/\[.*?\]/g,"").trim()}</span></div>`
+  `<span style="font-size:0.8em">${cleanText(t.text)}</span></div>`
 ).join("");
 
 // ── INBOX ─────────────────────────────────────────────────────────────────────
