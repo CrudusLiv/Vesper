@@ -14,7 +14,7 @@ if (!raw) { dv.paragraph(`_No finance data for ${month}._`); return; }
 
 const totalMatch = raw.match(/\[!summary\]\s*RM\s*([\d,.]+)/);
 const total = totalMatch ? totalMatch[1] : "?";
-const totalNum = parseFloat(total.replace(",", "")) || 0;
+const totalNum = parseFloat(total.replace(/,/g, "")) || 0;
 
 const BUDGET = 1500;
 const pct = Math.min(100, Math.round((totalNum / BUDGET) * 100));
@@ -46,7 +46,9 @@ if (isPaused) {
   return;
 }
 
-const tasks = dv.page("HABITS").file.tasks;
+const page = dv.page("HABITS");
+if (!page) { dv.paragraph("_HABITS.md not found._"); return; }
+const tasks = page.file.tasks;
 for (const t of tasks.values) {
   const icon = t.completed ? "✅" : "⬜";
   dv.paragraph(`${icon} ${t.text}`);
@@ -96,7 +98,7 @@ if (!dlLines.length) {
     const title = parts.slice(2).join(" — ").trim();
     const d = new Date(date);
     const hoursLeft = (d - now) / 3_600_000;
-    const flag = hoursLeft <= 24 ? "🔴" : hoursLeft <= 72 ? "🟡" : "⚪";
+    const flag = hoursLeft < 0 ? "⛔" : hoursLeft <= 24 ? "🔴" : hoursLeft <= 72 ? "🟡" : "⚪";
     return [flag, date, course, title];
   });
   dv.table(["", "Date", "Course", "Title"], rows);
@@ -115,9 +117,9 @@ if (!projLines.length) {
 ## Recent Notes
 
 ```dataviewjs
-const EXCLUDE = [".obsidian", "state/", "inbox/_processed", "HOME"];
+const EXCLUDE = [".obsidian", "state/", "inbox/_processed", "finance/"];
 const recent = dv.pages()
-  .where(p => !EXCLUDE.some(x => p.file.path.includes(x)))
+  .where(p => !EXCLUDE.some(x => p.file.path.includes(x)) && p.file.name !== "HOME")
   .sort(p => p.file.mtime, "desc")
   .slice(0, 5);
 
@@ -141,7 +143,9 @@ if (!raw) {
   return;
 }
 
-const state = JSON.parse(raw);
+let state;
+try { state = JSON.parse(raw); }
+catch (e) { dv.paragraph(`_State file is corrupt: ${e.message}_`); return; }
 const ts = state.timestamp ? new Date(state.timestamp * 1000) : null;
 const now = new Date();
 const ageMin = ts ? Math.round((now - ts) / 60_000) : null;
