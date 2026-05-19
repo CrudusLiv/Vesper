@@ -186,7 +186,7 @@ if (!hbRaw) {
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
-const root = dv.el("div", "", {cls: "dashboard"});
+const root = dv.container;
 root.innerHTML = `
 <div style="font-size:18px;font-weight:700;color:var(--text-normal);margin-bottom:2px">Second Brain</div>
 <div style="color:var(--text-muted);font-size:0.8em;margin-bottom:12px">${dateStr} · Kuala Lumpur</div>
