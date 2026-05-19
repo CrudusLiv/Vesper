@@ -94,7 +94,7 @@ def write_gcal_today(snapshot: dict) -> None:
             start_dt = datetime.fromisoformat(e.get("start", ""))
         except ValueError:
             continue
-        if start_dt.date() != today:
+        if start_dt.astimezone(kl).date() != today:
             continue
         events.append((start_dt.strftime("%H:%M"), e.get("summary", "(no title)")))
 
@@ -102,7 +102,7 @@ def write_gcal_today(snapshot: dict) -> None:
         return
 
     events.sort()
-    lines = ["---", f"generated: {_iso()}", f"date: {today}", "---", ""]
+    lines = ["---", f"updated: {_iso(snapshot.get('timestamp'))}", f"date: {today}", "---", ""]
     for time_str, summary in events:
         lines.append(f"- {time_str}: {summary}")
 
