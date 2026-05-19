@@ -1,5 +1,5 @@
 /* ── Custom properties ─────────────────────────────────────────────────────── */
-.dashboard { --db-accent: #a371f7; --db-dim: #7c3aed; --db-card: var(--background-secondary); }
+.dashboard { --db-accent: #a371f7; --db-accent-rgb: 163, 113, 247; --db-dim: #7c3aed; --db-card: var(--background-secondary); }
 
 /* ── Grid layout ────────────────────────────────────────────────────────────── */
 .db-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
@@ -16,7 +16,7 @@
 /* ── Focus hero ─────────────────────────────────────────────────────────────── */
 .db-focus {
   border-left: 3px solid var(--db-accent);
-  background: rgba(163,113,247,.08);
+  background: rgba(var(--db-accent-rgb), .08);
   border-radius: 0 8px 8px 0;
 }
 
