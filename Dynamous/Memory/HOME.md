@@ -33,3 +33,22 @@ while ((m = catRegex.exec(raw)) !== null) {
 }
 if (catRows.length) dv.table(["Category", "Amount", "Share"], catRows);
 ```
+
+## Habits — Daily Pillars
+
+```dataviewjs
+const raw = await dv.io.load("HABITS.md");
+const isPaused = raw && raw.includes("Stub — paused");
+
+dv.header(4, "Habits — Daily Pillars");
+if (isPaused) {
+  dv.paragraph("> **Paused** — resumes when uni starts (June 2026).");
+  return;
+}
+
+const tasks = dv.page("HABITS").file.tasks;
+for (const t of tasks.values) {
+  const icon = t.completed ? "✅" : "⬜";
+  dv.paragraph(`${icon} ${t.text}`);
+}
+```
