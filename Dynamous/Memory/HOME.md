@@ -129,3 +129,35 @@ for (const p of recent) {
   dv.paragraph(`${when} — ${p.file.link}`);
 }
 ```
+
+## System — Heartbeat
+
+```dataviewjs
+const raw = await dv.io.load("state/heartbeat-state.json");
+dv.header(4, "System — Heartbeat");
+
+if (!raw) {
+  dv.paragraph("_No heartbeat state yet. Run `py .claude/scripts/heartbeat.py` once._");
+  return;
+}
+
+const state = JSON.parse(raw);
+const ts = state.timestamp ? new Date(state.timestamp * 1000) : null;
+const now = new Date();
+const ageMin = ts ? Math.round((now - ts) / 60_000) : null;
+
+dv.paragraph(`**Last tick:** ${ts ? ts.toLocaleString() : "unknown"} (${ageMin ?? "?"}m ago)`);
+
+const integrations = ["discord", "github", "inbox"];
+for (const name of integrations) {
+  const section = state[name];
+  const ok = section && !section.error;
+  const icon = ok ? "🟢" : "🔴";
+  const detail = ok
+    ? (name === "discord" ? `${section.new_count} msgs` :
+       name === "github"  ? `${section.push_count} pushes` :
+       `${section.count} files`)
+    : (section?.error ?? "not polled");
+  dv.paragraph(`${icon} **${name}** — ${detail}`);
+}
+```
