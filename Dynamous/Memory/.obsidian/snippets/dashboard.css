@@ -1,0 +1,18 @@
+/* Dashboard card styling for HOME.md (cssclasses: dashboard) */
+
+.dashboard .dataview.dataview-error { display: none; }
+
+/* Card block around each dataviewjs output */
+.dashboard .block-language-dataviewjs {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: var(--background-secondary);
+}
+
+/* Urgency colours for the deadlines table */
+.dashboard td:first-child { font-size: 1.1em; }
+
+/* Progress bar monospace */
+.dashboard code { font-family: var(--font-monospace); letter-spacing: -0.02em; }
