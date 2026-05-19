@@ -1,3 +1,10 @@
+/* ── Full-width override (bypass readable line length) ──────────────────────── */
+.markdown-preview-view.dashboard .markdown-preview-sizer,
+.view-content.dashboard .markdown-preview-sizer {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
 /* ── Custom properties ─────────────────────────────────────────────────────── */
 .dashboard { --db-accent: #a371f7; --db-accent-rgb: 163, 113, 247; --db-dim: #7c3aed; --db-card: var(--background-secondary); }
 
