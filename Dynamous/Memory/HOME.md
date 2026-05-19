@@ -275,7 +275,7 @@ root.innerHTML = `
     <div class="db-card">
       <div class="db-label">QUICK CAPTURE</div>
       <div style="background:var(--background-primary);border-radius:4px;padding:6px 8px;margin-bottom:6px;font-size:0.8em;color:var(--text-muted);font-style:italic">Capture a thought, task, or idea...</div>
-      <button class="db-capture-btn" style="background:var(--db-accent);border:none;border-radius:4px;padding:5px;width:100%;font-size:0.8em;font-weight:700;color:#fff;cursor:pointer">+ Add to Inbox</button>
+      <button style="background:var(--db-accent);border:none;border-radius:4px;padding:5px;width:100%;font-size:0.8em;font-weight:700;color:#fff;cursor:pointer" onclick="window._dbCapture()">+ Add to Inbox</button>
     </div>
 
     <div class="db-card">
@@ -288,7 +288,7 @@ root.innerHTML = `
 </div>
 `;
 
-root.querySelector(".db-capture-btn")?.addEventListener("click", async () => {
+window._dbCapture = async () => {
   const input = window.prompt("Capture a thought, task, or idea:");
   if (!input || !input.trim()) return;
   const path = `daily/${todayStr}.md`;
@@ -297,6 +297,6 @@ root.querySelector(".db-capture-btn")?.addEventListener("click", async () => {
   const content = existing ? existing + `\n- ${input.trim()}` : `# ${todayStr}\n\n- ${input.trim()}`;
   await app.vault.adapter.write(path, content);
   new Notice("Captured to " + path);
-});
+};
 ```
 
