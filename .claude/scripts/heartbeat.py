@@ -26,7 +26,7 @@ sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts" / "integrations"))
 import _env  # noqa: F401, E402 -- side effect: loads .env into os.environ so notify can read DISCORD_BOT_TOKEN
 
-from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, discord_ping, discord_dm_capture, gcal_sync  # noqa: E402
+from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, discord_ping, discord_dm_capture, gcal_sync, vault_state_writer  # noqa: E402
 # Deadlines are now sourced from inbox classification (project documents
 # mentioning dated milestones), not Gmail/Calendar.
 from security import sanitize  # noqa: E402
@@ -100,6 +100,14 @@ def execute(actions: dict | None) -> dict:
         )
         summary["notifications"] += 1
     return summary
+
+
+def _persist(curr: dict) -> None:
+    snapshot.save_state(curr)
+    try:
+        vault_state_writer.write_all(curr)
+    except Exception as exc:
+        print(f"vault_state_writer failed: {exc}", file=sys.stderr)
 
 
 def main() -> int:
@@ -208,13 +216,13 @@ def main() -> int:
             habits.mark_nudged()
 
     if not snapshot.has_changes(diff):
-        snapshot.save_state(curr)
+        _persist(curr)
         print("No changes since last tick. Snapshot saved.")
         return 0
 
     if not llm.is_available():
         print("`claude` CLI not on PATH. Skipping reasoning step.", file=sys.stderr)
-        snapshot.save_state(curr)
+        _persist(curr)
         return 1
 
     actions = llm.call_json(
@@ -224,7 +232,7 @@ def main() -> int:
     )
 
     result = execute(actions)
-    snapshot.save_state(curr)
+    _persist(curr)
     print(f"Tick complete: {result['notifications']} notifications.")
     return 0
 
