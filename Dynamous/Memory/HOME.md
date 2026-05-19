@@ -105,18 +105,6 @@ for (const l of dlLines.filter(l => l.startsWith(todayStr))) {
   const m = l.match(/\d{4}-\d{2}-\d{2}\s*[—–-]\s*(.+?)\s*[—–-]\s*(.+)/);
   if (m) events.push({time:"00:00", title:m[2].trim(), subtitle:m[1].trim()+" · Due today"});
 }
-if (hbRaw) {
-  try {
-    if (JSON.parse(hbRaw).timestamp) {
-      const nowMins = now.getHours() * 60 + now.getMinutes();
-      for (let h = 9; h <= 21; h++) for (const min of [0, 30]) {
-        const tMins = h * 60 + min;
-        if (tMins >= nowMins - 120 && tMins <= nowMins + 120)
-          events.push({time:`${String(h).padStart(2,"0")}:${String(min).padStart(2,"0")}`, title:"Heartbeat tick", subtitle:"Automated"});
-      }
-    }
-  } catch {}
-}
 events.sort((a,b) => a.time.localeCompare(b.time));
 let nowIdx = -1;
 for (let i=0;i<events.length;i++) { if (events[i].time <= nowHHMM) nowIdx = i; }
@@ -128,6 +116,21 @@ const schedRows = events.map((ev,i) => {
     `<div style="font-size:0.7rem;color:${isNow?"var(--db-accent)":"var(--text-muted)"}">${ev.subtitle}</div></div></div>`;
 }).join("") || `<div style="color:var(--text-muted);font-style:italic;font-size:0.85em">No events today</div>`;
 const gcalNote = gcalRaw ? "" : `<div style="margin-top:7px;color:var(--text-muted);font-size:0.7rem;font-style:italic">+ GCal events once OAuth is configured</div>`;
+
+// ── RECENT NOTES ─────────────────────────────────────────────────────────────
+const NOTE_EXCLUDE = ["HOME", ".obsidian", "state/", "inbox/_processed", "finance/"];
+const recentNotes = dv.pages()
+  .where(p => !NOTE_EXCLUDE.some(x => p.file.path.includes(x)) && p.file.name !== "HOME")
+  .sort(p => p.file.mtime, "desc")
+  .limit(5);
+const recentHTML = recentNotes.length === 0
+  ? `<div style="color:var(--text-muted);font-style:italic;font-size:0.85em">No notes yet</div>`
+  : [...recentNotes].map(p => {
+      const when = p.file.mtime.toFormat("HH:mm");
+      return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8em;margin-bottom:5px">` +
+        `<span style="color:var(--db-accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${p.file.name}</span>` +
+        `<span style="color:var(--text-muted);font-size:0.7rem;flex-shrink:0;margin-left:8px">${when}</span></div>`;
+    }).join("");
 
 // ── DAILY PILLARS ─────────────────────────────────────────────────────────────
 let pillarsHTML;
@@ -232,6 +235,20 @@ root.innerHTML = `
       ${finHTML}
     </div>
 
+    <div class="db-card" style="position:relative;overflow:hidden;min-height:100px">
+      <div class="db-label">VAULT GRAPH</div>
+      <svg style="position:absolute;top:28px;left:0;width:100%;height:78px;opacity:.5" xmlns="http://www.w3.org/2000/svg">
+        <line x1="38%" y1="20" x2="57%" y2="42" stroke="#a371f7" stroke-width="1"/>
+        <line x1="38%" y1="20" x2="25%" y2="55" stroke="#a371f7" stroke-width="1"/>
+        <line x1="57%" y1="42" x2="68%" y2="22" stroke="#a371f7" stroke-width="1"/>
+        <circle cx="38%" cy="20" r="5" fill="#a371f7"/>
+        <circle cx="57%" cy="42" r="4" fill="#7c3aed"/>
+        <circle cx="25%" cy="55" r="3.5" fill="#6e40c9"/>
+        <circle cx="68%" cy="22" r="3" fill="#4a2c8a"/>
+      </svg>
+      <span style="position:absolute;bottom:8px;right:10px;color:var(--text-muted);font-size:0.6rem">Juggl</span>
+    </div>
+
   </div>
 
   <div class="db-col">
@@ -251,8 +268,8 @@ root.innerHTML = `
     </div>
 
     <div class="db-card">
-      <div class="db-label">VAULT GRAPH</div>
-      <div class="db-graph"></div>
+      <div class="db-label">RECENT NOTES</div>
+      ${recentHTML}
     </div>
 
     <div class="db-card">
@@ -283,7 +300,3 @@ root.querySelector(".db-capture-btn")?.addEventListener("click", async () => {
 });
 ```
 
-```juggl
-CURRENT
-height: 120px
-```
