@@ -213,7 +213,7 @@ function makeCalGrid(y, m) {
     const isToday = y === calYear && m === calMonth && day === todayDay;
     const hasDl   = (dlMap[k] || []).length > 0;
     cells.push(
-      `<div style="text-align:center;padding:3px 1px;border-radius:4px;background:${isToday?"var(--db-accent)":"transparent"};cursor:${hasDl?"pointer":"default"}"${hasDl?` onclick="window._dbShowDlDay('${k}')"`:""}>`+
+      `<div style="text-align:center;padding:3px 1px;border-radius:4px;background:${isToday?"var(--db-accent)":"transparent"};cursor:pointer" onclick="window._dbOpenDay('${k}')">`+
       `<span style="font-size:0.75rem;color:${isToday?"#fff":hasDl?"var(--text-normal)":"var(--text-muted)"};font-weight:${isToday||hasDl?"600":"400"}">${day}</span>`+
       (hasDl&&!isToday?`<div style="width:4px;height:4px;border-radius:50%;background:var(--db-accent);margin:1px auto 0"></div>`:`<div style="height:5px"></div>`)+
       `</div>`
@@ -373,6 +373,14 @@ window._dbNavMonth = (delta) => {
   root.querySelector("#db-cal-dlcount").textContent = `${dls.length} deadline${dls.length===1?"":"s"} this month`;
   root.querySelector("#db-cal-dllist").innerHTML = makeDlList(dls);
   window._dbCalIdx = next;
+};
+
+window._dbOpenDay = async (k) => {
+  const path = `daily/${k}.md`;
+  let exists = true;
+  try { await app.vault.adapter.stat(path); } catch { exists = false; }
+  if (!exists) await app.vault.adapter.write(path, `# ${k}\n`);
+  app.workspace.openLinkText(path, "", false);
 };
 
 window._dbShowDlDay = (k) => {
