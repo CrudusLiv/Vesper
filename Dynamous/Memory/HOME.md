@@ -111,3 +111,21 @@ if (!projLines.length) {
   for (const l of projLines) dv.paragraph(l.replace(/^- /, ""));
 }
 ```
+
+## Recent Notes
+
+```dataviewjs
+const EXCLUDE = [".obsidian", "state/", "inbox/_processed", "HOME"];
+const recent = dv.pages()
+  .where(p => !EXCLUDE.some(x => p.file.path.includes(x)))
+  .sort(p => p.file.mtime, "desc")
+  .slice(0, 5);
+
+dv.header(4, "Recent Notes");
+if (!recent.length) { dv.paragraph("_No notes yet._"); return; }
+
+for (const p of recent) {
+  const when = p.file.mtime.toFormat("MM-dd HH:mm");
+  dv.paragraph(`${when} — ${p.file.link}`);
+}
+```
