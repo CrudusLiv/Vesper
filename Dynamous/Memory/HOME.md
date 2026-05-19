@@ -184,6 +184,49 @@ if (!hbRaw) {
   }
 }
 
+// ── CALENDAR ─────────────────────────────────────────────────────────────────
+const calYear  = now.getFullYear();
+const calMonth = now.getMonth();
+const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+const startDow    = (new Date(calYear, calMonth, 1).getDay() + 6) % 7; // Mon=0
+
+const dlMap = {};
+for (const d of futureDeadlines) {
+  const k = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+  (dlMap[k] = dlMap[k] || []).push({title: d.title, course: d.course});
+}
+
+const dayHdrs = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(h =>
+  `<div style="text-align:center;font-size:0.6rem;color:var(--text-muted);padding-bottom:6px;font-weight:600">${h}</div>`
+).join("");
+
+let calCells = Array(startDow).fill(`<div></div>`);
+for (let day = 1; day <= daysInMonth; day++) {
+  const k = `${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+  const isToday = day === now.getDate();
+  const dls = dlMap[k] || [];
+  calCells.push(
+    `<div style="text-align:center;padding:3px 1px;border-radius:4px;background:${isToday?"var(--db-accent)":"transparent"}">` +
+    `<span style="font-size:0.75rem;color:${isToday?"#fff":dls.length?"var(--text-normal)":"var(--text-muted)"};font-weight:${isToday||dls.length?"600":"400"}">${day}</span>` +
+    (dls.length && !isToday ? `<div style="width:4px;height:4px;border-radius:50%;background:var(--db-accent);margin:1px auto 0"></div>` : `<div style="height:5px"></div>`) +
+    `</div>`
+  );
+}
+
+const upcomingDls = futureDeadlines.slice(0, 8);
+const dlListHTML = upcomingDls.length === 0
+  ? `<div style="color:var(--text-muted);font-style:italic;font-size:0.8em">No upcoming deadlines</div>`
+  : upcomingDls.map(d => {
+      const daysLeft = Math.ceil((d.date - new Date(now.getFullYear(),now.getMonth(),now.getDate())) / 864e5);
+      const urgColor = daysLeft <= 1 ? "#f85149" : daysLeft <= 3 ? "#d29922" : "var(--text-muted)";
+      return `<div style="display:flex;align-items:center;gap:10px;font-size:0.78rem;padding:4px 0;border-bottom:1px solid var(--background-modifier-border)">` +
+        `<span style="color:var(--db-accent);font-weight:700;min-width:28px;text-align:center">${d.date.getDate()}</span>` +
+        `<span style="flex:1;color:var(--text-normal)">${d.title}</span>` +
+        `<span style="color:var(--text-muted);font-size:0.7rem">${d.course}</span>` +
+        `<span style="color:${urgColor};font-size:0.7rem;min-width:40px;text-align:right">${daysLeft === 0 ? "today" : daysLeft === 1 ? "tmrw" : `${daysLeft}d`}</span>` +
+        `</div>`;
+    }).join("");
+
 // ── RENDER ────────────────────────────────────────────────────────────────────
 const root = dv.container;
 root.innerHTML = `
@@ -271,6 +314,23 @@ root.innerHTML = `
 
   </div>
 
+</div>
+
+<div class="db-card" style="margin-top:10px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div class="db-label" style="margin-bottom:0">CALENDAR — ${monthLabel}</div>
+    <span style="color:var(--text-muted);font-size:0.65rem">${upcomingDls.length} deadline${upcomingDls.length===1?"":"s"} this month</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:16px">
+    <div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px">${dayHdrs}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">${calCells.join("")}</div>
+    </div>
+    <div style="border-left:1px solid var(--background-modifier-border);padding-left:16px">
+      <div class="db-label" style="margin-bottom:6px">UPCOMING</div>
+      ${dlListHTML}
+    </div>
+  </div>
 </div>
 `;
 
