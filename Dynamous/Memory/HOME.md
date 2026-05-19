@@ -52,3 +52,24 @@ for (const t of tasks.values) {
   dv.paragraph(`${icon} ${t.text}`);
 }
 ```
+
+## Inbox
+
+```dataviewjs
+const discord = dv.page("state/discord-recent");
+const github = dv.page("state/github-counts");
+const inboxCount = dv.pages('"inbox"')
+  .where(p => !p.file.path.includes("_processed") && !p.file.name.startsWith("."))
+  .length;
+
+dv.header(4, "Inbox");
+dv.paragraph(`**Discord DMs:** ${discord?.unread_dms ?? "_not synced_"}`);
+dv.paragraph(`**GitHub pushes:** ${github?.prs_open ?? "_not synced_"}`);
+dv.paragraph(`**Vault inbox:** ${inboxCount} file(s)`);
+
+if (discord) {
+  const dmRaw = await dv.io.load("state/discord-recent.md");
+  const body = dmRaw ? dmRaw.replace(/^---[\s\S]*?---\n/, "").trim() : "";
+  if (body) dv.paragraph(body);
+}
+```
