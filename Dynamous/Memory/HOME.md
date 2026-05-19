@@ -274,7 +274,7 @@ root.innerHTML = `
 
     <div class="db-card">
       <div class="db-label">QUICK CAPTURE</div>
-      <div style="background:var(--background-primary);border-radius:4px;padding:6px 8px;margin-bottom:6px;font-size:0.8em;color:var(--text-muted);font-style:italic">Capture a thought, task, or idea...</div>
+      <input id="db-capture-input" type="text" placeholder="Capture a thought, task, or idea..." style="background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:4px;padding:6px 8px;margin-bottom:6px;font-size:0.8em;width:100%;box-sizing:border-box;color:var(--text-normal)" onkeydown="if(event.key==='Enter')window._dbCapture()"/>
       <button style="background:var(--db-accent);border:none;border-radius:4px;padding:5px;width:100%;font-size:0.8em;font-weight:700;color:#fff;cursor:pointer" onclick="window._dbCapture()">+ Add to Inbox</button>
     </div>
 
@@ -289,13 +289,15 @@ root.innerHTML = `
 `;
 
 window._dbCapture = async () => {
-  const input = window.prompt("Capture a thought, task, or idea:");
-  if (!input || !input.trim()) return;
+  const inputEl = root.querySelector("#db-capture-input");
+  const input = inputEl?.value?.trim();
+  if (!input) return;
   const path = `daily/${todayStr}.md`;
   let existing = "";
   try { existing = await app.vault.adapter.read(path); } catch {}
-  const content = existing ? existing + `\n- ${input.trim()}` : `# ${todayStr}\n\n- ${input.trim()}`;
+  const content = existing ? existing + `\n- ${input}` : `# ${todayStr}\n\n- ${input}`;
   await app.vault.adapter.write(path, content);
+  if (inputEl) inputEl.value = "";
   new Notice("Captured to " + path);
 };
 ```
