@@ -187,45 +187,68 @@ if (!hbRaw) {
 // ── CALENDAR ─────────────────────────────────────────────────────────────────
 const calYear  = now.getFullYear();
 const calMonth = now.getMonth();
-const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-const startDow    = (new Date(calYear, calMonth, 1).getDay() + 6) % 7; // Mon=0
+const todayDay = now.getDate();
+
+// Build deadline map from ALL deadlines (not just future) so past months show dots
+const allDeadlines = dlLines
+  .map(l => { const m = l.match(/^(\d{4}-\d{2}-\d{2})\s*[—–-]\s*(.+?)\s*[—–-]\s*(.+)/); return m ? {date:new Date(m[1]+"T00:00:00"),course:m[2].trim(),title:m[3].trim()} : null; })
+  .filter(Boolean).sort((a,b) => a.date - b.date);
 
 const dlMap = {};
-for (const d of futureDeadlines) {
+for (const d of allDeadlines) {
   const k = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
-  (dlMap[k] = dlMap[k] || []).push({title: d.title, course: d.course});
+  (dlMap[k] = dlMap[k] || []).push(d);
 }
 
 const dayHdrs = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(h =>
   `<div style="text-align:center;font-size:0.6rem;color:var(--text-muted);padding-bottom:6px;font-weight:600">${h}</div>`
 ).join("");
 
-let calCells = Array(startDow).fill(`<div></div>`);
-for (let day = 1; day <= daysInMonth; day++) {
-  const k = `${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-  const isToday = day === now.getDate();
-  const dls = dlMap[k] || [];
-  calCells.push(
-    `<div style="text-align:center;padding:3px 1px;border-radius:4px;background:${isToday?"var(--db-accent)":"transparent"}">` +
-    `<span style="font-size:0.75rem;color:${isToday?"#fff":dls.length?"var(--text-normal)":"var(--text-muted)"};font-weight:${isToday||dls.length?"600":"400"}">${day}</span>` +
-    (dls.length && !isToday ? `<div style="width:4px;height:4px;border-radius:50%;background:var(--db-accent);margin:1px auto 0"></div>` : `<div style="height:5px"></div>`) +
-    `</div>`
-  );
+function makeCalGrid(y, m) {
+  const days    = new Date(y, m + 1, 0).getDate();
+  const startDow = (new Date(y, m, 1).getDay() + 6) % 7;
+  let cells = Array(startDow).fill(`<div></div>`);
+  for (let day = 1; day <= days; day++) {
+    const k = `${y}-${String(m+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    const isToday = y === calYear && m === calMonth && day === todayDay;
+    const hasDl   = (dlMap[k] || []).length > 0;
+    cells.push(
+      `<div style="text-align:center;padding:3px 1px;border-radius:4px;background:${isToday?"var(--db-accent)":"transparent"};cursor:${hasDl?"pointer":"default"}"${hasDl?` onclick="window._dbShowDlDay('${k}')"`:""}>`+
+      `<span style="font-size:0.75rem;color:${isToday?"#fff":hasDl?"var(--text-normal)":"var(--text-muted)"};font-weight:${isToday||hasDl?"600":"400"}">${day}</span>`+
+      (hasDl&&!isToday?`<div style="width:4px;height:4px;border-radius:50%;background:var(--db-accent);margin:1px auto 0"></div>`:`<div style="height:5px"></div>`)+
+      `</div>`
+    );
+  }
+  return `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px">${dayHdrs}</div>`+
+         `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">${cells.join("")}</div>`;
 }
 
-const upcomingDls = futureDeadlines.slice(0, 8);
-const dlListHTML = upcomingDls.length === 0
-  ? `<div style="color:var(--text-muted);font-style:italic;font-size:0.8em">No upcoming deadlines</div>`
-  : upcomingDls.map(d => {
-      const daysLeft = Math.ceil((d.date - new Date(now.getFullYear(),now.getMonth(),now.getDate())) / 864e5);
-      const urgColor = daysLeft <= 1 ? "#f85149" : daysLeft <= 3 ? "#d29922" : "var(--text-muted)";
-      return `<div style="display:flex;align-items:center;gap:10px;font-size:0.78rem;padding:4px 0;border-bottom:1px solid var(--background-modifier-border)">` +
-        `<span style="color:var(--db-accent);font-weight:700;min-width:28px;text-align:center">${d.date.getDate()}</span>` +
-        `<span style="flex:1;color:var(--text-normal)">${d.title}</span>` +
-        `<span style="color:var(--text-muted);font-size:0.7rem">${d.course}</span>` +
-        `<span style="color:${urgColor};font-size:0.7rem;min-width:40px;text-align:right">${daysLeft === 0 ? "today" : daysLeft === 1 ? "tmrw" : `${daysLeft}d`}</span>` +
-        `</div>`;
-    }).join("");
+function makeDlList(dls) {
+  if (!dls.length) return `<div style="color:var(--text-muted);font-style:italic;font-size:0.8em">No deadlines this month</div>`;
+  const today0 = new Date(calYear, calMonth, todayDay);
+  return dls.slice(0,8).map(d => {
+    const daysLeft = Math.ceil((d.date - today0) / 864e5);
+    const urgColor = daysLeft < 0 ? "var(--text-muted)" : daysLeft <= 1 ? "#f85149" : daysLeft <= 3 ? "#d29922" : "var(--text-muted)";
+    const label    = daysLeft < 0 ? `${Math.abs(daysLeft)}d ago` : daysLeft === 0 ? "today" : daysLeft === 1 ? "tmrw" : `${daysLeft}d`;
+    return `<div style="display:flex;align-items:center;gap:10px;font-size:0.78rem;padding:5px 0;border-bottom:1px solid var(--background-modifier-border);cursor:pointer" onclick="window._dbOpenNote('DEADLINES.md')">`+
+      `<span style="color:var(--db-accent);font-weight:700;min-width:28px;text-align:center">${d.date.getDate()}</span>`+
+      `<span style="flex:1;color:var(--text-normal)">${d.title}</span>`+
+      `<span style="color:var(--text-muted);font-size:0.7rem;white-space:nowrap">${d.course}</span>`+
+      `<span style="color:${urgColor};font-size:0.7rem;min-width:42px;text-align:right;font-weight:600">${label}</span>`+
+      `</div>`;
+  }).join("");
+}
+
+// Pre-generate 5 months: 2 back, current, 2 ahead
+const CAL_MONTHS = [-2,-1,0,1,2].map(offset => {
+  const total = calMonth + offset;
+  const y = calYear + Math.floor(total / 12);
+  const m = ((total % 12) + 12) % 12;
+  const label = new Date(y, m, 1).toLocaleDateString("en-MY",{month:"long",year:"numeric"}).toUpperCase();
+  const dls   = allDeadlines.filter(d => d.date.getFullYear()===y && d.date.getMonth()===m);
+  return { y, m, label, grid: makeCalGrid(y, m), dls };
+});
+const CAL_START_IDX = 2; // index of current month
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
 const root = dv.container;
@@ -318,23 +341,47 @@ root.innerHTML = `
 
 <div class="db-card" style="margin-top:10px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-    <div class="db-label" style="margin-bottom:0">CALENDAR — ${monthLabel}</div>
-    <span style="color:var(--text-muted);font-size:0.65rem">${upcomingDls.length} deadline${upcomingDls.length===1?"":"s"} this month</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button onclick="window._dbNavMonth(-1)" style="background:transparent;border:1px solid var(--background-modifier-border);border-radius:4px;color:var(--text-muted);cursor:pointer;font-size:0.9rem;padding:1px 7px;line-height:1.4">‹</button>
+      <div class="db-label" id="db-cal-label" style="margin-bottom:0">${CAL_MONTHS[CAL_START_IDX].label}</div>
+      <button onclick="window._dbNavMonth(1)"  style="background:transparent;border:1px solid var(--background-modifier-border);border-radius:4px;color:var(--text-muted);cursor:pointer;font-size:0.9rem;padding:1px 7px;line-height:1.4">›</button>
+    </div>
+    <span id="db-cal-dlcount" style="color:var(--text-muted);font-size:0.65rem">${CAL_MONTHS[CAL_START_IDX].dls.length} deadline${CAL_MONTHS[CAL_START_IDX].dls.length===1?"":"s"} this month</span>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:16px">
     <div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px">${dayHdrs}</div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">${calCells.join("")}</div>
+      ${CAL_MONTHS.map((cm,i)=>`<div id="db-cal-grid-${i}" style="display:${i===CAL_START_IDX?"block":"none"}">${cm.grid}</div>`).join("")}
     </div>
     <div style="border-left:1px solid var(--background-modifier-border);padding-left:16px">
-      <div class="db-label" style="margin-bottom:6px">UPCOMING</div>
-      ${dlListHTML}
+      <div class="db-label" style="margin-bottom:6px">DEADLINES</div>
+      <div id="db-cal-dllist">${makeDlList(CAL_MONTHS[CAL_START_IDX].dls)}</div>
     </div>
   </div>
 </div>
 `;
 
 window._dbOpenNote = (path) => app.workspace.openLinkText(path, "", false);
+
+window._dbCalIdx = CAL_START_IDX;
+window._dbNavMonth = (delta) => {
+  const next = Math.max(0, Math.min(CAL_MONTHS.length - 1, window._dbCalIdx + delta));
+  if (next === window._dbCalIdx) return;
+  root.querySelector(`#db-cal-grid-${window._dbCalIdx}`).style.display = "none";
+  root.querySelector(`#db-cal-grid-${next}`).style.display = "block";
+  root.querySelector("#db-cal-label").textContent = CAL_MONTHS[next].label;
+  const dls = CAL_MONTHS[next].dls;
+  root.querySelector("#db-cal-dlcount").textContent = `${dls.length} deadline${dls.length===1?"":"s"} this month`;
+  root.querySelector("#db-cal-dllist").innerHTML = makeDlList(dls);
+  window._dbCalIdx = next;
+};
+
+window._dbShowDlDay = (k) => {
+  const dls = dlMap[k] || [];
+  if (!dls.length) return;
+  const d = new Date(k+"T00:00:00");
+  const label = d.toLocaleDateString("en-MY",{weekday:"short",day:"numeric",month:"short"});
+  new Notice(`${label}\n\n${dls.map(x=>`📌 ${x.title}  —  ${x.course}`).join("\n")}`, 6000);
+};
 
 window._dbCapture = async () => {
   const inputEl = root.querySelector("#db-capture-input");
