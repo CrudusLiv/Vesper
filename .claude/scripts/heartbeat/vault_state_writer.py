@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -80,7 +80,39 @@ def write_heartbeat_state(snapshot: dict) -> None:
     )
 
 
+def write_gcal_today(snapshot: dict) -> None:
+    gcal = snapshot.get("gcal") or {}
+    if "error" in gcal or not gcal.get("events"):
+        return
+
+    kl = timezone(timedelta(hours=8))
+    today = datetime.now(tz=kl).date()
+
+    events = []
+    for e in gcal.get("events", []):
+        try:
+            start_dt = datetime.fromisoformat(e.get("start", ""))
+        except ValueError:
+            continue
+        if start_dt.date() != today:
+            continue
+        events.append((start_dt.strftime("%H:%M"), e.get("summary", "(no title)")))
+
+    if not events:
+        return
+
+    events.sort()
+    lines = ["---", f"generated: {_iso()}", f"date: {today}", "---", ""]
+    for time_str, summary in events:
+        lines.append(f"- {time_str}: {summary}")
+
+    d = _vault_state_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "gcal-today.md").write_text("\n".join(lines), encoding="utf-8")
+
+
 def write_all(snapshot: dict) -> None:
     write_discord(snapshot)
     write_github(snapshot)
+    write_gcal_today(snapshot)
     write_heartbeat_state(snapshot)

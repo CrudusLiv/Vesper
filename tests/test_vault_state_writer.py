@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 import pytest
 
@@ -82,3 +83,57 @@ def test_write_all_creates_all_files(tmp_vault):
     assert (state / "discord-recent.md").exists()
     assert (state / "github-counts.md").exists()
     assert (state / "heartbeat-state.json").exists()
+
+
+# ── write_gcal_today ──────────────────────────────────────────────────────────
+
+def _today_kl_str() -> str:
+    from datetime import timezone, timedelta
+    kl = timezone(timedelta(hours=8))
+    return datetime.now(tz=kl).strftime("%Y-%m-%d")
+
+def _yesterday_kl_str() -> str:
+    from datetime import timezone, timedelta
+    kl = timezone(timedelta(hours=8))
+    return (datetime.now(tz=kl) - timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+def test_write_gcal_today_filters_to_today(tmp_vault):
+    from heartbeat import vault_state_writer
+    today = _today_kl_str()
+    yesterday = _yesterday_kl_str()
+    snap = {"gcal": {"events": [
+        {"start": f"{today}T09:00:00+08:00",     "summary": "Morning standup"},
+        {"start": f"{yesterday}T18:00:00+08:00", "summary": "Yesterday's event"},
+        {"start": f"{today}T14:30:00+08:00",     "summary": "Afternoon review"},
+    ]}}
+    vault_state_writer.write_gcal_today(snap)
+
+    out = tmp_vault / "state" / "gcal-today.md"
+    assert out.exists()
+    text = out.read_text(encoding="utf-8")
+    assert "Morning standup" in text
+    assert "Afternoon review" in text
+    assert "Yesterday" not in text
+
+
+def test_write_gcal_today_skips_on_error(tmp_vault):
+    from heartbeat import vault_state_writer
+    vault_state_writer.write_gcal_today({"gcal": {"error": "oauth not configured"}})
+    assert not (tmp_vault / "state" / "gcal-today.md").exists()
+
+
+def test_write_gcal_today_skips_when_no_events(tmp_vault):
+    from heartbeat import vault_state_writer
+    vault_state_writer.write_gcal_today({"gcal": {}})
+    assert not (tmp_vault / "state" / "gcal-today.md").exists()
+
+
+def test_write_all_creates_gcal_today(tmp_vault):
+    from heartbeat import vault_state_writer
+    today = _today_kl_str()
+    snap = {**SNAP_FULL, "gcal": {"events": [
+        {"start": f"{today}T10:00:00+08:00", "summary": "Test event"}
+    ]}}
+    vault_state_writer.write_all(snap)
+    assert (tmp_vault / "state" / "gcal-today.md").exists()
