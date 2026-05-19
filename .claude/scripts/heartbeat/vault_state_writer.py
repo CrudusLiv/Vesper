@@ -17,7 +17,9 @@ def _vault_state_dir() -> Path:
 
 
 def _iso(ts: float | None = None) -> str:
-    t = datetime.fromtimestamp(ts or time.time(), tz=timezone.utc)
+    if ts is None:
+        ts = time.time()
+    t = datetime.fromtimestamp(ts, tz=timezone.utc)
     return t.strftime("%Y-%m-%dT%H:%M:%S")
 
 
