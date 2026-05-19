@@ -235,19 +235,6 @@ root.innerHTML = `
       ${finHTML}
     </div>
 
-    <div class="db-card" style="position:relative;overflow:hidden;min-height:100px">
-      <div class="db-label">VAULT GRAPH</div>
-      <svg style="position:absolute;top:28px;left:0;width:100%;height:78px;opacity:.5" xmlns="http://www.w3.org/2000/svg">
-        <line x1="38%" y1="20" x2="57%" y2="42" stroke="#a371f7" stroke-width="1"/>
-        <line x1="38%" y1="20" x2="25%" y2="55" stroke="#a371f7" stroke-width="1"/>
-        <line x1="57%" y1="42" x2="68%" y2="22" stroke="#a371f7" stroke-width="1"/>
-        <circle cx="38%" cy="20" r="5" fill="#a371f7"/>
-        <circle cx="57%" cy="42" r="4" fill="#7c3aed"/>
-        <circle cx="25%" cy="55" r="3.5" fill="#6e40c9"/>
-        <circle cx="68%" cy="22" r="3" fill="#4a2c8a"/>
-      </svg>
-      <span style="position:absolute;bottom:8px;right:10px;color:var(--text-muted);font-size:0.6rem">Juggl</span>
-    </div>
 
   </div>
 

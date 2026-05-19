@@ -50,9 +50,6 @@
   text-transform: uppercase;
 }
 
-/* ── Vault graph container ──────────────────────────────────────────────────── */
-.db-graph { height: 120px; border-radius: 6px; overflow: hidden; }
-
 /* ── Strip card border from outer dataviewjs block (cards are rendered inside) ─ */
 .dashboard .block-language-dataviewjs {
   border: none;
