@@ -73,3 +73,41 @@ if (discord) {
   if (body) dv.paragraph(body);
 }
 ```
+
+## Deadlines + Projects
+
+```dataviewjs
+const dlRaw = await dv.io.load("DEADLINES.md");
+const projRaw = await dv.io.load("PROJECTS.md");
+
+dv.header(4, "Deadlines");
+
+const now = new Date();
+const dlLines = (dlRaw || "").split("\n")
+  .filter(l => /^\d{4}-\d{2}-\d{2}/.test(l.trim()));
+
+if (!dlLines.length) {
+  dv.paragraph("_No active deadlines._");
+} else {
+  const rows = dlLines.map(l => {
+    const parts = l.split(" — ");
+    const date = parts[0]?.trim();
+    const course = parts[1]?.trim() ?? "";
+    const title = parts.slice(2).join(" — ").trim();
+    const d = new Date(date);
+    const hoursLeft = (d - now) / 3_600_000;
+    const flag = hoursLeft <= 24 ? "🔴" : hoursLeft <= 72 ? "🟡" : "⚪";
+    return [flag, date, course, title];
+  });
+  dv.table(["", "Date", "Course", "Title"], rows);
+}
+
+dv.header(4, "Active Projects");
+const projLines = (projRaw || "").split("\n")
+  .filter(l => l.match(/^- \*\*/));
+if (!projLines.length) {
+  dv.paragraph("_No active projects._");
+} else {
+  for (const l of projLines) dv.paragraph(l.replace(/^- /, ""));
+}
+```
