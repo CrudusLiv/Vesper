@@ -25,8 +25,8 @@ const [dlRaw, projRaw, gcalRaw, hbRaw, habitsRaw, finRaw] = await Promise.all([
 // ── CURRENT FOCUS ─────────────────────────────────────────────────────────────
 const dlLines = (dlRaw||"").split("\n").filter(l => /^\d{4}-\d{2}-\d{2}/.test(l.trim()));
 const futureDeadlines = dlLines
-  .map(l => { const m = l.match(/^(\d{4}-\d{2}-\d{2})\s*[—–-]\s*(.+?)\s*[—–-]\s*(.+)/); return m ? {date:new Date(m[1]),course:m[2].trim(),title:m[3].trim()} : null; })
-  .filter(d => d && d.date >= now)
+  .map(l => { const m = l.match(/^(\d{4}-\d{2}-\d{2})\s*[—–-]\s*(.+?)\s*[—–-]\s*(.+)/); return m ? {date:new Date(m[1]+"T00:00:00"),course:m[2].trim(),title:m[3].trim()} : null; })
+  .filter(d => d && d.date >= new Date(now.getFullYear(), now.getMonth(), now.getDate()))
   .sort((a,b) => a.date - b.date);
 
 let focusTitle = "No active focus", focusSubtitle = "", focusMilestone = "", focusNext = "", focusColor = "var(--text-muted)";
@@ -102,8 +102,12 @@ for (const l of dlLines.filter(l => l.startsWith(todayStr))) {
 if (hbRaw) {
   try {
     if (JSON.parse(hbRaw).timestamp) {
-      for (let h=9;h<=21;h++) for (const min of [0,30])
-        events.push({time:`${String(h).padStart(2,"0")}:${String(min).padStart(2,"0")}`, title:"Heartbeat tick", subtitle:"Automated"});
+      const nowMins = now.getHours() * 60 + now.getMinutes();
+      for (let h = 9; h <= 21; h++) for (const min of [0, 30]) {
+        const tMins = h * 60 + min;
+        if (tMins >= nowMins - 120 && tMins <= nowMins + 120)
+          events.push({time:`${String(h).padStart(2,"0")}:${String(min).padStart(2,"0")}`, title:"Heartbeat tick", subtitle:"Automated"});
+      }
     }
   } catch {}
 }
@@ -134,7 +138,7 @@ if (!habitsPage) {
 }
 
 // ── HEARTBEAT ─────────────────────────────────────────────────────────────────
-let hbHTML;
+let hbHTML = "";
 if (!hbRaw) {
   hbHTML = `<div style="color:var(--text-muted);font-style:italic;font-size:0.85em">No heartbeat data yet</div>`;
 } else {
