@@ -7,7 +7,7 @@ cssclasses:
 const now      = new Date();
 const monthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
 const monthLabel = now.toLocaleDateString("en-MY",{month:"long",year:"numeric"}).toUpperCase();
-const todayStr = now.toISOString().slice(0,10);
+const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
 const nowHHMM  = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
 const dateStr  = now.toLocaleDateString("en-MY",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
 const BUDGET   = 1500;
@@ -29,7 +29,7 @@ const futureDeadlines = dlLines
   .filter(d => d && d.date >= new Date(now.getFullYear(), now.getMonth(), now.getDate()))
   .sort((a,b) => a.date - b.date);
 
-let focusTitle = "No active focus", focusSubtitle = "", focusMilestone = "", focusNext = "", focusColor = "var(--text-muted)";
+let focusTitle = "No active focus", focusSubtitle = "Add deadlines to DEADLINES.md", focusMilestone = "", focusNext = "", focusColor = "var(--text-muted)";
 if (futureDeadlines.length > 0) {
   const nd = futureDeadlines[0];
   const h = (nd.date - now) / 36e5;
@@ -58,7 +58,7 @@ function cleanText(raw) {
   return String(raw).replace(/\[.*?\]/g,"").replace(/\*\*(.+?)\*\*/g,"$1").replace(/_([^_]+)_/g,"$1").trim();
 }
 const taskRows = topTasks.map(t =>
-  `<div style="display:flex;align-items:center;gap:7px;background:var(--background-primary);border-radius:4px;padding:5px 8px">` +
+  `<div style="display:flex;align-items:center;gap:7px;background:var(--background-primary);border-radius:4px;padding:5px 8px;cursor:pointer" onclick="window._dbOpenNote('${t.path}')">` +
   `<div style="width:5px;height:5px;border-radius:50%;background:${dotColor(t)};flex-shrink:0"></div>` +
   `<span style="font-size:0.8em">${cleanText(t.text)}</span></div>`
 ).join("");
@@ -79,8 +79,7 @@ if (finRaw) {
   const catRows    = [...finRaw.matchAll(/\|\s+`(\w+)`\s+\|\s+RM\s+([\d,]+)\s+\|\s+([\d.]+)%/g)]
     .map(m => ({name:m[1], amt:parseFloat(m[2].replace(/,/g,"")), pct:parseInt(m[3])}));
   finHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
-      <span></span>
+    <div style="display:flex;justify-content:flex-end;align-items:baseline;margin-bottom:7px">
       <span style="font-weight:700;font-size:11px">RM ${total.toLocaleString()} <span style="color:var(--text-muted);font-weight:400;font-size:0.65rem">/ ${BUDGET}</span></span>
     </div>
     <div style="background:var(--background-modifier-border);height:4px;border-radius:2px;margin-bottom:9px">
@@ -118,7 +117,7 @@ const schedRows = events.map((ev,i) => {
 const gcalNote = gcalRaw ? "" : `<div style="margin-top:7px;color:var(--text-muted);font-size:0.7rem;font-style:italic">+ GCal events once OAuth is configured</div>`;
 
 // ── RECENT NOTES ─────────────────────────────────────────────────────────────
-const NOTE_EXCLUDE = ["HOME", ".obsidian", "state/", "inbox/_processed", "finance/"];
+const NOTE_EXCLUDE = ["HOME", "SOUL", "DEADLINES", "PROJECTS", "MEMORY", "HEARTBEAT", "HABITS", ".obsidian", "state/", "inbox/_processed", "finance/"];
 const recentNotes = dv.pages()
   .where(p => !NOTE_EXCLUDE.some(x => p.file.path.includes(x)) && p.file.name !== "HOME")
   .sort(p => p.file.mtime, "desc")
