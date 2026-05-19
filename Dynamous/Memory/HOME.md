@@ -128,7 +128,7 @@ const recentHTML = recentNotes.length === 0
   : [...recentNotes].map(p => {
       const when = p.file.mtime.toFormat("HH:mm");
       return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8em;margin-bottom:5px">` +
-        `<span style="color:var(--db-accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${p.file.name}</span>` +
+        `<span style="color:var(--db-accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;cursor:pointer" onclick="window._dbOpenNote('${p.file.path}')">${p.file.name}</span>` +
         `<span style="color:var(--text-muted);font-size:0.7rem;flex-shrink:0;margin-left:8px">${when}</span></div>`;
     }).join("");
 
@@ -274,6 +274,8 @@ root.innerHTML = `
 
 </div>
 `;
+
+window._dbOpenNote = (path) => app.workspace.openLinkText(path, "", false);
 
 window._dbCapture = async () => {
   const inputEl = root.querySelector("#db-capture-input");
