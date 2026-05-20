@@ -429,7 +429,10 @@ root.innerHTML = `
       <div style="font-size:18px;font-weight:700;color:var(--text-normal);margin-bottom:2px">Second Brain</div>
       <div style="color:var(--text-muted);font-size:0.8em">${dateStr} · Kuala Lumpur</div>
     </div>
-    <button onclick="window._dbToggleEditMode()" style="background:rgba(163,113,247,0.12);border:1px solid rgba(163,113,247,0.35);border-radius:4px;color:#a371f7;font-size:0.7rem;padding:4px 10px;cursor:pointer;margin-top:2px;flex-shrink:0">⊞ Edit Layout</button>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:2px;flex-shrink:0">
+      <button onclick="window._dbRefresh()" style="background:rgba(163,113,247,0.08);border:1px solid rgba(163,113,247,0.25);border-radius:4px;color:#a371f7;font-size:0.7rem;padding:4px 10px;cursor:pointer">↻ Refresh</button>
+      <button onclick="window._dbToggleEditMode()" style="background:rgba(163,113,247,0.12);border:1px solid rgba(163,113,247,0.35);border-radius:4px;color:#a371f7;font-size:0.7rem;padding:4px 10px;cursor:pointer">⊞ Edit Layout</button>
+    </div>
   </div>
   <div id="db-header-edit" style="display:none;justify-content:space-between;align-items:center;margin-bottom:12px">
     <div>
@@ -469,6 +472,20 @@ ${renderGrid(layout)}
 `;
 
 window._dbOpenNote = (path) => app.workspace.openLinkText(path, "", false);
+
+function _dbForceRefresh() {
+  const view = app.workspace.activeLeaf?.view;
+  if (view?.previewMode) {
+    view.previewMode.rerender(true);
+  } else {
+    // fallback: Dataview index bump
+    const dvp = app.plugins.plugins["dataview"];
+    if (dvp?.index) dvp.index.revision = (dvp.index.revision ?? 0) + 1;
+    app.metadataCache.trigger("dataview:refresh-views");
+  }
+}
+window._dbRefresh = _dbForceRefresh;
+
 
 window._dbCalIdx = CAL_START_IDX;
 window._dbNavMonth = (delta) => {
@@ -579,9 +596,7 @@ window._dbLockLayout = async function() {
 
 window._dbResetLayout = async function() {
   try { await app.vault.adapter.remove("state/dashboard-layout.json"); } catch {}
-  const leaf = app.workspace.activeLeaf;
-  const file = leaf?.view?.file;
-  if (file) await leaf.openFile(file);
+  _dbForceRefresh();
 };
 
 window._dbAddColumn = function() {
