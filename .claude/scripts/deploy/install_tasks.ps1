@@ -140,9 +140,10 @@ $idxRepeatSrc = New-ScheduledTaskTrigger -Once -At '00:00' `
     -RepetitionDuration (New-TimeSpan -Hours 24)
 $idxTrigger = New-ScheduledTaskTrigger -Daily -At '00:00'
 $idxTrigger.Repetition = $idxRepeatSrc.Repetition
+$IdxLaunch = Join-Path $PSScriptRoot 'run_index.vbs'
 $idxAction = New-ScheduledTaskAction `
-    -Execute $PyPath `
-    -Argument "`"$ScriptsDir\memory\memory_index.py`"" `
+    -Execute 'wscript.exe' `
+    -Argument "`"$IdxLaunch`"" `
     -WorkingDirectory $ProjectDir
 Register-Task `
     -Name 'secondbrain-index' `
