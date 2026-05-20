@@ -62,6 +62,12 @@ pwsh -ExecutionPolicy Bypass -File .claude\scripts\deploy\install_tasks.ps1
 
 Idempotent — re-running replaces any existing `secondbrain-*` task.
 
+The `secondbrain-discord` task triggers at logon. After installing, either **reboot** or start it manually for this session:
+
+```powershell
+Start-ScheduledTask -TaskName 'secondbrain-discord'
+```
+
 | Task | Trigger | What it runs |
 |---|---|---|
 | `secondbrain-heartbeat` | Daily 09:00 KL, every 30 min for 13 h | `heartbeat.py` — integration scan, draft replies, Toast alerts |
