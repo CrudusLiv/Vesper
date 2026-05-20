@@ -58,9 +58,9 @@ function cleanText(raw) {
   return String(raw).replace(/\[.*?\]/g,"").replace(/\*\*(.+?)\*\*/g,"$1").replace(/_([^_]+)_/g,"$1").trim();
 }
 const taskRows = topTasks.map(t =>
-  `<div style="display:flex;align-items:center;gap:7px;background:var(--background-primary);border-radius:4px;padding:5px 8px;cursor:pointer" onclick="window._dbOpenNote('${t.path}')">` +
-  `<div style="width:5px;height:5px;border-radius:50%;background:${dotColor(t)};flex-shrink:0"></div>` +
-  `<span style="font-size:0.8em">${cleanText(t.text)}</span></div>`
+  `<div style="display:flex;align-items:center;gap:8px;background:var(--background-primary);border-radius:4px;padding:7px 10px;cursor:pointer" onclick="window._dbOpenNote('${t.path}')">` +
+  `<div style="width:6px;height:6px;border-radius:50%;background:${dotColor(t)};flex-shrink:0"></div>` +
+  `<span style="font-size:0.9em">${cleanText(t.text)}</span></div>`
 ).join("");
 
 // ── INBOX ─────────────────────────────────────────────────────────────────────
@@ -80,14 +80,14 @@ if (finRaw) {
     .map(m => ({name:m[1], amt:parseFloat(m[2].replace(/,/g,"")), pct:parseInt(m[3])}));
   finHTML = `
     <div style="display:flex;justify-content:flex-end;align-items:baseline;margin-bottom:7px">
-      <span style="font-weight:700;font-size:11px">RM ${total.toLocaleString()} <span style="color:var(--text-muted);font-weight:400;font-size:0.65rem">/ ${BUDGET}</span></span>
+      <span style="font-weight:700;font-size:14px">RM ${total.toLocaleString()} <span style="color:var(--text-muted);font-weight:400;font-size:0.75rem">/ ${BUDGET}</span></span>
     </div>
     <div style="background:var(--background-modifier-border);height:4px;border-radius:2px;margin-bottom:9px">
       <div class="db-bar-fill" style="width:${pct}%;height:100%"></div>
     </div>
     ${catRows.map(c =>
-      `<div style="margin-bottom:5px">` +
-      `<div style="display:flex;justify-content:space-between;font-size:0.7rem;margin-bottom:2px"><span>${c.name}</span><span style="color:var(--db-accent)">RM ${c.amt.toLocaleString()} · ${c.pct}%</span></div>` +
+      `<div style="margin-bottom:6px">` +
+      `<div style="display:flex;justify-content:space-between;font-size:0.8em;margin-bottom:2px"><span>${c.name}</span><span style="color:var(--db-accent)">RM ${c.amt.toLocaleString()} · ${c.pct}%</span></div>` +
       `<div style="background:var(--background-modifier-border);height:3px;border-radius:2px"><div class="db-bar-cat" style="width:${c.pct}%;height:100%"></div></div></div>`
     ).join("")}`;
 }
@@ -111,8 +111,8 @@ const schedRows = events.map((ev,i) => {
   const isNow = i === nowIdx;
   return `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--background-modifier-border)${isNow?";background:rgba(var(--db-accent-rgb),.06);margin:0 -4px;padding-left:4px":""}">` +
     `<span class="db-time"${isNow?' style="color:var(--db-accent)"':''}>${isNow?"Now":ev.time}</span>` +
-    `<div><div style="font-size:0.8em${isNow?";font-weight:600":""}">${ev.title}</div>` +
-    `<div style="font-size:0.7rem;color:${isNow?"var(--db-accent)":"var(--text-muted)"}">${ev.subtitle}</div></div></div>`;
+    `<div><div style="font-size:0.9em${isNow?";font-weight:600":""}">${ev.title}</div>` +
+    `<div style="font-size:0.78rem;color:${isNow?"var(--db-accent)":"var(--text-muted)"}">${ev.subtitle}</div></div></div>`;
 }).join("") || `<div style="color:var(--text-muted);font-style:italic;font-size:0.85em">No events today</div>`;
 const gcalNote = gcalRaw ? "" : `<div style="margin-top:7px;color:var(--text-muted);font-size:0.7rem;font-style:italic">+ GCal events once OAuth is configured</div>`;
 
@@ -128,7 +128,7 @@ const recentHTML = recentNotes.length === 0
       const when = p.file.mtime.toFormat("HH:mm");
       return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8em;margin-bottom:5px">` +
         `<span style="color:var(--db-accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;cursor:pointer" onclick="window._dbOpenNote('${p.file.path}')">${p.file.name}</span>` +
-        `<span style="color:var(--text-muted);font-size:0.7rem;flex-shrink:0;margin-left:8px">${when}</span></div>`;
+        `<span style="color:var(--text-muted);font-size:0.75rem;flex-shrink:0;margin-left:8px">${when}</span></div>`;
     }).join("");
 
 // ── DAILY PILLARS ─────────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ if (!habitsPage) {
   const ht = habitsPage.file.tasks;
   pillarsHTML = ht.length === 0
     ? `<div style="color:var(--text-muted);font-style:italic;font-size:0.85em">No habits defined</div>`
-    : [...ht].map(t => `<div style="display:flex;align-items:center;gap:6px;font-size:0.8em;margin-bottom:4px"><span>${t.completed?"✅":"◻"}</span><span>${String(t.text)}</span></div>`).join("");
+    : [...ht].map(t => `<div style="display:flex;align-items:center;gap:8px;font-size:0.9em;margin-bottom:6px"><span>${t.completed?"✅":"◻"}</span><span>${String(t.text)}</span></div>`).join("");
 }
 
 // ── HEARTBEAT ─────────────────────────────────────────────────────────────────
@@ -153,34 +153,57 @@ if (!hbRaw) {
   let hs = null;
   try { hs = JSON.parse(hbRaw); } catch { hbHTML = `<div style="color:#f85149;font-size:0.85em">Corrupt state file</div>`; }
   if (hs) {
-    const lastTs  = hs.timestamp ? new Date(hs.timestamp * 1000) : null;
-    const mAgo    = lastTs ? Math.round((now - lastTs) / 6e4) : null;
-    const nextTs  = lastTs ? new Date(lastTs.getTime() + 30 * 6e4) : null;
+    const lastTs = hs.timestamp ? new Date(hs.timestamp * 1000) : null;
+    const mAgo   = lastTs ? Math.round((now - lastTs) / 6e4) : null;
+
+    // Next tick accounts for active hours 09:00–22:00 local time
+    function nextHeartbeat(from) {
+      const c = new Date(from.getTime() + 30 * 6e4);
+      const hhmm = c.getHours() * 60 + c.getMinutes();
+      if (hhmm >= 9*60 && hhmm < 22*60) return c;
+      const next = new Date(c);
+      if (hhmm >= 22*60) next.setDate(next.getDate() + 1);
+      next.setHours(9, 0, 0, 0);
+      return next;
+    }
+
+    const nextTs  = lastTs ? nextHeartbeat(lastTs) : null;
     const mUntil  = nextTs ? Math.round((nextTs - now) / 6e4) : null;
     const barPct  = Math.round(Math.min(30, mAgo ?? 0) / 30 * 100);
+
+    const nextLabel = mUntil === null ? "unknown"
+      : mUntil <= 0   ? "overdue"
+      : mUntil < 60   ? `in ${mUntil}m`
+      : `at ${nextTs.toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit",hour12:false})}`;
+
     const intRows = [
-      {key:"discord", label:"discord", detail:hs.discord?.error ?? `${hs.discord?.new_count??0} msgs`},
-      {key:"github",  label:"github",  detail:hs.github?.error  ?? `${hs.github?.push_count??0} pushes`},
-      {key:"inbox",   label:"inbox",   detail:hs.inbox?.error   ?? `${hs.inbox?.count??0} files`},
+      {key:"discord", label:"Discord", detail:hs.discord?.error ?? `${hs.discord?.new_count??0} msgs`},
+      {key:"github",  label:"GitHub",  detail:hs.github?.error  ?? `${hs.github?.push_count??0} pushes`},
+      {key:"inbox",   label:"Inbox",   detail:hs.inbox?.error   ?? `${hs.inbox?.count??0} files`},
     ].map(r => {
       const ok = !hs[r.key]?.error;
-      return `<div style="display:flex;justify-content:space-between;font-size:0.7rem"><span>${ok?"🟢":"🔴"} ${r.label}</span><span style="color:${ok?"#3fb950":"#f85149"}">${r.detail}</span></div>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.82em;padding:5px 0;border-bottom:1px solid var(--background-modifier-border)">` +
+        `<span style="display:flex;align-items:center;gap:7px"><span style="width:8px;height:8px;border-radius:50%;background:${ok?"#3fb950":"#f85149"};flex-shrink:0"></span>${r.label}</span>` +
+        `<span style="color:${ok?"#3fb950":"#f85149"};font-weight:600">${r.detail}</span></div>`;
     }).join("");
+
     hbHTML = `
-      <div style="background:var(--background-primary);border-radius:4px;padding:6px 8px;margin-bottom:7px">
-        <div style="display:flex;justify-content:space-between;font-size:0.7rem;margin-bottom:3px">
-          <span style="color:var(--text-muted)">Last</span>
-          <span>${lastTs ? `${lastTs.toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit",hour12:false})} (${mAgo}m ago)` : "unknown"}</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="background:var(--background-primary);border-radius:6px;padding:9px 11px">
+          <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:3px">Last tick</div>
+          <div style="font-size:1em;font-weight:700">${lastTs ? lastTs.toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit",hour12:false}) : "—"}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">${mAgo !== null ? `${mAgo}m ago` : ""}</div>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:0.7rem;margin-bottom:4px">
-          <span style="color:var(--text-muted)">Next</span>
-          <span style="color:var(--db-accent)">${nextTs ? `${nextTs.toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit",hour12:false})} (in ${mUntil}m)` : "unknown"}</span>
-        </div>
-        <div style="background:var(--background-modifier-border);height:2px;border-radius:1px">
-          <div style="background:var(--db-accent);width:${barPct}%;height:100%;border-radius:1px"></div>
+        <div style="background:var(--background-primary);border-radius:6px;padding:9px 11px">
+          <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:3px">Next tick</div>
+          <div style="font-size:1em;font-weight:700;color:var(--db-accent)">${nextTs ? nextTs.toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit",hour12:false}) : "—"}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">${nextLabel}</div>
         </div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:3px">${intRows}</div>`;
+      <div style="background:var(--background-modifier-border);height:3px;border-radius:2px;margin-bottom:10px">
+        <div style="background:var(--db-accent);width:${barPct}%;height:100%;border-radius:2px"></div>
+      </div>
+      ${intRows}`;
   }
 }
 
@@ -233,8 +256,8 @@ function makeDlList(dls) {
     return `<div style="display:flex;align-items:center;gap:10px;font-size:0.78rem;padding:5px 0;border-bottom:1px solid var(--background-modifier-border);cursor:pointer" onclick="window._dbOpenNote('DEADLINES.md')">`+
       `<span style="color:var(--db-accent);font-weight:700;min-width:28px;text-align:center">${d.date.getDate()}</span>`+
       `<span style="flex:1;color:var(--text-normal)">${d.title}</span>`+
-      `<span style="color:var(--text-muted);font-size:0.7rem;white-space:nowrap">${d.course}</span>`+
-      `<span style="color:${urgColor};font-size:0.7rem;min-width:42px;text-align:right;font-weight:600">${label}</span>`+
+      `<span style="color:var(--text-muted);font-size:0.75rem;white-space:nowrap">${d.course}</span>`+
+      `<span style="color:${urgColor};font-size:0.75rem;min-width:42px;text-align:right;font-weight:600">${label}</span>`+
       `</div>`;
   }).join("");
 }
@@ -261,11 +284,11 @@ root.innerHTML = `
 
     <div class="db-focus db-card">
       <div class="db-label" style="color:var(--db-accent)">● CURRENT FOCUS</div>
-      <div style="font-weight:700;font-size:15px;line-height:1.2;margin-bottom:4px">${focusTitle}</div>
-      <div style="color:${focusColor};font-size:0.85em;margin-bottom:8px">${focusSubtitle}</div>
+      <div style="font-weight:700;font-size:18px;line-height:1.2;margin-bottom:5px">${focusTitle}</div>
+      <div style="color:${focusColor};font-size:0.9em;margin-bottom:8px">${focusSubtitle}</div>
       <div style="display:flex;gap:6px">
-        ${focusMilestone ? `<span style="background:var(--background-primary);border-radius:3px;padding:3px 8px;font-size:0.65rem;color:var(--db-accent);border:1px solid var(--background-modifier-border)">${focusMilestone}</span>` : ""}
-        ${focusNext      ? `<span style="background:var(--background-primary);border-radius:3px;padding:3px 8px;font-size:0.65rem;color:var(--text-muted);border:1px solid var(--background-modifier-border)">${focusNext}</span>` : ""}
+        ${focusMilestone ? `<span style="background:var(--background-primary);border-radius:3px;padding:3px 9px;font-size:0.75rem;color:var(--db-accent);border:1px solid var(--background-modifier-border)">${focusMilestone}</span>` : ""}
+        ${focusNext      ? `<span style="background:var(--background-primary);border-radius:3px;padding:3px 9px;font-size:0.75rem;color:var(--text-muted);border:1px solid var(--background-modifier-border)">${focusNext}</span>` : ""}
       </div>
     </div>
 
@@ -274,23 +297,23 @@ root.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:5px">
         ${taskRows || `<div style="color:var(--text-muted);font-style:italic;font-size:0.85em">No open tasks</div>`}
       </div>
-      <div style="margin-top:6px;color:var(--text-muted);font-size:0.7rem">${allTasks.length} open</div>
+      <div style="margin-top:6px;color:var(--text-muted);font-size:0.78rem">${allTasks.length} open</div>
     </div>
 
     <div class="db-card">
       <div class="db-label">INBOX</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px">
-        <div class="db-chip" style="padding:8px;text-align:center">
-          <div style="color:var(--db-accent);font-size:18px;font-weight:700;line-height:1">${discordDMs}</div>
-          <div style="color:var(--text-muted);font-size:0.6rem;margin-top:3px">Discord DMs</div>
+        <div class="db-chip" style="padding:10px 8px;text-align:center">
+          <div style="color:var(--db-accent);font-size:20px;font-weight:700;line-height:1">${discordDMs}</div>
+          <div style="color:var(--text-muted);font-size:0.72rem;margin-top:4px">Discord DMs</div>
         </div>
-        <div class="db-chip" style="padding:8px;text-align:center">
-          <div style="color:var(--db-accent);font-size:18px;font-weight:700;line-height:1">${githubPRs}</div>
-          <div style="color:var(--text-muted);font-size:0.6rem;margin-top:3px">GitHub</div>
+        <div class="db-chip" style="padding:10px 8px;text-align:center">
+          <div style="color:var(--db-accent);font-size:20px;font-weight:700;line-height:1">${githubPRs}</div>
+          <div style="color:var(--text-muted);font-size:0.72rem;margin-top:4px">GitHub PRs</div>
         </div>
-        <div class="db-chip" style="padding:8px;text-align:center">
-          <div style="color:var(--db-accent);font-size:18px;font-weight:700;line-height:1">${vaultInbox}</div>
-          <div style="color:var(--text-muted);font-size:0.6rem;margin-top:3px">Vault inbox</div>
+        <div class="db-chip" style="padding:10px 8px;text-align:center">
+          <div style="color:var(--db-accent);font-size:20px;font-weight:700;line-height:1">${vaultInbox}</div>
+          <div style="color:var(--text-muted);font-size:0.72rem;margin-top:4px">Vault inbox</div>
         </div>
       </div>
     </div>
@@ -308,7 +331,7 @@ root.innerHTML = `
     <div class="db-card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div class="db-label" style="margin-bottom:0">TODAY'S SCHEDULE</div>
-        <div style="color:var(--db-accent);font-size:0.65rem">${now.toLocaleDateString("en-MY",{day:"numeric",month:"short"})}</div>
+        <div style="color:var(--db-accent);font-size:0.78rem">${now.toLocaleDateString("en-MY",{day:"numeric",month:"short"})}</div>
       </div>
       ${schedRows}
       ${gcalNote}
@@ -326,8 +349,8 @@ root.innerHTML = `
 
     <div class="db-card">
       <div class="db-label">QUICK CAPTURE</div>
-      <input id="db-capture-input" type="text" placeholder="Capture a thought, task, or idea..." style="background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:4px;padding:6px 8px;margin-bottom:6px;font-size:0.8em;width:100%;box-sizing:border-box;color:var(--text-normal)" onkeydown="if(event.key==='Enter')window._dbCapture()"/>
-      <button style="background:var(--db-accent);border:none;border-radius:4px;padding:5px;width:100%;font-size:0.8em;font-weight:700;color:#fff;cursor:pointer" onclick="window._dbCapture()">+ Add to Inbox</button>
+      <input id="db-capture-input" type="text" placeholder="Capture a thought, task, or idea..." style="background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:4px;padding:8px 10px;margin-bottom:7px;font-size:0.9em;width:100%;box-sizing:border-box;color:var(--text-normal)" onkeydown="if(event.key==='Enter')window._dbCapture()"/>
+      <button style="background:var(--db-accent);border:none;border-radius:4px;padding:7px;width:100%;font-size:0.9em;font-weight:700;color:#fff;cursor:pointer" onclick="window._dbCapture()">+ Add to Inbox</button>
     </div>
 
     <div class="db-card">

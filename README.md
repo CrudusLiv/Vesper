@@ -72,7 +72,7 @@ Start-ScheduledTask -TaskName 'secondbrain-discord'
 |---|---|---|
 | `secondbrain-heartbeat` | Daily 09:00 KL, every 30 min for 13 h | `heartbeat.py` — integration scan, draft replies, Toast alerts |
 | `secondbrain-reflect`   | Daily 08:00 KL | `memory_reflect.py` — promote daily log into `MEMORY.md` |
-| `secondbrain-index`     | Every 10 min | `memory/memory_index.py` — re-embed changed vault files |
+| `secondbrain-index`     | Every 10 min | `run_index.vbs` → `memory/memory_index.py` — re-embed changed vault files (windowless) |
 | `secondbrain-discord`   | At logon, restart on failure | `start_discord_bot.ps1` — DM chat + message cache |
 
 Inspect:

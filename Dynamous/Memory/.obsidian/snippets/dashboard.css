@@ -39,12 +39,12 @@
 .db-bar-cat  { background: var(--db-accent); opacity: .85; border-radius: 2px; }
 
 /* ── Schedule ───────────────────────────────────────────────────────────────── */
-.db-time { color: var(--text-muted); font-size: 0.7rem; width: 38px; flex-shrink: 0; }
+.db-time { color: var(--text-muted); font-size: 0.8rem; width: 42px; flex-shrink: 0; }
 
 /* ── Section labels ─────────────────────────────────────────────────────────── */
 .db-label {
-  font-size: 0.65rem;
-  letter-spacing: .1em;
+  font-size: 0.72rem;
+  letter-spacing: .08em;
   color: var(--text-muted);
   margin-bottom: 0.5rem;
   text-transform: uppercase;
