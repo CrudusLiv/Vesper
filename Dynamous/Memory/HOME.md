@@ -13,14 +13,29 @@ const dateStr  = now.toLocaleDateString("en-MY",{weekday:"long",year:"numeric",m
 const BUDGET   = 1500;
 
 // ── pre-fetch all vault files in parallel ─────────────────────────────────────
-const [dlRaw, projRaw, gcalRaw, hbRaw, habitsRaw, finRaw] = await Promise.all([
+const [dlRaw, projRaw, gcalRaw, hbRaw, habitsRaw, finRaw, layoutRaw] = await Promise.all([
   dv.io.load("DEADLINES.md"),
   dv.io.load("PROJECTS.md"),
   dv.io.load("state/gcal-today.md"),
   dv.io.load("state/heartbeat-state.json"),
   dv.io.load("HABITS.md"),
   dv.io.load(`finance/${monthKey}.md`),
+  dv.io.load("state/dashboard-layout.json"),
 ]);
+
+// ── LAYOUT ────────────────────────────────────────────────────────────────────
+const DEFAULT_LAYOUT = {
+  columns: [
+    ["focus", "tasks", "inbox", "finance"],
+    ["schedule", "pillars", "recent", "capture", "heartbeat"]
+  ],
+  hidden: [],
+  columnWidths: ["1.4fr", "1fr"]
+};
+let layout = DEFAULT_LAYOUT;
+try { if (layoutRaw) layout = JSON.parse(layoutRaw); } catch {}
+window.__dbLayout = JSON.parse(JSON.stringify(layout)); // in-memory copy for edit mode
+window.__dbEditMode = false; // reset on each render
 
 // ── CURRENT FOCUS ─────────────────────────────────────────────────────────────
 const dlLines = (dlRaw||"").split("\n").filter(l => /^\d{4}-\d{2}-\d{2}/.test(l.trim()));
@@ -273,35 +288,43 @@ const CAL_MONTHS = [-2,-1,0,1,2].map(offset => {
 });
 const CAL_START_IDX = 2; // index of current month
 
-// ── RENDER ────────────────────────────────────────────────────────────────────
-const root = dv.container;
-root.innerHTML = `
-<div style="font-size:18px;font-weight:700;color:var(--text-normal);margin-bottom:2px">Second Brain</div>
-<div style="color:var(--text-muted);font-size:0.8em;margin-bottom:12px">${dateStr} · Kuala Lumpur</div>
-<div class="db-grid">
-
-  <div class="db-col">
-
-    <div class="db-focus db-card">
-      <div class="db-label" style="color:var(--db-accent)">● CURRENT FOCUS</div>
+// ── CARD HTML MAP ─────────────────────────────────────────────────────────────
+const CARD_HTML = {
+  focus: `
+    <div class="db-card db-focus" data-id="focus">
+      <div class="db-card-hd">
+        <span class="db-drag-handle">⠿</span>
+        <div class="db-label" style="margin-bottom:0;flex:1;color:var(--db-accent)">● CURRENT FOCUS</div>
+        <button class="db-dismiss-btn" onclick="window._dbDismissCard('focus')">✕</button>
+      </div>
       <div style="font-weight:700;font-size:18px;line-height:1.2;margin-bottom:5px">${focusTitle}</div>
       <div style="color:${focusColor};font-size:0.9em;margin-bottom:8px">${focusSubtitle}</div>
       <div style="display:flex;gap:6px">
         ${focusMilestone ? `<span style="background:var(--background-primary);border-radius:3px;padding:3px 9px;font-size:0.75rem;color:var(--db-accent);border:1px solid var(--background-modifier-border)">${focusMilestone}</span>` : ""}
         ${focusNext      ? `<span style="background:var(--background-primary);border-radius:3px;padding:3px 9px;font-size:0.75rem;color:var(--text-muted);border:1px solid var(--background-modifier-border)">${focusNext}</span>` : ""}
       </div>
-    </div>
+    </div>`,
 
-    <div class="db-card">
-      <div class="db-label">TODAY'S TASKS</div>
+  tasks: `
+    <div class="db-card" data-id="tasks">
+      <div class="db-card-hd">
+        <span class="db-drag-handle">⠿</span>
+        <div class="db-label" style="margin-bottom:0;flex:1">TODAY'S TASKS</div>
+        <button class="db-dismiss-btn" onclick="window._dbDismissCard('tasks')">✕</button>
+      </div>
       <div style="display:flex;flex-direction:column;gap:5px">
         ${taskRows || `<div style="color:var(--text-muted);font-style:italic;font-size:0.85em">No open tasks</div>`}
       </div>
       <div style="margin-top:6px;color:var(--text-muted);font-size:0.78rem">${allTasks.length} open</div>
-    </div>
+    </div>`,
 
-    <div class="db-card">
-      <div class="db-label">INBOX</div>
+  inbox: `
+    <div class="db-card" data-id="inbox">
+      <div class="db-card-hd">
+        <span class="db-drag-handle">⠿</span>
+        <div class="db-label" style="margin-bottom:0;flex:1">INBOX</div>
+        <button class="db-dismiss-btn" onclick="window._dbDismissCard('inbox')">✕</button>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px">
         <div class="db-chip" style="padding:10px 8px;text-align:center">
           <div style="color:var(--db-accent);font-size:20px;font-weight:700;line-height:1">${discordDMs}</div>
@@ -316,51 +339,113 @@ root.innerHTML = `
           <div style="color:var(--text-muted);font-size:0.72rem;margin-top:4px">Vault inbox</div>
         </div>
       </div>
-    </div>
+    </div>`,
 
-    <div class="db-card">
-      <div class="db-label">FINANCE — ${monthLabel}</div>
+  finance: `
+    <div class="db-card" data-id="finance">
+      <div class="db-card-hd">
+        <span class="db-drag-handle">⠿</span>
+        <div class="db-label" style="margin-bottom:0;flex:1">FINANCE — ${monthLabel}</div>
+        <button class="db-dismiss-btn" onclick="window._dbDismissCard('finance')">✕</button>
+      </div>
       ${finHTML}
-    </div>
+    </div>`,
 
-
-  </div>
-
-  <div class="db-col">
-
-    <div class="db-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div class="db-label" style="margin-bottom:0">TODAY'S SCHEDULE</div>
-        <div style="color:var(--db-accent);font-size:0.78rem">${now.toLocaleDateString("en-MY",{day:"numeric",month:"short"})}</div>
+  schedule: `
+    <div class="db-card" data-id="schedule">
+      <div class="db-card-hd">
+        <span class="db-drag-handle">⠿</span>
+        <div class="db-label" style="margin-bottom:0;flex:1">TODAY'S SCHEDULE</div>
+        <div style="color:var(--db-accent);font-size:0.78rem;margin-left:8px">${now.toLocaleDateString("en-MY",{day:"numeric",month:"short"})}</div>
+        <button class="db-dismiss-btn" onclick="window._dbDismissCard('schedule')">✕</button>
       </div>
       ${schedRows}
       ${gcalNote}
-    </div>
+    </div>`,
 
-    <div class="db-card">
-      <div class="db-label">DAILY PILLARS</div>
+  pillars: `
+    <div class="db-card" data-id="pillars">
+      <div class="db-card-hd">
+        <span class="db-drag-handle">⠿</span>
+        <div class="db-label" style="margin-bottom:0;flex:1">DAILY PILLARS</div>
+        <button class="db-dismiss-btn" onclick="window._dbDismissCard('pillars')">✕</button>
+      </div>
       ${pillarsHTML}
-    </div>
+    </div>`,
 
-    <div class="db-card">
-      <div class="db-label">RECENT NOTES</div>
+  recent: `
+    <div class="db-card" data-id="recent">
+      <div class="db-card-hd">
+        <span class="db-drag-handle">⠿</span>
+        <div class="db-label" style="margin-bottom:0;flex:1">RECENT NOTES</div>
+        <button class="db-dismiss-btn" onclick="window._dbDismissCard('recent')">✕</button>
+      </div>
       ${recentHTML}
-    </div>
+    </div>`,
 
-    <div class="db-card">
-      <div class="db-label">QUICK CAPTURE</div>
+  capture: `
+    <div class="db-card" data-id="capture">
+      <div class="db-card-hd">
+        <span class="db-drag-handle">⠿</span>
+        <div class="db-label" style="margin-bottom:0;flex:1">QUICK CAPTURE</div>
+        <button class="db-dismiss-btn" onclick="window._dbDismissCard('capture')">✕</button>
+      </div>
       <input id="db-capture-input" type="text" placeholder="Capture a thought, task, or idea..." style="background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:4px;padding:8px 10px;margin-bottom:7px;font-size:0.9em;width:100%;box-sizing:border-box;color:var(--text-normal)" onkeydown="if(event.key==='Enter')window._dbCapture()"/>
       <button style="background:var(--db-accent);border:none;border-radius:4px;padding:7px;width:100%;font-size:0.9em;font-weight:700;color:#fff;cursor:pointer" onclick="window._dbCapture()">+ Add to Inbox</button>
-    </div>
+    </div>`,
 
-    <div class="db-card">
-      <div class="db-label">HEARTBEAT</div>
+  heartbeat: `
+    <div class="db-card" data-id="heartbeat">
+      <div class="db-card-hd">
+        <span class="db-drag-handle">⠿</span>
+        <div class="db-label" style="margin-bottom:0;flex:1">HEARTBEAT</div>
+        <button class="db-dismiss-btn" onclick="window._dbDismissCard('heartbeat')">✕</button>
+      </div>
       ${hbHTML}
+    </div>`,
+};
+
+// ── RENDER HELPERS ────────────────────────────────────────────────────────────
+function renderGrid(lyt) {
+  const widths = lyt.columnWidths.length === lyt.columns.length
+    ? lyt.columnWidths
+    : Array(lyt.columns.length).fill("1fr");
+  const colsHTML = lyt.columns.map((cardIds, i) => {
+    const cards = cardIds
+      .filter(id => !lyt.hidden.includes(id) && CARD_HTML[id])
+      .map(id => CARD_HTML[id])
+      .join("");
+    return `<div class="db-col" data-col-idx="${i}">${cards}</div>`;
+  }).join("");
+  return `<div class="db-grid" id="db-main-grid" style="grid-template-columns:${widths.join(" ")}">${colsHTML}</div>`;
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+const root = dv.container;
+root.innerHTML = `
+<div id="db-header">
+  <div id="db-header-locked" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+    <div>
+      <div style="font-size:18px;font-weight:700;color:var(--text-normal);margin-bottom:2px">Second Brain</div>
+      <div style="color:var(--text-muted);font-size:0.8em">${dateStr} · Kuala Lumpur</div>
     </div>
-
+    <button onclick="window._dbToggleEditMode()" style="background:rgba(163,113,247,0.12);border:1px solid rgba(163,113,247,0.35);border-radius:4px;color:#a371f7;font-size:0.7rem;padding:4px 10px;cursor:pointer;margin-top:2px;flex-shrink:0">⊞ Edit Layout</button>
   </div>
-
+  <div id="db-header-edit" style="display:none;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div>
+      <div style="font-size:18px;font-weight:700;color:var(--text-normal);margin-bottom:2px">Second Brain</div>
+      <div style="color:#a371f7;font-size:0.75em">Edit mode — drag cards, add/remove columns</div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <button class="db-col-add" onclick="window._dbAddColumn()" style="background:rgba(163,113,247,0.1);border:1px solid rgba(163,113,247,0.3);border-radius:4px;color:#a371f7;font-size:0.7rem;padding:3px 8px;cursor:pointer">+ col</button>
+      <button class="db-col-remove" onclick="window._dbRemoveColumn()" style="background:rgba(255,82,82,0.08);border:1px solid rgba(255,82,82,0.3);border-radius:4px;color:#f85149;font-size:0.7rem;padding:3px 8px;cursor:pointer">− col</button>
+      <button onclick="window._dbResetLayout()" style="background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:4px;color:var(--text-muted);font-size:0.7rem;padding:3px 8px;cursor:pointer">Reset Layout</button>
+      <button onclick="window._dbLockLayout()" style="background:rgba(163,113,247,0.2);border:1px solid #a371f7;border-radius:4px;color:#a371f7;font-size:0.7rem;padding:3px 9px;cursor:pointer;font-weight:700">✓ Lock Layout</button>
+    </div>
+  </div>
 </div>
+
+${renderGrid(layout)}
 
 <div class="db-card" style="margin-top:10px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -425,6 +510,133 @@ window._dbCapture = async () => {
   await app.vault.adapter.write(path, content);
   if (inputEl) inputEl.value = "";
   new Notice("Captured to " + path);
+};
+
+window._dbToggleEditMode = function() {
+  window.__dbEditMode = !window.__dbEditMode;
+  const grid   = root.querySelector("#db-main-grid");
+  const locked = root.querySelector("#db-header-locked");
+  const edit   = root.querySelector("#db-header-edit");
+  const addBtn = root.querySelector(".db-col-add");
+  const remBtn = root.querySelector(".db-col-remove");
+
+  if (window.__dbEditMode) {
+    grid.classList.add("db-edit-mode");
+    locked.style.display = "none";
+    edit.style.display   = "flex";
+    if (addBtn) addBtn.disabled = window.__dbLayout.columns.length >= 4;
+    if (remBtn) remBtn.disabled = window.__dbLayout.columns.length <= 1;
+  } else {
+    grid.classList.remove("db-edit-mode");
+    locked.style.display = "flex";
+    edit.style.display   = "none";
+  }
+};
+
+// ── SORTABLE ──────────────────────────────────────────────────────────────────
+if (!window.Sortable) {
+  try {
+    const code = await app.vault.adapter.read(".obsidian/scripts/sortable.min.js");
+    const script = document.createElement("script");
+    script.textContent = code;
+    document.head.appendChild(script);
+  } catch {
+    new Notice("dashboard: sortable.min.js not found — drag-and-drop disabled");
+  }
+}
+
+function initSortable() {
+  if (!window.Sortable) return;
+  const grid = root.querySelector("#db-main-grid");
+  if (!grid) return;
+  grid.querySelectorAll(".db-col").forEach(col => {
+    new Sortable(col, {
+      group:       "cards",
+      animation:   150,
+      handle:      ".db-drag-handle",
+      ghostClass:  "db-drag-ghost",
+    });
+  });
+}
+initSortable();
+
+window._dbLockLayout = async function() {
+  const grid = root.querySelector("#db-main-grid");
+  const cols = [...grid.querySelectorAll(".db-col")];
+  window.__dbLayout.columns = cols.map(col =>
+    [...col.querySelectorAll(".db-card[data-id]")].map(el => el.getAttribute("data-id"))
+  );
+  if (window.__dbLayout.columnWidths.length !== cols.length) {
+    window.__dbLayout.columnWidths = Array(cols.length).fill("1fr");
+  }
+  await app.vault.adapter.write(
+    "state/dashboard-layout.json",
+    JSON.stringify(window.__dbLayout, null, 2)
+  );
+  window._dbToggleEditMode();
+  new Notice("Layout saved");
+};
+
+window._dbResetLayout = async function() {
+  try { await app.vault.adapter.remove("state/dashboard-layout.json"); } catch {}
+  const leaf = app.workspace.activeLeaf;
+  const file = leaf?.view?.file;
+  if (file) await leaf.openFile(file);
+};
+
+window._dbAddColumn = function() {
+  if (window.__dbLayout.columns.length >= 4) return;
+  window.__dbLayout.columns.push([]);
+  window.__dbLayout.columnWidths = Array(window.__dbLayout.columns.length).fill("1fr");
+
+  const grid    = root.querySelector("#db-main-grid");
+  const newCol  = document.createElement("div");
+  newCol.className = "db-col";
+  newCol.setAttribute("data-col-idx", String(window.__dbLayout.columns.length - 1));
+  grid.appendChild(newCol);
+  grid.style.gridTemplateColumns = window.__dbLayout.columnWidths.join(" ");
+
+  const addBtn = root.querySelector(".db-col-add");
+  const remBtn = root.querySelector(".db-col-remove");
+  if (addBtn) addBtn.disabled = window.__dbLayout.columns.length >= 4;
+  if (remBtn) remBtn.disabled = false;
+
+  if (window.Sortable) {
+    new Sortable(newCol, { group:"cards", animation:150, handle:".db-drag-handle", ghostClass:"db-drag-ghost" });
+  }
+};
+
+window._dbRemoveColumn = function() {
+  if (window.__dbLayout.columns.length <= 1) return;
+  const grid    = root.querySelector("#db-main-grid");
+  const cols    = [...grid.querySelectorAll(".db-col")];
+  const lastCol = cols[cols.length - 1];
+  const prevCol = cols[cols.length - 2];
+
+  // Move cards to the previous column (DOM) and read their ids before moving
+  const removedIds = [...lastCol.querySelectorAll(".db-card[data-id]")].map(el => el.getAttribute("data-id"));
+  [...lastCol.querySelectorAll(".db-card")].forEach(card => prevCol.appendChild(card));
+
+  // Update in-memory layout using DOM-derived ids
+  window.__dbLayout.columns.pop();
+  window.__dbLayout.columns[window.__dbLayout.columns.length - 1].push(...removedIds);
+  window.__dbLayout.columnWidths = Array(window.__dbLayout.columns.length).fill("1fr");
+
+  lastCol.remove();
+  grid.style.gridTemplateColumns = window.__dbLayout.columnWidths.join(" ");
+
+  const addBtn = root.querySelector(".db-col-add");
+  const remBtn = root.querySelector(".db-col-remove");
+  if (addBtn) addBtn.disabled = false;
+  if (remBtn) remBtn.disabled = window.__dbLayout.columns.length <= 1;
+};
+
+window._dbDismissCard = function(id) {
+  const card = document.querySelector(`.db-card[data-id="${id}"]`);
+  if (card) card.remove();
+  if (!window.__dbLayout.hidden.includes(id)) {
+    window.__dbLayout.hidden.push(id);
+  }
 };
 ```
 

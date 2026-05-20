@@ -9,7 +9,7 @@
 .dashboard { --db-accent: #a371f7; --db-accent-rgb: 163, 113, 247; --db-dim: #7c3aed; --db-card: var(--background-secondary); }
 
 /* ── Grid layout ────────────────────────────────────────────────────────────── */
-.db-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+.db-grid { display: grid; gap: 10px; }
 .db-col  { display: flex; flex-direction: column; gap: 8px; }
 
 /* ── Cards ──────────────────────────────────────────────────────────────────── */
@@ -60,3 +60,46 @@
 
 /* ── Suppress Dataview errors ───────────────────────────────────────────────── */
 .dashboard .dataview.dataview-error { display: none; }
+
+/* ── Card header row (drag handle + label + dismiss) ────────────────────────── */
+.db-card-hd { display: flex; align-items: center; margin-bottom: 0.5rem; }
+
+/* ── Drag handle ─────────────────────────────────────────────────────────────── */
+.db-drag-handle {
+  display: none;
+  cursor: grab;
+  color: var(--db-accent);
+  opacity: 0.6;
+  font-size: 1rem;
+  padding-right: 6px;
+  flex-shrink: 0;
+  user-select: none;
+}
+.db-drag-handle:active { cursor: grabbing; }
+.db-edit-mode .db-drag-handle { display: inline; }
+
+/* ── Dismiss button ──────────────────────────────────────────────────────────── */
+.db-dismiss-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: #f85149;
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0 0 0 6px;
+  flex-shrink: 0;
+  opacity: 0.7;
+  line-height: 1;
+}
+.db-dismiss-btn:hover { opacity: 1; }
+.db-edit-mode .db-dismiss-btn { display: inline; }
+
+/* ── Cards in edit mode get a dashed purple border ───────────────────────────── */
+.db-edit-mode .db-card { border: 1px dashed rgba(163, 113, 247, 0.4); }
+.db-edit-mode .db-card.db-focus {
+  border: 1px dashed rgba(163, 113, 247, 0.4);
+  border-left: 3px solid var(--db-accent);
+}
+
+/* ── SortableJS ghost (the card being dragged) ───────────────────────────────── */
+.db-drag-ghost { opacity: 0.35; }
