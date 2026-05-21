@@ -45,7 +45,6 @@ _NOTE_PREFIX_STRIP_RE = re.compile(
     r"^\s*note(?:\s+to\s+self)?\s*[:\-—,]?\s+",
     re.IGNORECASE,
 )
-_NOTE_TOPIC_MAX = 60
 
 
 def classify_rule_based(content: str) -> str:
@@ -99,7 +98,7 @@ def _append_note(target: Path, dt: datetime, raw: str) -> bool:
         return False
     lines = stripped.split("\n")
     first = lines[0].strip()
-    topic = (first[:_NOTE_TOPIC_MAX].rstrip() + "…") if len(first) > _NOTE_TOPIC_MAX else first
+    topic = first
     extra_lines = [ln.rstrip() for ln in lines[1:] if ln.strip()]
     bullet = f"- {dt.strftime('%Y-%m-%d')} — {topic}\n"
     if extra_lines:
