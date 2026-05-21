@@ -163,6 +163,12 @@ if (!habitsPage) {
 }
 
 // ── STATUS ────────────────────────────────────────────────────────────────────
+let lastRefreshTs = null;
+if (logRaw) {
+  const m = logRaw.match(/^updated:\s*(\S+)/m);
+  if (m) { try { lastRefreshTs = new Date(m[1]); } catch {} }
+}
+
 let hbHTML = "";
 if (!hbRaw && !logRaw) {
   hbHTML = `<div style="color:var(--text-muted);font-style:italic;font-size:0.85em">No data yet — click Refresh</div>`;
@@ -202,10 +208,14 @@ if (!hbRaw && !logRaw) {
       : mUntil < 60  ? `in ${mUntil}m`
       : `at ${nextTs.toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit",hour12:false})}`;
 
+    const refreshLabel = lastRefreshTs
+      ? lastRefreshTs.toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit",hour12:false})
+      : "—";
+
     hbHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div style="background:var(--background-primary);border-radius:6px;padding:9px 11px">
-          <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:3px">Last ran</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:3px">Last heartbeat</div>
           <div style="font-size:1em;font-weight:700">${lastTs ? lastTs.toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit",hour12:false}) : "—"}</div>
           <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">${mAgo !== null ? `${mAgo}m ago` : ""}</div>
         </div>
@@ -215,7 +225,8 @@ if (!hbRaw && !logRaw) {
           <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">${nextLabel}</div>
         </div>
       </div>
-      ${intRows}`;
+      ${intRows}
+      <div style="margin-top:8px;font-size:0.72rem;color:var(--text-muted);text-align:right">Last refresh: ${refreshLabel}</div>`;
   }
 
   if (logRaw) {
@@ -508,6 +519,7 @@ window._dbRefresh = async function() {
         }
       );
     });
+    await new Promise(r => setTimeout(r, 700));
   } else {
     new Notice('child_process unavailable — run: py .claude/scripts/refresh.py', 5000);
   }
