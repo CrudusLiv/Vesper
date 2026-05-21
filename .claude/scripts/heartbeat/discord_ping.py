@@ -2,8 +2,7 @@
 long-running Phase 4 bot) and returns new pings since the last tick.
 
 A "ping" is:
-- A message in any channel where content contains <@USER_ID>, OR
-- A DM from a user other than CrudusLiv.
+- A message in a server channel where content contains <@USER_ID>.
 
 State file (.claude/data/discord_last_tick.json) tracks:
 - last_tick: ISO timestamp of last successful scan
@@ -74,10 +73,8 @@ def scan_pings(
             FROM messages
             WHERE created_at >= ?
               AND is_bot = 0
-              AND (
-                (is_dm = 1 AND is_self = 0)
-                OR (is_dm = 0 AND content LIKE ?)
-            )
+              AND is_dm = 0
+              AND content LIKE ?
             ORDER BY created_at ASC
             """,
             (cutoff, f"%{mention_token}%"),
