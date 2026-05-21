@@ -43,7 +43,12 @@ def main() -> int:
 
     inbox.refresh_daily_timeline()
 
+    prev_saved = snapshot.load_state()
     curr = snapshot.build_snapshot()
+    # Preserve the scheduled heartbeat run time so the dashboard "Last ran"
+    # shows when the heartbeat actually fired, not when the user hit Refresh.
+    if prev_saved and prev_saved.get("heartbeat_ran_at"):
+        curr["heartbeat_ran_at"] = prev_saved["heartbeat_ran_at"]
     vault_state_writer.write_all(curr)
     snapshot.save_state(curr)
 

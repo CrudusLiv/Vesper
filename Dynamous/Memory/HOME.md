@@ -171,7 +171,7 @@ if (!hbRaw && !logRaw) {
   if (hbRaw) { try { hs = JSON.parse(hbRaw); } catch {} }
 
   if (hs) {
-    const lastTs = hs.timestamp ? new Date(hs.timestamp * 1000) : null;
+    const lastTs = (hs.heartbeat_ran_at ?? hs.timestamp) ? new Date((hs.heartbeat_ran_at ?? hs.timestamp) * 1000) : null;
     const mAgo   = lastTs ? Math.round((now - lastTs) / 6e4) : null;
 
     const pingCount = (pingsRaw || "").match(/^ping_count:\s*(\d+)/m)?.[1] ?? "—";
@@ -195,7 +195,7 @@ if (!hbRaw && !logRaw) {
       next.setHours(9, 0, 0, 0);
       return next;
     }
-    const nextTs   = lastTs ? nextRun(lastTs) : null;
+    const nextTs = lastTs ? nextRun(lastTs) : null;
     const mUntil   = nextTs ? Math.round((nextTs - now) / 6e4) : null;
     const nextLabel = mUntil === null ? "unknown"
       : mUntil <= 0  ? "overdue"

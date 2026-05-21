@@ -199,6 +199,7 @@ def main() -> int:
         print(f"gcal_sync failed: {exc}", file=sys.stderr)
 
     curr = snapshot.build_snapshot()
+    curr["heartbeat_ran_at"] = curr["timestamp"]  # only set by scheduled heartbeat
     prev = snapshot.load_state()
     diff = snapshot.diff_snapshot(prev, curr)
 
