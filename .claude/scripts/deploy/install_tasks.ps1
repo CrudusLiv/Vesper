@@ -19,7 +19,10 @@ surface on the desktop.
 #>
 [CmdletBinding()]
 param(
-    [string]$User = $env:USERNAME
+    [string]$User = $env:USERNAME,
+    # Pass -VisibleHeartbeat to run heartbeat.py directly (shows a console window).
+    # Default: invisible via run_heartbeat.vbs (wscript.exe, no popup).
+    [switch]$VisibleHeartbeat
 )
 
 $ErrorActionPreference = 'Stop'
@@ -106,10 +109,20 @@ $hbRepeatSrc = New-ScheduledTaskTrigger -Once -At '09:00' `
     -RepetitionDuration (New-TimeSpan -Hours 13)
 $hbTrigger = New-ScheduledTaskTrigger -Daily -At '09:00'
 $hbTrigger.Repetition = $hbRepeatSrc.Repetition
-$hbAction = New-ScheduledTaskAction `
-    -Execute $PyPath `
-    -Argument "`"$ScriptsDir\heartbeat.py`"" `
-    -WorkingDirectory $ProjectDir
+$HbLaunch = Join-Path $PSScriptRoot 'run_heartbeat.vbs'
+if ($VisibleHeartbeat) {
+    $hbAction = New-ScheduledTaskAction `
+        -Execute $PyPath `
+        -Argument "`"$ScriptsDir\heartbeat.py`"" `
+        -WorkingDirectory $ProjectDir
+    Write-Host "  heartbeat: visible (py heartbeat.py)"
+} else {
+    $hbAction = New-ScheduledTaskAction `
+        -Execute 'wscript.exe' `
+        -Argument "`"$HbLaunch`"" `
+        -WorkingDirectory $ProjectDir
+    Write-Host "  heartbeat: invisible (run_heartbeat.vbs)"
+}
 Register-Task `
     -Name 'secondbrain-heartbeat' `
     -Trigger $hbTrigger `

@@ -57,10 +57,21 @@ py .claude\scripts\query.py status
 The four scheduled tasks live in `.claude/scripts/deploy/`. Open PowerShell **as Administrator** (`Register-ScheduledTask` requires elevation, even for user-scoped tasks):
 
 ```powershell
+# Default — heartbeat runs invisibly (no console window)
 pwsh -ExecutionPolicy Bypass -File .claude\scripts\deploy\install_tasks.ps1
+
+# Optional — show a console window for the heartbeat (useful for debugging)
+pwsh -ExecutionPolicy Bypass -File .claude\scripts\deploy\install_tasks.ps1 -VisibleHeartbeat
 ```
 
 Idempotent — re-running replaces any existing `secondbrain-*` task.
+
+**Choosing heartbeat launch style:**
+
+| Mode | How it runs | When to use |
+|---|---|---|
+| Default (invisible) | `wscript.exe run_heartbeat.vbs` — no popup | Normal daily use — output is written to `state/refresh-log.md` in the vault |
+| `-VisibleHeartbeat` | `py heartbeat.py` directly — shows a console window | Debugging; lets you read stdout/stderr live |
 
 The `secondbrain-discord` task triggers at logon. After installing, either **reboot** or start it manually for this session:
 
@@ -70,10 +81,10 @@ Start-ScheduledTask -TaskName 'secondbrain-discord'
 
 | Task | Trigger | What it runs |
 |---|---|---|
-| `secondbrain-heartbeat` | Daily 09:00 KL, every 30 min for 13 h | `heartbeat.py` — integration scan, draft replies, Toast alerts |
+| `secondbrain-heartbeat` | Daily 09:00 KL, every 30 min for 13 h | `run_heartbeat.vbs` → `heartbeat.py` — integration scan, Toast alerts (windowless by default) |
 | `secondbrain-reflect`   | Daily 08:00 KL | `memory_reflect.py` — promote daily log into `MEMORY.md` |
 | `secondbrain-index`     | Every 10 min | `run_index.vbs` → `memory/memory_index.py` — re-embed changed vault files (windowless) |
-| `secondbrain-discord`   | At logon, restart on failure | `start_discord_bot.ps1` — DM chat + message cache |
+| `secondbrain-discord`   | At logon, restart on failure | `start_discord_bot.vbs` → `start_discord_bot.ps1` — DM chat + message cache (windowless) |
 
 Inspect:
 
@@ -163,8 +174,11 @@ py .claude\scripts\query.py vault inbox
 py .claude\scripts\memory\memory_index.py                          # rebuild index
 py .claude\scripts\memory\memory_search.py "deadline" --top-k 5
 
-# Run heartbeat manually (useful for testing toasts / drafts)
+# Run heartbeat manually (shows console, useful for debugging)
 py .claude\scripts\heartbeat.py
+
+# On-demand refresh without the scheduler — updates Obsidian dashboard + fires ping notifications
+py .claude\scripts\refresh.py
 
 # Tests
 pytest

@@ -13,7 +13,7 @@ const dateStr  = now.toLocaleDateString("en-MY",{weekday:"long",year:"numeric",m
 const BUDGET   = 1500;
 
 // ── pre-fetch all vault files in parallel ─────────────────────────────────────
-const [dlRaw, projRaw, gcalRaw, hbRaw, habitsRaw, finRaw, layoutRaw] = await Promise.all([
+const [dlRaw, projRaw, gcalRaw, hbRaw, habitsRaw, finRaw, layoutRaw, logRaw, pingsRaw] = await Promise.all([
   dv.io.load("DEADLINES.md"),
   dv.io.load("PROJECTS.md"),
   dv.io.load("state/gcal-today.md"),
@@ -21,6 +21,8 @@ const [dlRaw, projRaw, gcalRaw, hbRaw, habitsRaw, finRaw, layoutRaw] = await Pro
   dv.io.load("HABITS.md"),
   dv.io.load(`finance/${monthKey}.md`),
   dv.io.load("state/dashboard-layout.json"),
+  dv.io.load("state/refresh-log.md"),
+  dv.io.load("state/discord-pings.md"),
 ]);
 
 // ── LAYOUT ────────────────────────────────────────────────────────────────────
@@ -160,19 +162,31 @@ if (!habitsPage) {
     : [...ht].map(t => `<div style="display:flex;align-items:center;gap:8px;font-size:0.9em;margin-bottom:6px"><span>${t.completed?"✅":"◻"}</span><span>${String(t.text)}</span></div>`).join("");
 }
 
-// ── HEARTBEAT ─────────────────────────────────────────────────────────────────
+// ── STATUS ────────────────────────────────────────────────────────────────────
 let hbHTML = "";
-if (!hbRaw) {
-  hbHTML = `<div style="color:var(--text-muted);font-style:italic;font-size:0.85em">No heartbeat data yet</div>`;
+if (!hbRaw && !logRaw) {
+  hbHTML = `<div style="color:var(--text-muted);font-style:italic;font-size:0.85em">No data yet — click Refresh</div>`;
 } else {
   let hs = null;
-  try { hs = JSON.parse(hbRaw); } catch { hbHTML = `<div style="color:#f85149;font-size:0.85em">Corrupt state file</div>`; }
+  if (hbRaw) { try { hs = JSON.parse(hbRaw); } catch {} }
+
   if (hs) {
     const lastTs = hs.timestamp ? new Date(hs.timestamp * 1000) : null;
     const mAgo   = lastTs ? Math.round((now - lastTs) / 6e4) : null;
 
-    // Next tick accounts for active hours 09:00–22:00 local time
-    function nextHeartbeat(from) {
+    const pingCount = (pingsRaw || "").match(/^ping_count:\s*(\d+)/m)?.[1] ?? "—";
+
+    const intRows = [
+      {key:"discord", label:"Discord pings", detail:hs.discord?.error ?? `${pingCount}`, ok: !hs.discord?.error},
+      {key:"github",  label:"GitHub",        detail:hs.github?.error  ?? `${hs.github?.push_count??0} pushes`, ok: !hs.github?.error},
+      {key:"inbox",   label:"Inbox",         detail:hs.inbox?.error   ?? `${hs.inbox?.count??0} files`, ok: !hs.inbox?.error},
+    ].map(r =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.82em;padding:5px 0;border-bottom:1px solid var(--background-modifier-border)">` +
+      `<span style="display:flex;align-items:center;gap:7px"><span style="width:8px;height:8px;border-radius:50%;background:${r.ok?"#3fb950":"#f85149"};flex-shrink:0"></span>${r.label}</span>` +
+      `<span style="color:${r.ok?"#3fb950":"#f85149"};font-weight:600">${r.detail}</span></div>`
+    ).join("");
+
+    function nextRun(from) {
       const c = new Date(from.getTime() + 30 * 6e4);
       const hhmm = c.getHours() * 60 + c.getMinutes();
       if (hhmm >= 9*60 && hhmm < 22*60) return c;
@@ -181,44 +195,35 @@ if (!hbRaw) {
       next.setHours(9, 0, 0, 0);
       return next;
     }
-
-    const nextTs  = lastTs ? nextHeartbeat(lastTs) : null;
-    const mUntil  = nextTs ? Math.round((nextTs - now) / 6e4) : null;
-    const barPct  = Math.round(Math.min(30, mAgo ?? 0) / 30 * 100);
-
+    const nextTs   = lastTs ? nextRun(lastTs) : null;
+    const mUntil   = nextTs ? Math.round((nextTs - now) / 6e4) : null;
     const nextLabel = mUntil === null ? "unknown"
-      : mUntil <= 0   ? "overdue"
-      : mUntil < 60   ? `in ${mUntil}m`
+      : mUntil <= 0  ? "overdue"
+      : mUntil < 60  ? `in ${mUntil}m`
       : `at ${nextTs.toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit",hour12:false})}`;
-
-    const intRows = [
-      {key:"discord", label:"Discord", detail:hs.discord?.error ?? `${hs.discord?.new_count??0} msgs`},
-      {key:"github",  label:"GitHub",  detail:hs.github?.error  ?? `${hs.github?.push_count??0} pushes`},
-      {key:"inbox",   label:"Inbox",   detail:hs.inbox?.error   ?? `${hs.inbox?.count??0} files`},
-    ].map(r => {
-      const ok = !hs[r.key]?.error;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.82em;padding:5px 0;border-bottom:1px solid var(--background-modifier-border)">` +
-        `<span style="display:flex;align-items:center;gap:7px"><span style="width:8px;height:8px;border-radius:50%;background:${ok?"#3fb950":"#f85149"};flex-shrink:0"></span>${r.label}</span>` +
-        `<span style="color:${ok?"#3fb950":"#f85149"};font-weight:600">${r.detail}</span></div>`;
-    }).join("");
 
     hbHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div style="background:var(--background-primary);border-radius:6px;padding:9px 11px">
-          <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:3px">Last tick</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:3px">Last ran</div>
           <div style="font-size:1em;font-weight:700">${lastTs ? lastTs.toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit",hour12:false}) : "—"}</div>
           <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">${mAgo !== null ? `${mAgo}m ago` : ""}</div>
         </div>
         <div style="background:var(--background-primary);border-radius:6px;padding:9px 11px">
-          <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:3px">Next tick</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:3px">Next run</div>
           <div style="font-size:1em;font-weight:700;color:var(--db-accent)">${nextTs ? nextTs.toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit",hour12:false}) : "—"}</div>
           <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">${nextLabel}</div>
         </div>
       </div>
-      <div style="background:var(--background-modifier-border);height:3px;border-radius:2px;margin-bottom:10px">
-        <div style="background:var(--db-accent);width:${barPct}%;height:100%;border-radius:2px"></div>
-      </div>
       ${intRows}`;
+  }
+
+  if (logRaw) {
+    const logLines = logRaw.split("\n")
+      .filter(l => l.trim() && !l.startsWith("---") && !l.startsWith("updated:"));
+    if (logLines.length) {
+      hbHTML += `<div style="margin-top:10px;font-family:monospace;font-size:0.78em;color:var(--text-muted);background:var(--background-primary);border-radius:4px;padding:8px 10px;white-space:pre-wrap">${logLines.join("\n")}</div>`;
+    }
   }
 }
 
@@ -398,7 +403,7 @@ const CARD_HTML = {
     <div class="db-card" data-id="heartbeat">
       <div class="db-card-hd">
         <span class="db-drag-handle">⠿</span>
-        <div class="db-label" style="margin-bottom:0;flex:1">HEARTBEAT</div>
+        <div class="db-label" style="margin-bottom:0;flex:1">STATUS</div>
         <button class="db-dismiss-btn" onclick="window._dbDismissCard('heartbeat')">✕</button>
       </div>
       ${hbHTML}
@@ -478,13 +483,37 @@ function _dbForceRefresh() {
   if (view?.previewMode) {
     view.previewMode.rerender(true);
   } else {
-    // fallback: Dataview index bump
     const dvp = app.plugins.plugins["dataview"];
     if (dvp?.index) dvp.index.revision = (dvp.index.revision ?? 0) + 1;
     app.metadataCache.trigger("dataview:refresh-views");
   }
 }
-window._dbRefresh = _dbForceRefresh;
+
+window._dbRefresh = async function() {
+  const btn = document.querySelector('button[onclick="window._dbRefresh()"]');
+  if (btn) btn.textContent = "↻ Refreshing…";
+
+  const cp = window.require?.('child_process');
+  if (cp) {
+    const parts = app.vault.adapter.basePath.replace(/\\/g, '/').split('/');
+    const projectDir = parts.slice(0, -2).join('\\').replace(/\//g, '\\');
+    const scriptPath = projectDir + '\\.claude\\scripts\\refresh.py';
+    await new Promise((resolve) => {
+      cp.exec(
+        `py "${scriptPath}"`,
+        { cwd: projectDir, env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir }, windowsHide: true },
+        (err, stdout, stderr) => {
+          if (err) new Notice('Refresh failed: ' + (stderr || err.message), 5000);
+          resolve();
+        }
+      );
+    });
+  } else {
+    new Notice('child_process unavailable — run: py .claude/scripts/refresh.py', 5000);
+  }
+
+  _dbForceRefresh();
+};
 
 
 window._dbCalIdx = CAL_START_IDX;
