@@ -44,7 +44,16 @@ def main() -> int:
     inbox.refresh_daily_timeline()
 
     prev_saved = snapshot.load_state()
-    curr = snapshot.build_snapshot()
+    # Skip the GitHub API call: it dominates the refresh latency (~19s vs
+    # ~150ms for everything else) and the scheduled 30-min heartbeat already
+    # keeps github-counts.md fresh. Carry forward the last heartbeat's github
+    # snapshot so write_github() has data instead of blanking the file.
+    curr = {
+        "timestamp": time.time(),
+        "discord": snapshot._safe(snapshot._snapshot_discord),
+        "github":  (prev_saved or {}).get("github") or {},
+        "inbox":   snapshot._safe(snapshot._snapshot_inbox),
+    }
     # Preserve the scheduled heartbeat run time so the dashboard "Last ran"
     # shows when the heartbeat actually fired, not when the user hit Refresh.
     if prev_saved and prev_saved.get("heartbeat_ran_at"):
