@@ -1,11 +1,11 @@
 ---
 name: deadline-tracker
-description: Pull assignment and class deadlines from Gmail and Google Calendar, deduplicate, and refresh the ## Deadlines section in MEMORY.md. Heartbeat re-runs this every tick.
+description: Pull assignment and class deadlines from Gmail and Google Calendar, deduplicate, and refresh the ## Active section in DEADLINES.md. Heartbeat re-runs this every tick.
 ---
 
 # Deadline Tracker
 
-Keep `MEMORY.md` `## Deadlines` accurate and current. The heartbeat re-runs this skill on every tick to escalate items due in <72h.
+Keep `DEADLINES.md` `## Active` accurate and current. The heartbeat re-runs this skill on every tick to escalate items due in <72h.
 
 ## Procedure
 
@@ -39,22 +39,22 @@ Keep `MEMORY.md` `## Deadlines` accurate and current. The heartbeat re-runs this
 
 4. **Deduplicate.** A Gmail announcement and a Calendar event for the same item should merge. Dedup key: `(course, lowercased-title-keywords, due_date)`. When merging, prefer the entry with more `notes`. List both source IDs comma-separated.
 
-5. **Read existing deadlines** from `MEMORY.md` `## Deadlines`. Preserve any line **without a `source:` suffix** — those are manually-added by CrudusLiv and must never be overwritten.
+5. **Read existing deadlines** from `DEADLINES.md` `## Active`. Preserve every existing line — manual entries (added by CrudusLiv) and prior auto-extracted entries both live here and must never be overwritten.
 
 6. **Re-render the section.** Sort by `due_date` ascending. Format:
    ```markdown
-   ## Deadlines
+   ## Active
 
-   - **2026-06-12** — CS101 — Assignment 1: Pointers — `gmail:abc123`
-     submission via Moodle, 15% of grade
-   - **2026-06-15** — _(manual)_ — Pay tuition deposit
-   - **2026-06-18** — CS102 — Quiz 1 — `gcal:evt789`
+   - 2026-06-12 — CS101 — Assignment 1: Pointers
+   - 2026-06-15 — manual — Pay tuition deposit
+   - 2026-06-18 — CS102 — Quiz 1
    ```
+   The line format is `- <YYYY-MM-DD> — <course> — <title>` — one row per deadline, matching what the heartbeat writer (`heartbeat/deadlines.py`) and the imminent scanner (`heartbeat/imminent.py`) expect. To opt a row out of Google Calendar push, prefix the date with `nogcal:` (e.g. `- nogcal: 2026-06-15 — manual — Pay tuition deposit`).
 
-7. **Edit `MEMORY.md`** with the Edit tool, replacing **only** the `## Deadlines` section. Leave `## Active Projects`, `## Decisions`, `## Lessons`, `## Open questions` untouched.
+7. **Edit `DEADLINES.md`** with the Edit tool, replacing **only** the `## Active` section. Leave the `## Format` heading and surrounding prose untouched.
 
 8. **Note the action** in today's `daily/YYYY-MM-DD.md`:
-   `[HH:MM] Refreshed MEMORY.md ## Deadlines: <N> items, <M> new since last run.`
+   `[HH:MM] Refreshed DEADLINES.md ## Active: <N> items, <M> new since last run.`
 
 ## Heartbeat behaviour (Phase 6)
 
@@ -67,7 +67,7 @@ When invoked from the heartbeat:
 
 - **Only deadlines explicitly stated.** Don't infer "assignment due next Friday" from "we'll have an assignment soon". False positives erode trust faster than false negatives.
 - **Don't draft replies here** — that's the heartbeat's job (Phase 6). This skill only updates the deadline list.
-- **Don't delete manual entries.** Anything without a `source:` is the user's; leave it alone.
+- **Don't delete existing entries.** Treat anything already in `## Active` as load-bearing; only append.
 
 ## Edge cases
 
@@ -78,5 +78,5 @@ When invoked from the heartbeat:
 ## Don't
 
 - Don't list deadlines that have already passed.
-- Don't add deadlines that don't have a clear due date — vague "before end of term" entries belong in `projects/`, not `MEMORY.md`.
+- Don't add deadlines that don't have a clear due date — vague "before end of term" entries belong in `projects/`, not `DEADLINES.md`.
 - Don't run if Gmail is not configured — silently empty results would erase the existing deadline list.

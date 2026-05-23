@@ -118,7 +118,7 @@ def main() -> int:
     # Auto-classify and summarise anything dropped in inbox/ BEFORE the
     # snapshot runs. Processed files move to inbox/_processed/ so they don't
     # show as "new" in the diff below. Extracted deadlines get promoted into
-    # MEMORY.md ## Deadlines.
+    # DEADLINES.md ## Active.
     inbox_deadlines: list[dict] = []
     for summary in inbox.process_new_files():
         rel = summary["path"].relative_to(VAULT).as_posix()
@@ -137,13 +137,13 @@ def main() -> int:
 
     promoted = deadlines.promote(inbox_deadlines)
     if promoted:
-        print(f"Promoted {promoted} deadline(s) to MEMORY.md")
+        print(f"Promoted {promoted} deadline(s) to DEADLINES.md")
 
     # Refresh prev/next chain across daily logs so the graph view shows them
     # as a continuous timeline. Cheap (one read+write per daily file).
     inbox.refresh_daily_timeline()
 
-    # Imminent scan checks MEMORY.md ## Deadlines and DMs about anything
+    # Imminent scan checks DEADLINES.md ## Active and DMs about anything
     # within 48h (high) or 24h (urgent). Runs every tick so freshly-promoted
     # deadlines surface immediately.
     urgent, soon = imminent.scan()

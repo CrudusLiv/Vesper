@@ -1,7 +1,8 @@
-"""Promote heartbeat-extracted deadlines into MEMORY.md `## Deadlines`.
+"""Promote heartbeat-extracted deadlines into DEADLINES.md `## Active`.
 
-Format per PRD: `- YYYY-MM-DD — <course/source> — <title>  <!-- src:<id> -->`.
-The trailing HTML comment is the dedupe key so we never re-add the same item."""
+Format: `- YYYY-MM-DD — <course/source> — <title>`. Dedup is line-content
+match — the source file already moved to inbox/_processed/, so the same
+item can't be re-extracted on subsequent ticks."""
 from __future__ import annotations
 
 import os
@@ -10,9 +11,9 @@ from datetime import date
 from pathlib import Path
 
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
-MEMORY = PROJECT_DIR / "Dynamous" / "Memory" / "MEMORY.md"
+DEADLINES = PROJECT_DIR / "Dynamous" / "Memory" / "DEADLINES.md"
 
-SECTION = "## Deadlines"
+SECTION = "## Active"
 NEXT_HEADER_RE = re.compile(r"\n## ", re.MULTILINE)
 PLACEHOLDER_RE = re.compile(r"^_\(.*?\)_\s*$", re.MULTILINE)
 SRC_RE = re.compile(r"<!--\s*src:([^>]+?)\s*-->")
@@ -39,10 +40,10 @@ def _existing_srcs(section_text: str) -> set[str]:
 
 
 def promote(items: list[dict]) -> int:
-    """Append unique deadline items into MEMORY.md `## Deadlines`. Returns count added."""
-    if not items or not MEMORY.exists():
+    """Append unique deadline items into DEADLINES.md `## Active`. Returns count added."""
+    if not items or not DEADLINES.exists():
         return 0
-    text = MEMORY.read_text(encoding="utf-8")
+    text = DEADLINES.read_text(encoding="utf-8")
     if SECTION not in text:
         return 0
 
@@ -76,5 +77,5 @@ def promote(items: list[dict]) -> int:
 
     new_section = SECTION + "\n\n" + (body_clean.lstrip("\n") + "\n" if body_clean.strip() else "") + "\n".join(added) + "\n"
     new_text = text[:start] + new_section + ("\n" + after.lstrip("\n") if after else "")
-    MEMORY.write_text(new_text, encoding="utf-8")
+    DEADLINES.write_text(new_text, encoding="utf-8")
     return len(added)

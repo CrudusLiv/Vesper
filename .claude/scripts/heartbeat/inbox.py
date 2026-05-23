@@ -11,7 +11,7 @@ Runs at the top of each heartbeat tick, BEFORE the snapshot diff. For each
          - projects/<project>/<date>_<slug>.md for project documents
     4. Move the source to inbox/_processed/
     5. Return any extracted deadlines so the heartbeat can promote them
-       into MEMORY.md ## Deadlines.
+       into DEADLINES.md ## Active.
 
 Failures are caught per-file -- one broken PDF doesn't stop the others.
 """
