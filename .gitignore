@@ -28,5 +28,6 @@ __pycache__/
 
 # Local-only state (do not commit)
 .claude/settings.local.json
-.claude/chat/
+.claude/chat/*
+!.claude/chat/discord_bot.py
 Dynamous/Memory/.obsidian/
