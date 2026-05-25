@@ -214,11 +214,49 @@ def main() -> int:
                 print(f"_handle_inbox unknown-react failed: {exc}", file=sys.stderr)
 
     async def _handle_finance(message) -> None:
-        print(f"[stub] _handle_finance: {message.id} content={message.content!r}")
+        content = (message.content or "").strip()
+
+        if content.lower() in ("totals", "finance", "spend"):
+            try:
+                summary = await asyncio.to_thread(finance_tracker.month_summary)
+                await message.channel.send(f"```\n{summary}\n```")
+            except Exception as exc:
+                print(f"finance summary failed: {exc}", file=sys.stderr)
+                try:
+                    await message.channel.send(f"[finance summary error: {type(exc).__name__}]")
+                except Exception:
+                    pass
+            return
+
+        expense = finance_tracker.parse(content)
+        if expense:
+            try:
+                result = await asyncio.to_thread(
+                    finance_tracker.log,
+                    expense["amount"],
+                    expense["category"],
+                    expense["note"],
+                )
+                ack = (
+                    f"logged {finance_tracker.CURRENCY}{expense['amount']:.2f} / "
+                    f"{expense['category']}"
+                    + (f" ({expense['note']})" if expense['note'] else "")
+                    + f"\nmonth total {finance_tracker.CURRENCY}{result['month_total']:.2f}"
+                    + f" | {expense['category']} {finance_tracker.CURRENCY}{result['category_total']:.2f}"
+                )
+                await message.channel.send(ack)
+            except Exception as exc:
+                print(f"finance log failed: {exc}", file=sys.stderr)
+                try:
+                    await message.channel.send(f"[finance log error: {type(exc).__name__}]")
+                except Exception:
+                    pass
+            return
+
         try:
             await message.add_reaction("❓")
         except Exception as exc:
-            print(f"_handle_finance reaction failed: {exc}", file=sys.stderr)
+            print(f"_handle_finance unknown-react failed: {exc}", file=sys.stderr)
 
     async def _handle_vesper(message) -> None:
         print(f"[stub] _handle_vesper: {message.id} content={message.content!r}")
