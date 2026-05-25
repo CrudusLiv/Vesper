@@ -88,14 +88,15 @@ _NOTES_SEED = (
 )
 
 
-def _append_note(target: Path, dt: datetime, raw: str) -> bool:
+def _append_note(target: Path, dt: datetime, raw: str) -> str:
     """Append a `- YYYY-MM-DD — <topic>` bullet to the rolling notes file.
 
-    Multi-line bodies indent under the bullet. Returns False (and writes
-    nothing) if the message is empty after the `note:` prefix is stripped."""
+    Multi-line bodies indent under the bullet. Returns the stripped note
+    body on success, or empty string if the message is empty after the
+    `note:` prefix is stripped (in which case nothing is written)."""
     stripped = _NOTE_PREFIX_STRIP_RE.sub("", raw, count=1).strip()
     if not stripped:
-        return False
+        return ""
     lines = stripped.split("\n")
     first = lines[0].strip()
     topic = first
@@ -111,7 +112,7 @@ def _append_note(target: Path, dt: datetime, raw: str) -> bool:
     last_line = trimmed.rsplit("\n", 1)[-1].lstrip()
     sep = "\n" if last_line.startswith(("- ", "  ")) else "\n\n"
     target.write_text(trimmed + sep + bullet, encoding="utf-8")
-    return True
+    return stripped
 
 
 def route(msg: dict, *, label: Optional[str] = None) -> str:
