@@ -28,7 +28,7 @@ sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts" / "integrations"))
 import _env  # noqa: F401, E402 -- side effect: loads .env into os.environ so notify can read DISCORD_BOT_TOKEN
 
-from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, discord_ping, discord_dm_capture, gcal_sync, vault_state_writer, dashboard, dashboard_state  # noqa: E402
+from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, discord_ping, discord_dm_capture, gcal_sync, vault_state_writer, dashboard, dashboard_state, thread_chat  # noqa: E402
 # Deadlines are now sourced from inbox classification (project documents
 # mentioning dated milestones), not Gmail/Calendar.
 from security import sanitize  # noqa: E402
@@ -155,6 +155,197 @@ def _maybe_post_heartbeat_tick(curr: dict) -> None:
         print(f"heartbeat_tick post failed: {exc}", file=sys.stderr)
 
 
+_BUCKET_KIND: dict[str, tuple[str, str]] = {
+    # bucket -> (notify kind, stable threshold label stored in `fired`)
+    "approaching": ("deadline_72h", "72h"),
+    "soon":        ("deadline_72h", "72h"),
+    "urgent":      ("deadline_24h", "24h"),
+    "overdue":     ("deadline_overdue", "overdue"),
+}
+
+
+def _route_deadlines() -> None:
+    """Slice 3: post threshold-crossings into per-row forum threads in
+    #deadlines and refresh the edited 'Next 3 deadlines' rollup.
+
+    First sighting of any row creates the thread with the matching embed
+    (72h / 24h / overdue) and the row's stable key is recorded. Subsequent
+    ticks only post when the row crosses into a higher-urgency bucket
+    that hasn't already fired. Idempotent across ticks; safe to re-run."""
+    buckets = imminent.scan()
+    state = dashboard_state.load()
+    deadlines_state = state.setdefault("deadlines", {})
+
+    for item in imminent.actionable(buckets):
+        kind, threshold = _BUCKET_KIND[item["bucket"]]
+        key = item["key"]
+        record = deadlines_state.get(key)
+        if record is None:
+            # First time we've seen this row at any threshold -- create
+            # the forum thread with the matching embed.
+            course = item.get("course") or ""
+            title = item.get("title") or "(untitled)"
+            thread_name = (f"{course} — {title}" if course else title)[:100]
+            resp = dashboard.notify(kind, item, thread_name=thread_name)
+            if resp is not None:
+                # Forum-channel create returns channel_id = new thread,
+                # id = starter message of that thread.
+                thread_id = str(resp.get("channel_id") or resp.get("id") or "")
+                msg_id = str(resp.get("id") or "")
+                if thread_id and msg_id:
+                    deadlines_state[key] = {
+                        "fired": [threshold],
+                        "thread_id": thread_id,
+                        "starter_message_id": msg_id,
+                        "last_message_id": msg_id,
+                    }
+        else:
+            fired = record.get("fired") or []
+            if threshold not in fired:
+                thread_id = record.get("thread_id")
+                if thread_id:
+                    resp = dashboard.notify(kind, item, thread_id=thread_id)
+                    if resp is not None:
+                        fired.append(threshold)
+                        record["fired"] = fired
+                        last_id = resp.get("id")
+                        if last_id:
+                            record["last_message_id"] = str(last_id)
+
+    # "Next 3" rollup: edited-in-place inside its own forum thread so
+    # CrudusLiv can pin the starter message once by hand.
+    top3 = imminent.all_upcoming(buckets)[:3]
+    next3 = state.setdefault("next3", {"thread_id": None, "message_id": None})
+    msg_id = next3.get("message_id")
+    thread_id = next3.get("thread_id")
+    if msg_id and thread_id:
+        resp = dashboard.edit_message(
+            "next3", {"items": top3},
+            message_id=msg_id, thread_id=thread_id,
+        )
+        if resp is None and top3:
+            # Edit failed (thread/message deleted out-of-band). Forget it
+            # and let the next tick recreate -- avoids edit-recreate flap
+            # when the route itself is broken.
+            next3["thread_id"] = None
+            next3["message_id"] = None
+    elif top3:
+        resp = dashboard.notify("next3", {"items": top3}, thread_name="Next 3 deadlines")
+        if resp is not None:
+            new_thread = resp.get("channel_id") or resp.get("id")
+            new_msg = resp.get("id")
+            if new_thread and new_msg:
+                next3["thread_id"] = str(new_thread)
+                next3["message_id"] = str(new_msg)
+    state["next3"] = next3
+
+    dashboard_state.save(state)
+
+
+def _route_pr_events() -> None:
+    """Slice 5: pull recent PR events across every repo the GITHUB_TOKEN
+    can see (not just GITHUB_ASSIGNMENT_REPOS -- that env var stays scoped
+    to the code-reviewer skill) and route each through #pr-activity.
+
+    Dedupe via dashboard_state['pr_activity']['seen_event_ids'] -- event
+    ids are stable strings (open/merge/comment + repo + number) so the
+    same transition can never post twice. The seen list is capped to the
+    last 500 ids to bound state-file growth."""
+    try:
+        from integrations import github_int
+    except Exception as exc:
+        print(f"_route_pr_events: github_int import failed: {exc}", file=sys.stderr)
+        return
+
+    state = dashboard_state.load()
+    pr_state = state.setdefault("pr_activity", {})
+    seen_list: list[str] = pr_state.get("seen_event_ids") or []
+    seen: set[str] = set(seen_list)
+
+    # 24h window matches the rest of the scanner TTLs.
+    since = time.time() - 24 * 3600
+    try:
+        events = github_int.recent_pr_events(since=since)
+    except Exception as exc:
+        print(f"recent_pr_events failed: {exc}", file=sys.stderr)
+        return
+
+    posted = 0
+    for ev in events:
+        eid = ev.get("id")
+        if not eid or eid in seen:
+            continue
+        try:
+            resp = dashboard.notify(ev["kind"], ev)
+        except Exception as exc:
+            print(f"pr_event post failed for {eid}: {exc}", file=sys.stderr)
+            continue
+        if resp is not None:
+            seen.add(eid)
+            posted += 1
+
+    if posted:
+        # Preserve insertion order (chronological), keep last 500.
+        merged = [i for i in seen_list if i in seen]
+        for new_id in (ev["id"] for ev in events if ev.get("id") in seen and ev["id"] not in merged):
+            merged.append(new_id)
+        pr_state["seen_event_ids"] = merged[-500:]
+        dashboard_state.save(state)
+        print(f"pr_activity: posted {posted} event(s)")
+
+
+def _route_lecture(summary: dict, rel_path: str) -> None:
+    """Slice 4: post a freshly-summarised lecture as a new forum thread in
+    #lectures, then record the thread id in dashboard_state.lectures so
+    future slices (Slice 7 in-thread chat) can recognise it.
+
+    `summary` is one entry from inbox.process_new_files(); it carries name
+    (course), title, tldr, source, etc. `rel_path` is the note's path
+    relative to the vault root."""
+    # Dedupe by rel_path -- inbox.process_new_files() won't return the
+    # same lecture twice (source files move to _processed/), but a manual
+    # re-invocation of _route_lecture for the same note shouldn't spawn a
+    # second forum thread.
+    try:
+        prior = dashboard_state.load().get("lectures", {}).get(rel_path)
+    except Exception:
+        prior = None
+    if prior:
+        return
+
+    course = summary.get("name") or ""
+    title = summary.get("title") or "(untitled)"
+    thread_name = (f"{course} — {title}" if course else title)[:100]
+    payload = {
+        "name": course,
+        "title": title,
+        "tldr": summary.get("tldr") or [],
+        "vault_path": rel_path,
+        "source": summary.get("source") or "",
+    }
+    try:
+        resp = dashboard.notify("lecture_new", payload, thread_name=thread_name)
+    except Exception as exc:
+        print(f"_route_lecture failed for {rel_path}: {exc}", file=sys.stderr)
+        return
+    if resp is None:
+        return
+    thread_id = str(resp.get("channel_id") or resp.get("id") or "")
+    msg_id = str(resp.get("id") or "")
+    if not thread_id or not msg_id:
+        return
+    try:
+        state = dashboard_state.load()
+        lectures_state = state.setdefault("lectures", {})
+        lectures_state[rel_path] = {
+            "thread_id": thread_id,
+            "starter_message_id": msg_id,
+        }
+        dashboard_state.save(state)
+    except Exception as exc:
+        print(f"_route_lecture state save failed for {rel_path}: {exc}", file=sys.stderr)
+
+
 def _persist(curr: dict) -> None:
     snapshot.save_state(curr)
     try:
@@ -179,11 +370,14 @@ def _main_impl() -> int:
         bucket = summary["name"]
         if summary.get("subcategory"):
             bucket += f" / {summary['subcategory']}"
-        dashboard.notify("daily_digest", {
-            "title": f"{label}: {bucket}",
-            "body": f"{summary['title']}\nsaved to {rel}",
-            "priority": "normal",
-        })
+        if summary["type"] == "lecture":
+            _route_lecture(summary, rel)
+        else:
+            dashboard.notify("daily_digest", {
+                "title": f"{label}: {bucket}",
+                "body": f"{summary['title']}\nsaved to {rel}",
+                "priority": "normal",
+            })
         print(f"{label} ({summary['source']}) -> {rel}")
         inbox_deadlines.extend(summary.get("deadlines") or [])
 
@@ -195,22 +389,19 @@ def _main_impl() -> int:
     # as a continuous timeline. Cheap (one read+write per daily file).
     inbox.refresh_daily_timeline()
 
-    # Imminent scan checks DEADLINES.md ## Active and DMs about anything
-    # within 48h (high) or 24h (urgent). Runs every tick so freshly-promoted
-    # deadlines surface immediately.
-    urgent, soon = imminent.scan()
-    if urgent:
-        dashboard.notify("deadline_24h", {
-            "title": "Due within 24h",
-            "body": imminent.format_body(urgent),
-            "priority": "urgent",
-        })
-    if soon:
-        dashboard.notify("deadline_72h", {
-            "title": "Due within 48h",
-            "body": imminent.format_body(soon),
-            "priority": "high",
-        })
+    # Slice 3: imminent scan -> per-row forum threads in #deadlines.
+    # Threshold crossings (72h/24h/overdue) become embeds inside the
+    # row's thread; the "Next 3" rollup is edited in place every tick.
+    try:
+        _route_deadlines()
+    except Exception as exc:
+        print(f"_route_deadlines failed: {exc}", file=sys.stderr)
+
+    # Slice 5: PR open/merge/comment events across every visible repo.
+    try:
+        _route_pr_events()
+    except Exception as exc:
+        print(f"_route_pr_events failed: {exc}", file=sys.stderr)
 
     # Section 2: Discord ping toast scan.
     user_id = os.environ.get("DISCORD_USER_ID")
@@ -249,6 +440,20 @@ def _main_impl() -> int:
                 print(f"DM capture: {counts['note']} notes, {counts['finance']} finance, {counts['chit-chat']} discarded")
         except Exception as exc:
             print(f"discord_dm_capture failed: {exc}", file=sys.stderr)
+
+        # Slice 7: reply in agent-owned forum threads (deadlines + lectures).
+        # Shares state_path with the two scanners above; an LLM/post failure
+        # still marks the source row seen so the loop can't get stuck.
+        try:
+            posted = thread_chat.scan_and_reply(
+                db_path,
+                user_id=user_id,
+                state_path=state_path,
+            )
+            if posted:
+                print(f"thread_chat: posted {posted} in-thread reply/replies")
+        except Exception as exc:
+            print(f"thread_chat failed: {exc}", file=sys.stderr)
 
     # Section 6: push new DEADLINES.md rows and gcal: tags to Google Calendar.
     try:

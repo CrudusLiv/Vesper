@@ -3,11 +3,11 @@
 Sidecar JSON at .claude/data/discord_dashboard_state.json. Each top-level
 key is a namespace owned by one slice:
 
-  heartbeat        -- Slice 1 (#heartbeat throttle bookkeeping)
-  deadlines        -- Slice 3 (per-row threshold tracking + forum thread ids)
-  lectures         -- Slice 4 (per-note thread ids)
-  pr_activity      -- Slice 5 (per-PR last-event-id)
-  next3_message_id -- Slice 3 ("Next 3 deadlines" edited message id)
+  heartbeat   -- Slice 1 (#heartbeat throttle bookkeeping)
+  deadlines   -- Slice 3 (per-row threshold tracking + forum thread ids)
+  next3       -- Slice 3 ("Next 3 deadlines" edited-in-place forum thread)
+  lectures    -- Slice 4 (per-note thread ids)
+  pr_activity -- Slice 5 (per-PR last-event-id)
 
 Each slice should only read/write its own namespace. load() seeds missing
 keys from DEFAULT_STATE so forward-compatible adds don't break old state
@@ -28,7 +28,13 @@ DEFAULT_STATE: dict[str, Any] = {
     "deadlines": {},
     "lectures": {},
     "pr_activity": {},
-    "next3_message_id": None,
+    # Slice 3 "Next 3 deadlines" lives in its own forum thread because
+    # #deadlines is a forum channel. Both ids are needed: thread_id to
+    # target the right thread on PATCH, message_id to edit the starter
+    # post in place. Forward-compat: old state files without `next3`
+    # get seeded with this default; the legacy `next3_message_id` key
+    # at the top level (pre-Slice-3 schema) is ignored.
+    "next3": {"thread_id": None, "message_id": None},
 }
 
 

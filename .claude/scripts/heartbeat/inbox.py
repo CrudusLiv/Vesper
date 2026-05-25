@@ -298,6 +298,7 @@ def _process_one(src: Path) -> dict | None:
         })
 
     title = _extract_title(note_md) or classification.get("title") or src.stem
+    tldr = _extract_tldr(note_md) if doc_type == "lecture" else []
     return {
         "path": note_path,
         "type": doc_type,
@@ -306,6 +307,7 @@ def _process_one(src: Path) -> dict | None:
         "title": title,
         "source": src.name,
         "deadlines": deadlines,
+        "tldr": tldr,
     }
 
 
@@ -434,6 +436,26 @@ def _extract_title(note_md: str) -> str | None:
         if line.startswith("# "):
             return line[2:].strip()
     return None
+
+
+def _extract_tldr(note_md: str, n: int = 3) -> list[str]:
+    """First n bullets under '## Key concepts' -- used as the TL;DR posted
+    to #lectures (Slice 4). Empty list if the section is missing or has no
+    bullets. Strips leading dashes/asterisks; preserves the bullet text."""
+    in_section = False
+    out: list[str] = []
+    for line in note_md.splitlines():
+        if line.startswith("## "):
+            in_section = (line.strip() == "## Key concepts")
+            continue
+        if not in_section:
+            continue
+        stripped = line.lstrip()
+        if stripped.startswith(("- ", "* ")):
+            out.append(stripped[2:].strip())
+            if len(out) >= n:
+                break
+    return out
 
 
 DAILY = VAULT / "daily"

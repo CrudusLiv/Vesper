@@ -47,6 +47,115 @@ def _resolve_targets(g, repos: list[str] | None) -> list[str]:
     return [r.full_name for r in g.get_user().get_repos()][:20]
 
 
+def _all_user_repos(g, *, limit: int = 30) -> list[str]:
+    """All repos the authenticated token can see, sorted by recent push.
+    Capped to `limit` so we don't blow the rate budget on a long history
+    of stale forks. Slice 5 (#pr-activity) uses this -- it intentionally
+    ignores GITHUB_ASSIGNMENT_REPOS, which is scoped to code-reviewer."""
+    try:
+        repos = g.get_user().get_repos(sort="pushed", direction="desc")
+    except Exception as exc:
+        print(f"_all_user_repos failed: {exc}", file=sys.stderr)
+        return []
+    out: list[str] = []
+    for r in repos:
+        out.append(r.full_name)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def recent_pr_events(repos: list[str] | None = None, since: float | None = None) -> list[dict]:
+    """PR transitions and comments across `repos` since `since` (epoch s).
+
+    Emits three event kinds with stable dedupe ids:
+      pr_opened     id=f"open:{repo}:{number}"    -- PR created since cutoff
+      pr_merged     id=f"merge:{repo}:{number}"   -- PR merged since cutoff
+      pr_comment    id=f"comment:{comment_id}"    -- new issue/PR comment
+
+    Empty `repos` falls back to _all_user_repos(g). Sorted oldest first so
+    the dedupe consumer adds events in chronological order."""
+    g = _get_client()
+    if not g:
+        return []
+    if since is None:
+        since = (datetime.now(timezone.utc) - timedelta(days=1)).timestamp()
+    since_dt = datetime.fromtimestamp(since, tz=timezone.utc)
+
+    targets = repos if repos else _all_user_repos(g)
+    out: list[dict] = []
+    for full_name in targets:
+        try:
+            repo = g.get_repo(full_name)
+        except Exception as exc:
+            print(f"recent_pr_events: get_repo({full_name}) failed: {exc}", file=sys.stderr)
+            continue
+
+        # PRs updated since cutoff -- pulls opens and merges with one walk.
+        try:
+            for pr in repo.get_pulls(state="all", sort="updated", direction="desc"):
+                updated = pr.updated_at.replace(tzinfo=timezone.utc)
+                if updated < since_dt:
+                    break
+                created = pr.created_at.replace(tzinfo=timezone.utc)
+                if created >= since_dt:
+                    out.append({
+                        "id": f"open:{full_name}:{pr.number}",
+                        "kind": "pr_opened",
+                        "repo": full_name,
+                        "pr_number": pr.number,
+                        "pr_title": pr.title or "",
+                        "pr_url": pr.html_url,
+                        "actor": pr.user.login if pr.user else "",
+                        "ts": created.timestamp(),
+                    })
+                if pr.merged_at:
+                    merged = pr.merged_at.replace(tzinfo=timezone.utc)
+                    if merged >= since_dt:
+                        actor = ""
+                        if pr.merged_by:
+                            actor = pr.merged_by.login
+                        elif pr.user:
+                            actor = pr.user.login
+                        out.append({
+                            "id": f"merge:{full_name}:{pr.number}",
+                            "kind": "pr_merged",
+                            "repo": full_name,
+                            "pr_number": pr.number,
+                            "pr_title": pr.title or "",
+                            "pr_url": pr.html_url,
+                            "actor": actor,
+                            "ts": merged.timestamp(),
+                        })
+        except Exception as exc:
+            print(f"recent_pr_events: get_pulls({full_name}) failed: {exc}", file=sys.stderr)
+
+        # Issue comments since cutoff -- filter to those on PRs by URL shape.
+        try:
+            for c in repo.get_issues_comments(since=since_dt):
+                if "/pull/" not in (c.html_url or ""):
+                    continue
+                try:
+                    pr_num = int(c.html_url.split("/pull/")[1].split("#", 1)[0].rstrip("/").split("/", 1)[0])
+                except (ValueError, IndexError):
+                    continue
+                out.append({
+                    "id": f"comment:{c.id}",
+                    "kind": "pr_comment",
+                    "repo": full_name,
+                    "pr_number": pr_num,
+                    "pr_title": "",
+                    "pr_url": c.html_url,
+                    "actor": c.user.login if c.user else "",
+                    "ts": c.created_at.replace(tzinfo=timezone.utc).timestamp(),
+                })
+        except Exception as exc:
+            print(f"recent_pr_events: get_issues_comments({full_name}) failed: {exc}", file=sys.stderr)
+
+    out.sort(key=lambda e: e.get("ts", 0))
+    return out
+
+
 def recent_pushes(days: int = 7, repos: list[str] | None = None) -> list[dict]:
     g = _get_client()
     if not g:
