@@ -17,6 +17,8 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
+import traceback
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -26,7 +28,7 @@ sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts" / "integrations"))
 import _env  # noqa: F401, E402 -- side effect: loads .env into os.environ so notify can read DISCORD_BOT_TOKEN
 
-from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, discord_ping, discord_dm_capture, gcal_sync, vault_state_writer  # noqa: E402
+from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, discord_ping, discord_dm_capture, gcal_sync, vault_state_writer, dashboard, dashboard_state  # noqa: E402
 # Deadlines are now sourced from inbox classification (project documents
 # mentioning dated milestones), not Gmail/Calendar.
 from security import sanitize  # noqa: E402
@@ -102,6 +104,57 @@ def execute(actions: dict | None) -> dict:
     return summary
 
 
+def _compute_tick_status(snapshot_data: dict) -> tuple[str, list[str]]:
+    """Inspect the snapshot dict for per-integration error fields. Returns
+    ('red', [failing names]) if any integration reported an error this tick,
+    else ('green', [])."""
+    failing: list[str] = []
+    for name, data in snapshot_data.items():
+        if isinstance(data, dict) and "error" in data:
+            failing.append(name)
+    return ("red" if failing else "green", failing)
+
+
+def _maybe_post_heartbeat_tick(curr: dict) -> None:
+    """Throttled #heartbeat post. Fires when status changed, ticks_since_post
+    >= 8 (~4h at 30min cadence), or this is the first tick of the KL day.
+    Otherwise increments the silent-tick counter and returns."""
+    try:
+        status, failing = _compute_tick_status(curr)
+        now_ts = curr.get("timestamp") or time.time()
+        state = dashboard_state.load()
+        hb = state.get("heartbeat") or {}
+        last_status = hb.get("last_status")
+        last_ts = hb.get("last_tick_ts") or 0
+        ticks_since = hb.get("ticks_since_post") or 0
+
+        last_day = datetime.fromtimestamp(last_ts, tz=KL).date() if last_ts else None
+        today = datetime.fromtimestamp(now_ts, tz=KL).date()
+        first_today = last_day != today
+
+        if last_status != status or ticks_since >= 8 or first_today:
+            resp = dashboard.notify("heartbeat_tick", {
+                "status": status,
+                "failing": failing,
+                "tick_ts": now_ts,
+            })
+            if resp is not None:
+                # Only advance state when the post actually went out.
+                # Otherwise a transient failure / unset env var would
+                # silently consume the trigger and skip the retry.
+                hb["last_status"] = status
+                hb["ticks_since_post"] = 0
+        else:
+            hb["ticks_since_post"] = ticks_since + 1
+        hb["last_tick_ts"] = now_ts
+        state["heartbeat"] = hb
+        dashboard_state.save(state)
+    except Exception as exc:
+        # A failure here must never break the tick. The error route will
+        # catch any uncaught path via main()'s try/except.
+        print(f"heartbeat_tick post failed: {exc}", file=sys.stderr)
+
+
 def _persist(curr: dict) -> None:
     snapshot.save_state(curr)
     try:
@@ -110,7 +163,7 @@ def _persist(curr: dict) -> None:
         print(f"vault_state_writer failed: {exc}", file=sys.stderr)
 
 
-def main() -> int:
+def _main_impl() -> int:
     if not in_active_hours():
         print("Outside active hours (09:00-22:00 KL). Exiting.")
         return 0
@@ -200,6 +253,7 @@ def main() -> int:
 
     curr = snapshot.build_snapshot()
     curr["heartbeat_ran_at"] = curr["timestamp"]  # only set by scheduled heartbeat
+    _maybe_post_heartbeat_tick(curr)
     prev = snapshot.load_state()
     diff = snapshot.diff_snapshot(prev, curr)
 
@@ -236,6 +290,24 @@ def main() -> int:
     _persist(curr)
     print(f"Tick complete: {result['notifications']} notifications.")
     return 0
+
+
+def main() -> int:
+    """Wrap _main_impl in a try/except so any uncaught exception is routed
+    to #errors before re-raising. Lets Task Scheduler still register a
+    non-zero exit, while Discord sees the trace immediately."""
+    try:
+        return _main_impl()
+    except Exception:
+        try:
+            dashboard.notify("error", {
+                "script": "heartbeat",
+                "trace": traceback.format_exc(),
+                "tick_ts": time.time(),
+            })
+        except Exception as exc:
+            print(f"failed to route error to #errors: {exc}", file=sys.stderr)
+        raise
 
 
 if __name__ == "__main__":
