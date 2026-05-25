@@ -9,19 +9,23 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
-VAULT = PROJECT_DIR / "Dynamous" / "Memory"
-
 _FORBIDDEN_PREFIXES = ("_trash", "finance")
 
 
+def vault() -> Path:
+    """Return the vault root, re-reading CLAUDE_PROJECT_DIR each call so
+    tests that monkeypatch the env var see the temp vault."""
+    project_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
+    return project_dir / "Dynamous" / "Memory"
+
+
 def validate(path: str) -> Path:
-    """Resolve `path` under VAULT, raising ValueError on any unsafe input.
+    """Resolve `path` under the vault root, raising ValueError on any unsafe input.
 
     Rules:
       - Must be relative (no leading slash, no Windows drive letter)
       - Must not contain `..` segments
-      - After resolving symlinks, must remain under VAULT
+      - After resolving symlinks, must remain under the vault root
       - Must not target `_trash/` (restores go through undo only)
       - Must not target `finance/` (finance writes live in _handle_finance)
     """
@@ -42,12 +46,9 @@ def validate(path: str) -> Path:
     if top in _FORBIDDEN_PREFIXES:
         raise ValueError(f"path under {top}/ is off-limits, got {path!r}")
 
-    # Re-read CLAUDE_PROJECT_DIR at call time so test fixtures work
-    project_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
-    vault = project_dir / "Dynamous" / "Memory"
-
-    candidate = (vault / path).resolve()
-    vault_resolved = vault.resolve()
+    vault_root = vault()
+    candidate = (vault_root / path).resolve()
+    vault_resolved = vault_root.resolve()
     try:
         candidate.relative_to(vault_resolved)
     except ValueError:
