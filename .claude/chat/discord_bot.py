@@ -259,11 +259,22 @@ def main() -> int:
             print(f"_handle_finance unknown-react failed: {exc}", file=sys.stderr)
 
     async def _handle_vesper(message) -> None:
-        print(f"[stub] _handle_vesper: {message.id} content={message.content!r}")
         try:
-            await message.add_reaction("❓")
+            async with message.channel.typing():
+                reply = await asyncio.to_thread(
+                    handler.process_message,
+                    str(message.author.id),
+                    str(message.channel.id),
+                    message.content,
+                )
+            for chunk in _split_for_discord(reply):
+                await message.channel.send(chunk)
         except Exception as exc:
-            print(f"_handle_vesper reaction failed: {exc}", file=sys.stderr)
+            print(f"vesper reply failed: {exc}", file=sys.stderr)
+            try:
+                await message.channel.send(f"[error generating reply: {type(exc).__name__}]")
+            except Exception:
+                pass
 
     async def _route_message(message) -> bool:
         """Dispatch by channel.id. Returns True if a handler ran."""
