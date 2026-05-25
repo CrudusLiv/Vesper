@@ -56,3 +56,18 @@ def test_validate_rejects_trash(tmp_vault):
 def test_validate_rejects_finance(tmp_vault):
     with pytest.raises(ValueError, match="finance"):
         paths.validate("finance/2026-05.md")
+
+
+def test_validate_rejects_finance_case_insensitive(tmp_vault):
+    with pytest.raises(ValueError, match="off-limits"):
+        paths.validate("Finance/secret.md")
+
+
+def test_validate_rejects_trash_case_insensitive(tmp_vault):
+    with pytest.raises(ValueError, match="off-limits"):
+        paths.validate("_Trash/2026-05-25/x.md")
+
+
+def test_validate_rejects_whitespace_only(tmp_vault):
+    with pytest.raises(ValueError, match="non-empty"):
+        paths.validate("   ")

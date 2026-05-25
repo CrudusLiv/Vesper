@@ -29,7 +29,7 @@ def validate(path: str) -> Path:
       - Must not target `_trash/` (restores go through undo only)
       - Must not target `finance/` (finance writes live in _handle_finance)
     """
-    if not path or not isinstance(path, str):
+    if not path or not isinstance(path, str) or not path.strip():
         raise ValueError("path must be a non-empty string")
 
     # Absolute path or drive letter
@@ -43,7 +43,7 @@ def validate(path: str) -> Path:
         raise ValueError(f"path must not contain '..', got {path!r}")
 
     top = parts[0] if parts else ""
-    if top in _FORBIDDEN_PREFIXES:
+    if top.lower() in _FORBIDDEN_PREFIXES:
         raise ValueError(f"path under {top}/ is off-limits, got {path!r}")
 
     vault_root = vault()
@@ -51,7 +51,7 @@ def validate(path: str) -> Path:
     vault_resolved = vault_root.resolve()
     try:
         candidate.relative_to(vault_resolved)
-    except ValueError:
-        raise ValueError(f"path resolves outside vault: {path!r}")
+    except ValueError as exc:
+        raise ValueError(f"path resolves outside vault: {path!r}") from exc
 
     return candidate
