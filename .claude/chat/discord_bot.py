@@ -40,7 +40,6 @@ import integrations._env  # noqa: F401, E402  -- loads .env
 
 from chat import handler  # noqa: E402
 from finance import tracker as finance_tracker  # noqa: E402
-from heartbeat import dashboard as dashboard  # noqa: E402
 from heartbeat import discord_dm_capture  # noqa: E402
 from integrations import discord_int  # noqa: E402
 
