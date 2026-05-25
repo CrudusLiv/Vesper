@@ -190,6 +190,8 @@ def main() -> int:
                 except Exception as exc:
                     print(f"_handle_inbox failure-react failed: {exc}", file=sys.stderr)
                 return
+            elif discord_dm_capture.classify(content) != "note":
+                return
 
         if discord_dm_capture.classify(content) == "note":
             try:
