@@ -13,6 +13,10 @@ from pathlib import Path
 _FORBIDDEN_PREFIXES = ("_trash", "finance")
 
 
+def _is_forbidden_prefix(top: str) -> bool:
+    return top.lower() in _FORBIDDEN_PREFIXES
+
+
 def vault() -> Path:
     """Return the vault root, re-reading CLAUDE_PROJECT_DIR each call so
     tests that monkeypatch the env var see the temp vault."""
@@ -44,7 +48,7 @@ def validate(path: str) -> Path:
         raise ValueError(f"path must not contain '..', got {path!r}")
 
     top = parts[0] if parts else ""
-    if top.lower() in _FORBIDDEN_PREFIXES:
+    if _is_forbidden_prefix(top):
         raise ValueError(f"path under {top}/ is off-limits, got {path!r}")
 
     vault_root = vault()
@@ -74,7 +78,7 @@ def _vault_files() -> list[str]:
         except ValueError:
             continue
         top = rel.split("/", 1)[0]
-        if top.lower() in _FORBIDDEN_PREFIXES:
+        if _is_forbidden_prefix(top):
             continue
         out.append(rel)
     return out
