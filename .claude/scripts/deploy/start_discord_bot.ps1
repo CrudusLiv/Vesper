@@ -42,9 +42,11 @@ while ($true) {
     $start = Get-Date
     try {
         # Stream stdout+stderr to the daily log. 2>&1 merges them so order is
-        # preserved. The python process inherits this script's environment, so
-        # .env loading happens inside discord_int.py via _env.py.
-        & $py $BotScript 2>&1 | ForEach-Object {
+        # preserved. -u forces unbuffered stdout so on_ready prints reach the
+        # log immediately instead of waiting for an 8KB block to fill. The
+        # python process inherits this script's environment, so .env loading
+        # happens inside discord_int.py via _env.py.
+        & $py -u $BotScript 2>&1 | ForEach-Object {
             $line = "[{0}] {1}" -f (Get-Date -Format 'HH:mm:ss'), $_
             Add-Content -Path $logFile -Value $line
         }
