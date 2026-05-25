@@ -33,6 +33,7 @@ def test_append_adds_text_to_existing_file(tmp_vault, isolated_log):
     target = tmp_vault / "notes" / "x.md"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text("hello\n", encoding="utf-8")
+    original_size = target.stat().st_size  # byte count, may differ from len("hello\n") on Windows
 
     result = actions.append("notes/x.md", "world")
     assert target.read_text(encoding="utf-8") == "hello\nworld"
@@ -41,7 +42,7 @@ def test_append_adds_text_to_existing_file(tmp_vault, isolated_log):
     log = _read_log(isolated_log)
     assert len(log) == 1
     assert log[0]["action"] == "append"
-    assert log[0]["undo_state"]["original_length"] == len("hello\n")
+    assert log[0]["undo_state"]["original_length"] == original_size
 
 
 def test_append_errors_when_file_missing(tmp_vault, isolated_log):

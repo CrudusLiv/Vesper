@@ -19,8 +19,7 @@ def append(path: str, text: str) -> dict:
     target = paths.validate(path)
     if not target.exists():
         raise FileNotFoundError(path)
-    original_content = target.read_text(encoding="utf-8")
-    original_length = len(original_content)
+    original_length = target.stat().st_size
     with target.open("a", encoding="utf-8") as f:
         f.write(text)
     transactions.append({
