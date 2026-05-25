@@ -1,23 +1,36 @@
-"""Phase 7 Discord bot: cache messages (Phase 4.1) AND reply to DMs from
-the authorized user. Replaces the bot in `discord_int.run_bot()`.
+"""Discord bot: cache every message AND route owner posts in three input
+channels (#inbox, #finance, #vesper) to per-channel handlers. Replaces the
+bot in `discord_int.run_bot()`.
 
-SECURITY CARVE-OUT
-==================
+SECURITY CARVE-OUT (post 2026-05-24 input pivot)
+================================================
 This is the ONLY place in the codebase that calls `channel.send()`. The
 guardrail is two-pronged and AND-ed:
 
-1.  message.guild is None       -- DMs only, never server channels.
-2.  message.author.id matches DISCORD_USER_ID from .env -- only CrudusLiv.
+1.  message.author.id matches DISCORD_USER_ID from .env -- only CrudusLiv.
+2.  message.channel.id matches DISCORD_INBOX_CHANNEL_ID, _FINANCE_, or
+    _VESPER_ -- input is channel-scoped, never wildcard.
 
-Without both, the bot does NOT reply. The cache write (Phase 4.1 read-only
-behavior) still happens for every message, regardless.
+DMs from the owner are CACHE-ONLY: they are stored in discord_cache.db but
+trigger no handler, no reply, no react. The pre-pivot DM-input branches
+(finance parser, note classifier, totals, attachment, chat) have moved to
+_handle_finance / _handle_inbox / _handle_vesper respectively. The cache
+write (Phase 4.1 read-only behavior) still fires for every message,
+regardless of author or channel, before the gate runs.
+
+Outbound DMs from this codebase are limited to discord_ping.py's
+server-mention forward via notify.send. Everything else routes through
+dashboard.notify(<kind>, ...) webhooks. See:
+docs/superpowers/specs/2026-05-24-discord-input-pivot-design.md
 
 ENV REQUIRED
 ============
 - DISCORD_BOT_TOKEN  -- the bot token (Phase 4.1, already set)
-- DISCORD_USER_ID    -- your numeric Discord user ID. To find it: enable
-  Developer Mode in Discord (Settings -> Advanced -> Developer Mode), then
-  right-click your name anywhere -> Copy User ID.
+- DISCORD_USER_ID    -- your numeric Discord user ID. Developer Mode ->
+  right-click your name -> Copy User ID.
+- DISCORD_INBOX_CHANNEL_ID, DISCORD_FINANCE_CHANNEL_ID,
+  DISCORD_VESPER_CHANNEL_ID -- right-click each channel -> Copy Channel ID.
+  Each is optional; that arm is disabled if unset.
 
 RUN
 ===
