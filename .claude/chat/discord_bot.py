@@ -159,11 +159,59 @@ def main() -> int:
             print(f"  {name} arm: {status}")
 
     async def _handle_inbox(message) -> None:
-        print(f"[stub] _handle_inbox: {message.id} content={message.content!r}")
-        try:
-            await message.add_reaction("❓")
-        except Exception as exc:
-            print(f"_handle_inbox reaction failed: {exc}", file=sys.stderr)
+        content = (message.content or "").strip()
+        handled = False
+
+        if message.attachments:
+            saved = await _save_attachments_to_inbox(message)
+            if saved:
+                _spawn_heartbeat()
+                handled = True
+                try:
+                    await message.add_reaction("✅")
+                except Exception as exc:
+                    print(f"_handle_inbox reaction failed: {exc}", file=sys.stderr)
+            elif any(Path(a.filename).suffix.lower() in INBOX_EXTS for a in message.attachments):
+                try:
+                    await message.add_reaction("❌")
+                    await message.channel.send("[inbox] attachment save returned no files — check logs.")
+                except Exception as exc:
+                    print(f"_handle_inbox failure-react failed: {exc}", file=sys.stderr)
+                return
+
+        if discord_dm_capture.classify(content) == "note":
+            try:
+                dt = datetime.now(tz=KL)
+                stripped = await asyncio.to_thread(
+                    discord_dm_capture._append_note, NOTES_FILE, dt, content,
+                )
+                if stripped:
+                    handled = True
+                    try:
+                        await message.add_reaction("✅")
+                    except Exception as exc:
+                        print(f"_handle_inbox reaction failed: {exc}", file=sys.stderr)
+                else:
+                    handled = True
+                    try:
+                        await message.add_reaction("❌")
+                        await message.channel.send("[inbox] note was empty after stripping `note:` prefix.")
+                    except Exception as exc:
+                        print(f"_handle_inbox empty-note react failed: {exc}", file=sys.stderr)
+            except Exception as exc:
+                print(f"_handle_inbox note failed: {exc}", file=sys.stderr)
+                try:
+                    await message.add_reaction("❌")
+                    await message.channel.send(f"[inbox] note save error: {type(exc).__name__}")
+                except Exception:
+                    pass
+                return
+
+        if not handled:
+            try:
+                await message.add_reaction("❓")
+            except Exception as exc:
+                print(f"_handle_inbox unknown-react failed: {exc}", file=sys.stderr)
 
     async def _handle_finance(message) -> None:
         print(f"[stub] _handle_finance: {message.id} content={message.content!r}")
