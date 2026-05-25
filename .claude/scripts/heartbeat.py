@@ -95,11 +95,11 @@ def execute(actions: dict | None) -> dict:
     if not actions:
         return summary
     for n in (actions.get("notifications") or []):
-        notify.send(
-            n.get("title") or "Heartbeat",
-            n.get("body") or "",
-            n.get("priority") or "normal",
-        )
+        dashboard.notify("daily_digest", {
+            "title": n.get("title") or "Heartbeat",
+            "body": n.get("body") or "",
+            "priority": n.get("priority") or "normal",
+        })
         summary["notifications"] += 1
     return summary
 
@@ -179,12 +179,11 @@ def _main_impl() -> int:
         bucket = summary["name"]
         if summary.get("subcategory"):
             bucket += f" / {summary['subcategory']}"
-        notify.send(
-            f"{label}: {bucket}",
-            f"{summary['title']}\nsaved to {rel}",
-            priority="normal",
-            toast=True,
-        )
+        dashboard.notify("daily_digest", {
+            "title": f"{label}: {bucket}",
+            "body": f"{summary['title']}\nsaved to {rel}",
+            "priority": "normal",
+        })
         print(f"{label} ({summary['source']}) -> {rel}")
         inbox_deadlines.extend(summary.get("deadlines") or [])
 
@@ -201,9 +200,17 @@ def _main_impl() -> int:
     # deadlines surface immediately.
     urgent, soon = imminent.scan()
     if urgent:
-        notify.send("Due within 24h", imminent.format_body(urgent), priority="urgent", toast=True)
+        dashboard.notify("deadline_24h", {
+            "title": "Due within 24h",
+            "body": imminent.format_body(urgent),
+            "priority": "urgent",
+        })
     if soon:
-        notify.send("Due within 48h", imminent.format_body(soon), priority="high", toast=True)
+        dashboard.notify("deadline_72h", {
+            "title": "Due within 48h",
+            "body": imminent.format_body(soon),
+            "priority": "high",
+        })
 
     # Section 2: Discord ping toast scan.
     user_id = os.environ.get("DISCORD_USER_ID")
@@ -261,13 +268,21 @@ def _main_impl() -> int:
     # imminent-deadline scan, late-day nudge. These shouldn't be gated by
     # whether new emails/PRs/etc came in.
     for pillar in habits.auto_check(curr):
-        notify.send("Habit auto-checked", pillar, priority="low")
+        dashboard.notify("morning_digest", {
+            "title": "Habit auto-checked",
+            "body": pillar,
+            "priority": "low",
+        })
 
     if habits.should_nudge():
         unchecked = habits.unchecked_pillars()
         if unchecked:
             title, body = habits.nudge_message(unchecked)
-            notify.send(title, body, priority="normal")
+            dashboard.notify("evening_nudge", {
+                "title": title,
+                "body": body,
+                "priority": "normal",
+            })
             habits.mark_nudged()
 
     if not snapshot.has_changes(diff):
