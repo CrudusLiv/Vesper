@@ -292,139 +292,28 @@ def main() -> int:
 
     @client.event
     async def on_message(message) -> None:
+        # Cache every message, always. Phase 4.1 behavior preserved.
         try:
             discord_int._store_message(message, self_id_holder["id"])
         except Exception as exc:
             print(f"cache write failed: {exc}", file=sys.stderr)
 
-        # Channel input router (pivot). Owner-only.
-        if (
-            message.guild is not None
-            and owner_id
-            and str(message.author.id) == owner_id
-            and not message.author.bot
-        ):
-            if await _route_message(message):
-                return
-
-        # Reply gate -- both conditions required.
-        if message.guild is not None:
-            return
+        # Owner-only gate. Bots, other users, and our own messages are ignored.
         if not owner_id or str(message.author.id) != owner_id:
             return
         if message.author.bot:
             return
         if str(message.author.id) == self_id_holder["id"]:
-            return  # don't reply to ourselves
-
-        content = (message.content or "").strip()
-
-        # Finance: try the expense parser first. If the message matches the
-        # "<amount> <category> [note]" pattern, log it and skip the chat
-        # handler -- no need for the LLM to read it.
-        expense = finance_tracker.parse(content)
-        if expense and not message.attachments:
-            try:
-                result = await asyncio.to_thread(
-                    finance_tracker.log,
-                    expense["amount"],
-                    expense["category"],
-                    expense["note"],
-                )
-                ack = (
-                    f"logged {finance_tracker.CURRENCY}{expense['amount']:.2f} / "
-                    f"{expense['category']}"
-                    + (f" ({expense['note']})" if expense['note'] else "")
-                    + f"\nmonth total {finance_tracker.CURRENCY}{result['month_total']:.2f}"
-                    + f" | {expense['category']} {finance_tracker.CURRENCY}{result['category_total']:.2f}"
-                )
-                await message.channel.send(ack)
-            except Exception as exc:
-                print(f"finance log failed: {exc}", file=sys.stderr)
-                await message.channel.send(f"[finance log error: {type(exc).__name__}]")
             return
 
-        # Note capture: classify and append directly to notes/NOTES.md.
-        # The bot's reply confirms what code actually did, not what an LLM
-        # guesses happened.
-        if discord_dm_capture.classify(content) == "note":
-            try:
-                dt = datetime.now(tz=KL)
-                stripped = await asyncio.to_thread(
-                    discord_dm_capture._append_note, NOTES_FILE, dt, content,
-                )
-                if stripped:
-                    ack = "got it — note appended to `notes/NOTES.md`."
-                    try:
-                        dashboard.notify("inbox_text", {
-                            "content": stripped,
-                            "ts": dt.timestamp(),
-                            "vault_path": "notes/NOTES.md",
-                        })
-                    except Exception as exc:
-                        print(f"inbox_text notify failed: {exc}", file=sys.stderr)
-                else:
-                    ack = "note was empty after stripping the `note:` prefix — nothing written."
-                await message.channel.send(ack)
-            except Exception as exc:
-                print(f"note route failed: {exc}", file=sys.stderr)
-                try:
-                    await message.channel.send(f"[note route error: {type(exc).__name__}]")
-                except Exception:
-                    pass
+        # Channel input router. Owner posts in configured channels get handled.
+        if message.guild is not None:
+            await _route_message(message)
             return
 
-        # "totals" -- show the month summary.
-        if content.lower() in ("totals", "finance", "spend"):
-            try:
-                summary = await asyncio.to_thread(finance_tracker.month_summary)
-                await message.channel.send(f"```\n{summary}\n```")
-            except Exception as exc:
-                print(f"finance summary failed: {exc}", file=sys.stderr)
-            return
-
-        # Inbox drop-zone: if the owner DM'd a .pdf or .pptx, save it and
-        # kick off a heartbeat tick so it gets classified + summarised.
-        if message.attachments:
-            saved = await _save_attachments_to_inbox(message)
-            if saved:
-                _spawn_heartbeat()
-                created_ts = message.created_at.replace(tzinfo=timezone.utc).timestamp()
-                for filename in saved:
-                    try:
-                        dashboard.notify("inbox_attachment", {
-                            "filename": filename,
-                            "vault_path": f"inbox/{filename}",
-                            "ts": created_ts,
-                        })
-                    except Exception as exc:
-                        print(f"inbox_attachment notify failed: {exc}", file=sys.stderr)
-                ack = f"got {len(saved)} file(s) in inbox: {', '.join(saved)}\nprocessing now -- summary DM incoming."
-                try:
-                    await message.channel.send(ack)
-                except Exception as exc:
-                    print(f"ack send failed: {exc}", file=sys.stderr)
-                # If the message has no text, don't also run it through the
-                # chat handler (it'd just see an empty prompt).
-                if not (message.content or "").strip():
-                    return
-
-        try:
-            async with message.channel.typing():
-                reply = await asyncio.to_thread(
-                    handler.process_message,
-                    str(message.author.id),
-                    str(message.channel.id),
-                    message.content,
-                )
-            for chunk in _split_for_discord(reply):
-                await message.channel.send(chunk)
-        except Exception as exc:
-            print(f"reply failed: {exc}", file=sys.stderr)
-            try:
-                await message.channel.send(f"[error generating reply: {type(exc).__name__}]")
-            except Exception:
-                pass
+        # Owner DMs the bot: cache-only per the 2026-05-24 input pivot.
+        # See docs/superpowers/specs/2026-05-24-discord-input-pivot-design.md
+        return
 
     client.run(token)
     return 0
