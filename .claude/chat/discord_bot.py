@@ -126,6 +126,10 @@ def main() -> int:
             file=sys.stderr,
         )
 
+    inbox_channel_id   = os.environ.get("DISCORD_INBOX_CHANNEL_ID", "").strip()
+    finance_channel_id = os.environ.get("DISCORD_FINANCE_CHANNEL_ID", "").strip()
+    vesper_channel_id  = os.environ.get("DISCORD_VESPER_CHANNEL_ID", "").strip()
+
     try:
         import discord
     except ImportError:
@@ -145,6 +149,14 @@ def main() -> int:
         self_id_holder["id"] = str(client.user.id) if client.user else None
         owner_status = f"owner={owner_id}" if owner_id else "NO OWNER (cache-only mode)"
         print(f"Connected as {client.user} (id={self_id_holder['id']}) | {owner_status}")
+        arms = [
+            ("inbox",   inbox_channel_id),
+            ("finance", finance_channel_id),
+            ("vesper",  vesper_channel_id),
+        ]
+        for name, cid in arms:
+            status = f"enabled (channel={cid})" if cid else "DISABLED (env var unset)"
+            print(f"  {name} arm: {status}")
 
     @client.event
     async def on_message(message) -> None:
