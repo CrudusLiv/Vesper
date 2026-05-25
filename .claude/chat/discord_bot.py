@@ -158,12 +158,57 @@ def main() -> int:
             status = f"enabled (channel={cid})" if cid else "DISABLED (env var unset)"
             print(f"  {name} arm: {status}")
 
+    async def _handle_inbox(message) -> None:
+        print(f"[stub] _handle_inbox: {message.id} content={message.content!r}")
+        try:
+            await message.add_reaction("❓")
+        except Exception as exc:
+            print(f"_handle_inbox reaction failed: {exc}", file=sys.stderr)
+
+    async def _handle_finance(message) -> None:
+        print(f"[stub] _handle_finance: {message.id} content={message.content!r}")
+        try:
+            await message.add_reaction("❓")
+        except Exception as exc:
+            print(f"_handle_finance reaction failed: {exc}", file=sys.stderr)
+
+    async def _handle_vesper(message) -> None:
+        print(f"[stub] _handle_vesper: {message.id} content={message.content!r}")
+        try:
+            await message.add_reaction("❓")
+        except Exception as exc:
+            print(f"_handle_vesper reaction failed: {exc}", file=sys.stderr)
+
+    async def _route_message(message) -> bool:
+        """Dispatch by channel.id. Returns True if a handler ran."""
+        cid = str(message.channel.id)
+        if cid and cid == inbox_channel_id:
+            await _handle_inbox(message)
+            return True
+        if cid and cid == finance_channel_id:
+            await _handle_finance(message)
+            return True
+        if cid and cid == vesper_channel_id:
+            await _handle_vesper(message)
+            return True
+        return False
+
     @client.event
     async def on_message(message) -> None:
         try:
             discord_int._store_message(message, self_id_holder["id"])
         except Exception as exc:
             print(f"cache write failed: {exc}", file=sys.stderr)
+
+        # Channel input router (pivot). Owner-only.
+        if (
+            message.guild is not None
+            and owner_id
+            and str(message.author.id) == owner_id
+            and not message.author.bot
+        ):
+            if await _route_message(message):
+                return
 
         # Reply gate -- both conditions required.
         if message.guild is not None:
