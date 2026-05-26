@@ -9,9 +9,13 @@ Caller (chat handler) translates exceptions into user-facing replies.
 """
 from __future__ import annotations
 
+import shutil
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from vault import paths, transactions
+
+_KL = timezone(timedelta(hours=8))
 
 
 def append(path: str, text: str) -> dict:
@@ -100,3 +104,54 @@ def move(path: str, dest_dir: str) -> dict:
         "undo_state": {"from": path, "to": new_rel},
     })
     return {"path": new_rel}
+
+
+def delete(path: str) -> dict:
+    """Soft-delete: move file to _trash/YYYY-MM-DD/. Never calls unlink."""
+    src = paths.validate(path)
+    if not src.exists():
+        raise FileNotFoundError(path)
+    vault_root = paths.vault()
+    today = datetime.now(_KL).strftime("%Y-%m-%d")
+    trash_dir = vault_root / "_trash" / today
+    trash_dir.mkdir(parents=True, exist_ok=True)
+    dst = trash_dir / src.name
+    i = 1
+    while dst.exists():
+        dst = trash_dir / f"{src.stem}_{i}{src.suffix}"
+        i += 1
+    shutil.move(str(src), str(dst))
+    trash_rel = dst.relative_to(vault_root).as_posix()
+    transactions.append({
+        "action": "delete",
+        "args": {"path": path},
+        "undo_state": {"trash_path": trash_rel, "original_path": path},
+    })
+    return {"path": path, "trash_path": trash_rel}
+
+
+def list_dir(directory: str) -> dict:
+    """Return non-recursive entry names in `directory`. No log entry.
+
+    list_dir cannot use paths.validate() because that helper assumes a file
+    path; we enforce the same safety rules inline.
+    """
+    if directory.startswith("/") or directory.startswith("\\") or (len(directory) >= 2 and directory[1] == ":"):
+        raise ValueError(f"path must be relative, got {directory!r}")
+    parts = Path(directory).parts
+    if ".." in parts:
+        raise ValueError(f"path must not contain '..', got {directory!r}")
+    top = parts[0] if parts else ""
+    if paths._is_forbidden_prefix(top):
+        raise ValueError(f"path under {top}/ is off-limits, got {directory!r}")
+
+    vault_root = paths.vault()
+    target = (vault_root / directory).resolve()
+    try:
+        target.relative_to(vault_root.resolve())
+    except ValueError as exc:
+        raise ValueError(f"path resolves outside vault: {directory!r}") from exc
+    if not target.is_dir():
+        raise NotADirectoryError(directory)
+    entries = sorted(p.name for p in target.iterdir())
+    return {"directory": directory, "entries": entries}

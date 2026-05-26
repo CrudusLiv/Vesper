@@ -147,3 +147,81 @@ def test_move_relocates_file_to_other_dir(tmp_vault, isolated_log):
     log = _read_log(isolated_log)
     assert log[0]["action"] == "move"
     assert log[0]["undo_state"] == {"from": "notes/x.md", "to": "research/x.md"}
+
+
+# ---------- delete (soft) ----------
+
+def test_delete_moves_file_to_trash(tmp_vault, isolated_log):
+    src = tmp_vault / "notes" / "x.md"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text("bye", encoding="utf-8")
+
+    result = actions.delete("notes/x.md")
+    assert not src.exists()
+
+    trash_rel = result["trash_path"]
+    assert trash_rel.startswith("_trash/")
+    assert (tmp_vault / trash_rel).read_text(encoding="utf-8") == "bye"
+
+    log = _read_log(isolated_log)
+    assert log[0]["action"] == "delete"
+    assert log[0]["undo_state"]["trash_path"] == trash_rel
+
+
+def test_delete_does_not_call_unlink(tmp_vault, isolated_log, monkeypatch):
+    """Hard guarantee: soft-delete never reaches Path.unlink."""
+    src = tmp_vault / "notes" / "x.md"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text("bye", encoding="utf-8")
+
+    real_unlink = Path.unlink
+    def boom(self, *a, **kw):
+        raise AssertionError(f"unlink called on {self}")
+    monkeypatch.setattr(Path, "unlink", boom)
+    try:
+        actions.delete("notes/x.md")
+    finally:
+        monkeypatch.setattr(Path, "unlink", real_unlink)
+
+
+def test_delete_handles_name_collision_in_trash(tmp_vault, isolated_log):
+    """Two deletes in the same day of files with the same name must both succeed."""
+    for first in (True, False):
+        src = tmp_vault / "notes" / "x.md"
+        src.parent.mkdir(parents=True, exist_ok=True)
+        src.write_text("v1" if first else "v2", encoding="utf-8")
+        actions.delete("notes/x.md")
+
+    # Trash should contain two distinct entries under today's date dir
+    trash_today = list((tmp_vault / "_trash").rglob("x*.md"))
+    assert len(trash_today) == 2
+
+
+# ---------- list ----------
+
+def test_list_returns_filenames_in_dir(tmp_vault, isolated_log):
+    d = tmp_vault / "notes"
+    d.mkdir(exist_ok=True)
+    (d / "a.md").write_text("", encoding="utf-8")
+    (d / "b.md").write_text("", encoding="utf-8")
+
+    result = actions.list_dir("notes")
+    assert set(result["entries"]) == {"a.md", "b.md"}
+
+
+def test_list_is_not_recursive(tmp_vault, isolated_log):
+    d = tmp_vault / "notes"
+    (d / "sub").mkdir(parents=True, exist_ok=True)
+    (d / "a.md").write_text("", encoding="utf-8")
+    (d / "sub" / "b.md").write_text("", encoding="utf-8")
+
+    result = actions.list_dir("notes")
+    assert "a.md" in result["entries"]
+    assert "b.md" not in result["entries"]
+    assert "sub" in result["entries"]  # dir name shown, no descent
+
+
+def test_list_logs_nothing(tmp_vault, isolated_log):
+    (tmp_vault / "notes").mkdir(exist_ok=True)
+    actions.list_dir("notes")
+    assert _read_log(isolated_log) == []  # read-only verb, no log entry
