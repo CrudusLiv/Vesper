@@ -33,4 +33,5 @@ __pycache__/
 !.claude/chat/intent_parser.py
 !.claude/chat/about.py
 !.claude/chat/handler.py
+!.claude/chat/dry_run.py
 Dynamous/Memory/.obsidian/
