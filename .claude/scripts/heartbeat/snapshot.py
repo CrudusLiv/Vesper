@@ -59,7 +59,7 @@ def _snapshot_gmail() -> dict:
 
 def _snapshot_discord() -> dict:
     from integrations import discord_int
-    rows = discord_int.recent(hours=24, limit=50, dms_only=False)
+    rows = discord_int.recent(hours=24, limit=50, dms_only=True)
     return {
         "new_count": len(rows),
         "items": [
