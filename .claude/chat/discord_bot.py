@@ -55,6 +55,7 @@ from chat import handler  # noqa: E402
 from finance import tracker as finance_tracker  # noqa: E402
 from heartbeat import discord_dm_capture  # noqa: E402
 from integrations import discord_int  # noqa: E402
+from vault import actions as vault_actions  # noqa: E402
 
 from datetime import datetime, timedelta, timezone  # noqa: E402
 
@@ -220,6 +221,53 @@ def main() -> int:
                 except Exception:
                     pass
                 return
+
+        # Deterministic verb dispatch: `undo`, `delete: <path>`, `list: <dir>`.
+        # No LLM. These call into vault.actions (Tasks 4-7 infrastructure).
+        if not handled:
+            lowered = content.lower()
+            verb_text: str | None = None
+            try:
+                if lowered == "undo":
+                    result = await asyncio.to_thread(vault_actions.undo)
+                    verb_text = result["message"]
+                elif lowered.startswith("delete:"):
+                    target = content[len("delete:"):].strip()
+                    result = await asyncio.to_thread(vault_actions.delete, target)
+                    verb_text = f"soft-deleted {result['path']} -> {result['trash_path']}"
+                elif lowered.startswith("list:"):
+                    target = content[len("list:"):].strip()
+                    result = await asyncio.to_thread(vault_actions.list_dir, target)
+                    entries = result["entries"]
+                    if not entries:
+                        verb_text = f"{result['directory']}/ is empty"
+                    else:
+                        listing = ", ".join(entries[:20])
+                        more = f" (+{len(entries) - 20} more)" if len(entries) > 20 else ""
+                        verb_text = f"{result['directory']}/: {listing}{more}"
+
+                if verb_text is not None:
+                    handled = True
+                    try:
+                        await message.add_reaction("✅")
+                    except Exception as exc:
+                        print(f"_handle_inbox verb-react failed: {exc}", file=sys.stderr)
+                    await message.channel.send(f"[inbox] {verb_text}")
+            except (FileNotFoundError, FileExistsError, ValueError, NotADirectoryError) as exc:
+                handled = True
+                try:
+                    await message.add_reaction("❌")
+                    await message.channel.send(f"[inbox] {type(exc).__name__}: {exc}")
+                except Exception as exc2:
+                    print(f"_handle_inbox verb error-react failed: {exc2}", file=sys.stderr)
+            except Exception as exc:
+                handled = True
+                print(f"_handle_inbox verb failed: {exc}", file=sys.stderr)
+                try:
+                    await message.add_reaction("❌")
+                    await message.channel.send(f"[inbox] verb error: {type(exc).__name__}")
+                except Exception:
+                    pass
 
         if not handled:
             try:
