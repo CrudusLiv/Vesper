@@ -422,8 +422,7 @@ def _main_impl() -> int:
         except Exception as exc:
             print(f"discord_ping scan failed: {exc}", file=sys.stderr)
 
-    # Section 3: classify and route self-DMs to the capture bot.
-    if user_id:
+        # Section 3: classify and route self-DMs to the capture bot.
         try:
             bot_channel = (PROJECT_DIR / ".claude" / "data" / "discord_dm_channel.txt").read_text(encoding="utf-8").strip() or None
         except OSError:
