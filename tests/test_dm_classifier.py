@@ -71,15 +71,15 @@ def test_routing_finance_appends_to_monthly_file(tmp_vault):
     assert "RM 25 lunch" in body
 
 
-def test_routing_note_appends_to_daily(tmp_vault):
+def test_routing_note_appends_to_rolling_notes_file(tmp_vault):
     m = _import_module()
     msg = {"id": "2", "content": "note: try FastEmbed", "created_at": 1700000000.0}
     m.route(msg, label="note")
-    expected = tmp_vault / "daily" / "2023-11-15.md"
+    expected = tmp_vault / "notes" / "NOTES.md"
     assert expected.exists()
     body = expected.read_text(encoding="utf-8")
-    assert "## Captured" in body
-    assert "note: try FastEmbed" in body
+    assert "try FastEmbed" in body
+    assert "2023-11-15" in body  # date prefix on the bullet
 
 
 def test_routing_chitchat_discards(tmp_vault):

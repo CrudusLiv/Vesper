@@ -93,7 +93,11 @@ def _append_note(target: Path, dt: datetime, raw: str) -> str:
 
     Multi-line bodies indent under the bullet. Returns the stripped note
     body on success, or empty string if the message is empty after the
-    `note:` prefix is stripped (in which case nothing is written)."""
+    `note:` prefix is stripped (in which case nothing is written).
+
+    Two-step write so the bullet portion goes through vault.actions.append
+    and lands in the transaction log -- this is what makes `undo` in
+    #inbox reverse a `note:` post."""
     stripped = _NOTE_PREFIX_STRIP_RE.sub("", raw, count=1).strip()
     if not stripped:
         return ""
@@ -111,7 +115,22 @@ def _append_note(target: Path, dt: datetime, raw: str) -> str:
     trimmed = text.rstrip()
     last_line = trimmed.rsplit("\n", 1)[-1].lstrip()
     sep = "\n" if last_line.startswith(("- ", "  ")) else "\n\n"
-    target.write_text(trimmed + sep + bullet, encoding="utf-8")
+    # Step 1: normalize the file's tail (rstrip + separator). NOT logged --
+    # this is bookkeeping, not the actual note write.
+    target.write_text(trimmed + sep, encoding="utf-8")
+    # Step 2: append the bullet via vault.actions so the transaction log
+    # gets an entry and `undo` can truncate it back off.
+    try:
+        from vault import actions
+        rel = target.relative_to(VAULT).as_posix()
+        actions.append(rel, bullet)
+    except Exception as exc:
+        # If the vault module isn't importable (very early bootstrap) or
+        # paths.validate rejects the path, fall back to a plain append so
+        # the note still lands -- just won't be undoable.
+        print(f"_append_note: action-logged append failed ({exc}); falling back", file=sys.stderr)
+        with target.open("a", encoding="utf-8") as f:
+            f.write(bullet)
     return stripped
 
 

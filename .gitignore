@@ -30,4 +30,8 @@ __pycache__/
 .claude/settings.local.json
 .claude/chat/*
 !.claude/chat/discord_bot.py
+!.claude/chat/intent_parser.py
+!.claude/chat/about.py
+!.claude/chat/handler.py
+!.claude/chat/dry_run.py
 Dynamous/Memory/.obsidian/

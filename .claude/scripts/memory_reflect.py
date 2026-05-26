@@ -143,12 +143,84 @@ def reset_habits() -> str:
     return "no Today section"
 
 
+ABOUT_SYSTEM = """You curate ABOUT.md — durable facts about CrudusLiv himself
+(preferences, working style, recurring patterns), not project state.
+
+You receive yesterday's chat-session messages (in #vesper) and the current
+ABOUT.md. Output STRICT JSON only:
+
+{"new_bullets": ["one line each, <= 100 chars, no markdown"]}
+
+Rules:
+- Be RUTHLESS. Most exchanges produce nothing. Empty arrays are correct most days.
+- Only include facts that will still be true next month.
+- Skip task-specific or project-specific items — those belong in MEMORY.md.
+- Don't duplicate existing ABOUT.md bullets."""
+
+
+def _yesterday_chat_messages() -> str:
+    """Return yesterday's chat messages as a single string, or '' if none."""
+    import sqlite3
+    from datetime import datetime as _dt, timedelta as _td
+    db = PROJECT_DIR / ".claude" / "data" / "chat.db"
+    if not db.exists():
+        return ""
+    y_start = _dt.combine((_dt.now(KL) - _td(days=1)).date(), _dt.min.time(), tzinfo=KL).timestamp()
+    y_end = y_start + 86400
+    try:
+        conn = sqlite3.connect(str(db))
+        rows = conn.execute(
+            "SELECT role, content FROM messages WHERE ts >= ? AND ts < ? ORDER BY ts",
+            (y_start, y_end),
+        ).fetchall()
+        conn.close()
+    except sqlite3.Error:
+        return ""
+    return "\n".join(f"{role.upper()}: {content}" for role, content in rows)
+
+
+def curate_about() -> int:
+    """Returns the number of new bullets added (0 on no-op)."""
+    sys.path.insert(0, str(PROJECT_DIR / ".claude"))
+    from chat import about
+
+    chat_msgs = _yesterday_chat_messages()
+    if not chat_msgs.strip():
+        print("No chat messages yesterday. Skipping ABOUT curation.")
+        return 0
+    if not llm.is_available():
+        print("`claude` CLI not available. ABOUT curation skipped.", file=sys.stderr)
+        return 0
+
+    current = about.load_about()
+    prompt = (
+        f"YESTERDAY'S #VESPER CHAT MESSAGES:\n\n{chat_msgs}\n\n"
+        f"---\n\nCURRENT ABOUT.md:\n\n{current}\n\n"
+        f"Return JSON per the schema."
+    )
+    result = llm.call_json(prompt, system_prompt=ABOUT_SYSTEM, model="haiku") or {}
+    new_bullets = result.get("new_bullets") or []
+    if not isinstance(new_bullets, list):
+        return 0
+
+    added = 0
+    for bullet in new_bullets[:3]:
+        if isinstance(bullet, str) and about.append_bullet(bullet):
+            added += 1
+    print(f"ABOUT curation: added {added} bullet(s).")
+    return added
+
+
 def main() -> int:
     items = reflect()
     appended = append_to_memory(items)
     habits_status = reset_habits()
     print(f"Reflection: {appended} item(s) added to MEMORY.md.")
     print(f"Habits: {habits_status}.")
+    try:
+        curate_about()
+    except Exception as exc:
+        print(f"ABOUT curation failed (non-fatal): {exc}", file=sys.stderr)
     return 0
 
 
