@@ -1,60 +1,197 @@
 # BoredBot
 
-My second brain, built on Claude Code. Hooks, scripts, skills, and settings that turn Claude Code into a study partner: deadline tracking, lecture summarisation, and hybrid-RAG note search.
+A second brain built on Claude Code. Hooks, scripts, skills, and scheduled tasks that turn Claude Code into a study partner: deadline tracking, lecture summarisation, hybrid-RAG note search, a Discord dashboard that mirrors the vault, and Windows-Toast pings the moment you get @mentioned.
 
 The personal vault (notes, schedules, finances) lives locally at `Dynamous/Memory/` and is **not** committed — that directory is gitignored. Each machine keeps its own vault.
 
+Agent operates in **Advisor mode**: it drafts replies and writes into the vault, but never sends or commits without your review.
+
 ## What it does
 
-- **Deadline tracking** — pulls assignment and class deadlines from Google Calendar, deduplicates, refreshes `DEADLINES.md`, and fires Toast notifications at 24h / 48h.
-- **Lecture summarisation** — drop a `.pptx` or `.pdf` into `Dynamous/Memory/inbox/`, get a structured Obsidian note under `lectures/<course>/`.
-- **Note search (hybrid RAG)** — 70% vector + 30% BM25 over the whole vault. Embeddings are local (FastEmbed / ONNX, no API calls).
-- **Discord DM chat** — Phase 7 bot replies to your own DMs only. Read-only everywhere else.
-- **Daily reflection** — at 08:00 KL, promotes durable items from the previous day's `daily/` log into `MEMORY.md`.
-
-Agent operates in **Advisor mode**: it drafts DM replies and sends nothing else without your review.
+- **Discord @mention pings** — when you're @mentioned in any server channel the bot can see, a Windows Toast pops up and you get a DM-to-self with the message. No LLM in the loop; fastest path from "someone needs me" to "I know."
+- **Discord dashboard** — every event the heartbeat cares about (deadlines, lectures, PR activity, daily digest, errors, heartbeat liveness) posts to a dedicated channel via webhooks. Forum-style channels (`#deadlines`, `#lectures`) spawn a per-row thread; the in-thread chatbot (Slice 7) replies when you talk back.
+- **Discord channel input** — `#inbox` captures notes and `.pdf` / `.pptx` attachments; `#finance` parses expense lines into the ledger; `#vesper` is the LLM chat channel. DMs from you are cache-only.
+- **Deadline tracking** — project documents dropped into `inbox/` are classified, dated milestones get promoted into `DEADLINES.md`, mirrored to Google Calendar, and routed into forum threads at 72h / 24h / overdue thresholds.
+- **Lecture summarisation** — drop a `.pptx` or `.pdf` into `Dynamous/Memory/inbox/`, get a structured Obsidian note under `lectures/<course>/` and a new forum thread in `#lectures`.
+- **Hybrid-RAG note search** — 70% vector + 30% BM25 over the whole vault. Embeddings are local (FastEmbed / ONNX, no API calls).
+- **Heartbeat reasoning** — every 30 min during active hours, Python builds a snapshot diff and `claude -p` (Haiku) decides what (if anything) is worth notifying you about.
+- **Daily reflection** — at 08:00 KL, promotes durable items from yesterday's `daily/` log into `MEMORY.md`; rolls `HABITS.md`.
+- **Vault guardrails** — a path validator with hard-coded forbidden prefixes, an append-only JSONL transaction log, and a `suggest_for_missing` typo-recovery layer protect the vault from accidental writes.
 
 ## Requirements
 
 - Windows 11 (Task Scheduler is the deploy target — Linux/macOS works for dev only)
 - Python 3.14 (`py` launcher on PATH)
 - Claude Code
-- Google account if you want Calendar integration
-- Discord bot token if you want Discord features
+- A Discord bot token (required for pings and everything Discord-related)
+- A Google account (optional — only needed for Calendar sync)
+- A GitHub personal access token (optional — only needed for PR activity routing)
 
-## Setup
+---
+
+# Quickstart: just Discord @mention pings
+
+The minimum viable setup. You'll get a Windows Toast + a DM-to-self every time someone @mentions you in a Discord server the bot has been invited to. **No vault required, no Google account, no LLM call, no webhooks.**
+
+## 1. Create the Discord bot
+
+In the [Discord Developer Portal](https://discord.com/developers/applications):
+
+1. **New Application** → name it whatever
+2. **Bot** tab → **Reset Token** → copy the token (this becomes `DISCORD_BOT_TOKEN`)
+3. **Privileged Gateway Intents** → enable **Message Content Intent**
+4. **OAuth2 → URL Generator** → scopes: `bot`; permissions: `Read Messages/View Channels`, `Read Message History`. Open the generated URL and add the bot to the servers you want to be pinged from.
+
+Then grab your own user ID:
+
+- Discord client → Settings → Advanced → enable **Developer Mode**
+- Right-click your username → **Copy User ID** (this becomes `DISCORD_USER_ID`)
+
+## 2. Install Python deps
 
 ```powershell
-# 1. Clone
 git clone https://github.com/CrudusLiv/BoredBot.git
 cd BoredBot
-
-# 2. Install Python deps
 py -m pip install -r .claude/requirements.txt
-
-# 3. Secrets
-Copy-Item .env.example .env
-# Edit .env — only fill in what you'll actually use.
-
-# 4. (Optional) Google credentials
-#    Place google_credentials.json at .claude/data/google_credentials.json
-#    First run of the Calendar integration triggers the OAuth flow; the
-#    token is cached at .claude/data/google_token.json.
-
-# 5. Vault
-#    The agent expects Dynamous/Memory/ with at minimum SOUL.md and USER.md
-#    (see CLAUDE.md for the full layout). The directory is gitignored —
-#    copy your own vault into place, or start fresh from the templates.
-
-# 6. Open the directory in Claude Code. Session hooks fire automatically.
-
-# 7. Verify everything is wired up
-py .claude\scripts\query.py status
 ```
+
+## 3. Configure secrets
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Open `.env` and fill in only these two:
+
+```ini
+DISCORD_BOT_TOKEN=<your bot token>
+DISCORD_USER_ID=<your numeric user ID>
+```
+
+Leave every other key empty. Webhook URLs, Google creds, GitHub tokens — all optional. Their corresponding features silently skip when env vars are missing.
+
+## 4. Install the two tasks you need
+
+Open PowerShell **as Administrator** (`Register-ScheduledTask` requires elevation, even for user-scoped tasks):
+
+```powershell
+pwsh -ExecutionPolicy Bypass -File .claude\scripts\deploy\install_tasks.ps1
+```
+
+The installer registers four `secondbrain-*` tasks. For pings-only, you need:
+
+- `secondbrain-discord` — runs the bot at logon. It writes every visible message into `.claude/data/discord_cache.db`.
+- `secondbrain-heartbeat` — every 30 min between 09:00–22:00 KL, scans the cache for new `<@your_id>` mentions and fires the Toast + DM.
+
+Disable the two you don't need:
+
+```powershell
+Disable-ScheduledTask -TaskName 'secondbrain-reflect'   # needs a vault
+Disable-ScheduledTask -TaskName 'secondbrain-index'     # needs vault files to embed
+```
+
+The Discord task fires at logon — to start it now without rebooting:
+
+```powershell
+Start-ScheduledTask -TaskName 'secondbrain-discord'
+```
+
+## 5. Verify
+
+```powershell
+# Both should be Running / Ready
+Get-ScheduledTask -TaskName 'secondbrain-discord','secondbrain-heartbeat' |
+    Format-Table TaskName, State, LastRunTime, NextRunTime
+
+# Tail the bot log to confirm it connected
+Get-Content .claude\data\logs\discord-*.log -Wait -Tail 20
+
+# Manual heartbeat tick (don't wait for the next 30-min mark)
+py .claude\scripts\heartbeat.py
+```
+
+Have someone @mention you in a server the bot is in. Within 30 minutes (or immediately if you run the heartbeat manually) you should get a Toast and a DM.
+
+**Troubleshooting:** no Toast on Windows means `winotify` failed silently; check the heartbeat's stderr. No DM means `DISCORD_USER_ID` is wrong or the bot can't open a DM with you (Discord requires you share a server).
+
+---
+
+# Full setup
+
+If you want everything — dashboard, deadlines, lectures, RAG search, the LLM chat — pick up from the quickstart and add the rest.
+
+## Google credentials (optional, for Calendar)
+
+Place `google_credentials.json` at `.claude/data/google_credentials.json`. First run of any GCal command triggers an OAuth flow in your browser; the token is cached at `.claude/data/google_token.json` and reused thereafter.
+
+## Discord dashboard webhooks
+
+The dashboard routes events to channels via Discord webhooks. Each `DISCORD_HOOK_*` env var is one channel; empty values silently skip, so you can wire channels incrementally.
+
+In Discord, for each channel: **Channel Settings → Integrations → Webhooks → New Webhook → Copy URL**. Paste into the matching key in `.env`:
+
+| Env var | Channel role | Event kinds routed here |
+|---|---|---|
+| `DISCORD_HOOK_HEARTBEAT` | `#heartbeat` | `heartbeat_tick` — throttled liveness post |
+| `DISCORD_HOOK_ERRORS` | `#errors` | Uncaught script exceptions |
+| `DISCORD_HOOK_INBOX` | `#inbox` | `inbox_text`, `inbox_attachment` |
+| `DISCORD_HOOK_DEADLINES` | `#deadlines` *(forum)* | `deadline_72h`, `deadline_24h`, `deadline_overdue`, `next3`, `deadline_reply` |
+| `DISCORD_HOOK_LECTURES` | `#lectures` *(forum)* | `lecture_new`, `lecture_reply` |
+| `DISCORD_HOOK_PR_ACTIVITY` | `#pr-activity` | `pr_opened`, `pr_merged`, `pr_comment` |
+| `DISCORD_HOOK_CODE_REVIEW` | `#code-review` | `code_review` |
+| `DISCORD_HOOK_DAILY` | `#daily` | `morning_digest`, `evening_nudge`, `daily_digest` (emoji prefix distinguishes) |
+| `DISCORD_HOOK_VESPER` | `#vesper` | `vesper_reply` |
+| `DISCORD_HOOK_IDEAS` | `#ideas` | `idea` |
+| `DISCORD_HOOK_EMAIL_UNI`, `_EMAIL_PERSONAL` | `#email-*` | Reserved for email-source integrations |
+
+`#deadlines` and `#lectures` must be **forum channels** — the heartbeat creates a thread per deadline / lecture so the in-thread chatbot (Slice 7) can reply when you talk back.
+
+## Discord channel input
+
+The bot reads messages in three specific channels and routes them to handlers. Each is independent — leave any unset and that arm is disabled.
+
+| Env var | Channel | What it does |
+|---|---|---|
+| `DISCORD_INBOX_CHANNEL_ID` | `#inbox` | Text → appended to `notes/NOTES.md`. `.pdf`/`.pptx` attachments → saved to `Dynamous/Memory/inbox/` and queued for the lecture-summarizer. |
+| `DISCORD_FINANCE_CHANNEL_ID` | `#finance` | Lines like `lunch 12.50` get parsed and appended to the finance ledger. Totals are posted back. |
+| `DISCORD_VESPER_CHANNEL_ID` | `#vesper` | LLM chat with the agent's persona. |
+
+Right-click a channel in Discord (with Developer Mode on) → **Copy Channel ID**.
+
+**Security model:** the bot only ever calls `channel.send()` when the message author matches `DISCORD_USER_ID` *and* the channel ID matches one of these three. DMs are cache-only — no replies, no reacts.
+
+## GitHub (optional)
+
+```ini
+GITHUB_TOKEN=ghp_...                       # scope: repo
+GITHUB_ASSIGNMENT_REPOS=owner/repo1,owner/repo2  # scoped to the code-reviewer skill
+```
+
+`GITHUB_TOKEN` enables the PR activity router — every open/merge/comment across every repo your token can see posts to `#pr-activity`. `GITHUB_ASSIGNMENT_REPOS` is a separate, narrower list used by the code-reviewer skill.
+
+## Vault layout
+
+The agent expects `Dynamous/Memory/` to exist. Minimum required files:
+
+- `SOUL.md` — agent personality (loaded into every session via `SessionStart` hook)
+- `USER.md` — user profile (also loaded at session start)
+
+Recommended folders (created on first use, but worth knowing):
+
+- `daily/YYYY-MM-DD.md` — per-day session logs
+- `MEMORY.md` — durable promoted items
+- `DEADLINES.md` — active deadlines (auto-managed)
+- `HABITS.md` — habit tracker (auto-rolled)
+- `inbox/` — drop zone for `.pptx` / `.pdf`
+- `inbox/_processed/` — gitignored; sources are deleted after summarisation, the folder stays via `.gitkeep`
+- `lectures/<course>/` — output of the lecture-summarizer
+- `notes/NOTES.md` — `#inbox` channel notes land here
+
+The vault is gitignored — copy your own in, or start fresh from templates.
 
 ## Deploying the background bot
 
-The four scheduled tasks live in `.claude/scripts/deploy/`. Open PowerShell **as Administrator** (`Register-ScheduledTask` requires elevation, even for user-scoped tasks):
+Four scheduled tasks live in `.claude/scripts/deploy/`. Open PowerShell **as Administrator**:
 
 ```powershell
 # Default — heartbeat runs invisibly (no console window)
@@ -66,6 +203,13 @@ pwsh -ExecutionPolicy Bypass -File .claude\scripts\deploy\install_tasks.ps1 -Vis
 
 Idempotent — re-running replaces any existing `secondbrain-*` task.
 
+| Task | Trigger | What it runs |
+|---|---|---|
+| `secondbrain-heartbeat` | Daily 09:00 KL, every 30 min for 13 h | `run_heartbeat.vbs` → `heartbeat.py` — snapshot diff, LLM reasoning, dashboard posts, Toast pings |
+| `secondbrain-reflect` | Daily 08:00 KL | `memory_reflect.py` — promote yesterday's daily log into `MEMORY.md`, roll `HABITS.md` |
+| `secondbrain-index` | Every 10 min | `run_index.vbs` → `memory/memory_index.py` — re-embed changed vault files |
+| `secondbrain-discord` | At logon, restart on failure | `start_discord_bot.vbs` → `start_discord_bot.ps1` — message cache + channel router |
+
 **Choosing heartbeat launch style:**
 
 | Mode | How it runs | When to use |
@@ -73,18 +217,11 @@ Idempotent — re-running replaces any existing `secondbrain-*` task.
 | Default (invisible) | `wscript.exe run_heartbeat.vbs` — no popup | Normal daily use — output is written to `state/refresh-log.md` in the vault |
 | `-VisibleHeartbeat` | `py heartbeat.py` directly — shows a console window | Debugging; lets you read stdout/stderr live |
 
-The `secondbrain-discord` task triggers at logon. After installing, either **reboot** or start it manually for this session:
+The `secondbrain-discord` task triggers at logon. After installing, either reboot or start it manually:
 
 ```powershell
 Start-ScheduledTask -TaskName 'secondbrain-discord'
 ```
-
-| Task | Trigger | What it runs |
-|---|---|---|
-| `secondbrain-heartbeat` | Daily 09:00 KL, every 30 min for 13 h | `run_heartbeat.vbs` → `heartbeat.py` — integration scan, Toast alerts (windowless by default) |
-| `secondbrain-reflect`   | Daily 08:00 KL | `memory_reflect.py` — promote daily log into `MEMORY.md` |
-| `secondbrain-index`     | Every 10 min | `run_index.vbs` → `memory/memory_index.py` — re-embed changed vault files (windowless) |
-| `secondbrain-discord`   | At logon, restart on failure | `start_discord_bot.vbs` → `start_discord_bot.ps1` — DM chat + message cache (windowless) |
 
 Inspect:
 
@@ -97,23 +234,22 @@ Get-Content .claude\data\logs\discord-*.log -Wait -Tail 20
 
 ## Pausing the bot (disable without uninstalling)
 
-If you want the bot to **stop auto-running** but keep all the task definitions, env, OAuth tokens, and vault intact for later — disable the scheduled tasks. They stay registered but won't fire until you re-enable them.
+Disable the scheduled tasks. They stay registered but won't fire until re-enabled.
 
 Open PowerShell **as Administrator**:
 
 ```powershell
-# Disable all four tasks at once
+# Disable all four
 Get-ScheduledTask -TaskName 'secondbrain-*' | Disable-ScheduledTask
 
-# Or disable individually
+# Or individually
 Disable-ScheduledTask -TaskName 'secondbrain-heartbeat'
 Disable-ScheduledTask -TaskName 'secondbrain-discord'
 ```
 
-A disabled task survives reboots, Windows updates, and re-logons — it will not run again until you explicitly enable it. The Discord bot, since it runs at logon, also needs the **already-running** process killed if you disable it mid-session:
+A disabled task survives reboots, Windows updates, and re-logons — it won't run again until you explicitly enable it. The Discord bot, since it runs at logon, also needs the already-running process killed if you disable it mid-session:
 
 ```powershell
-# Kill the live Discord bot loop (the launcher will not restart it once the task is disabled)
 Get-Process -Name pwsh, wscript, python, py -ErrorAction SilentlyContinue |
     Where-Object { $_.Path -like '*BoredBot*' -or $_.CommandLine -like '*discord_bot*' } |
     Stop-Process -Force
@@ -136,8 +272,6 @@ The Discord task will fire again at your next logon (or run `Start-ScheduledTask
 
 ### Fully uninstalling
 
-If you want the tasks **gone**, not just paused:
-
 ```powershell
 pwsh -ExecutionPolicy Bypass -File .claude\scripts\deploy\uninstall_tasks.ps1
 ```
@@ -150,18 +284,20 @@ Removes all four tasks. Logs and vault data are preserved — delete `.claude\da
 |------|---------|
 | `.claude/hooks/` | SessionStart, PreCompact, SessionEnd, PreToolUse, UserPromptSubmit |
 | `.claude/scripts/` | `query.py` CLI dispatcher, `heartbeat.py`, `memory_reflect.py`, integrations, memory (RAG), deploy scripts |
-| `.claude/scripts/deploy/` | `install_tasks.ps1`, `uninstall_tasks.ps1`, `start_discord_bot.ps1` |
-| `.claude/chat/` | Discord DM chat bot (Phase 7) |
+| `.claude/scripts/heartbeat/` | Tick sub-modules — `dashboard.py` (webhook router), `discord_ping.py` (@mention scanner), `deadlines.py`, `inbox.py`, `imminent.py`, `gcal_sync.py`, `toast.py`, `notify.py`, `llm.py`, `thread_chat.py`, etc. |
+| `.claude/scripts/vault/` | Vault guardrails — `paths.py` (path validator), `transactions.py` (append-only JSONL log), `actions.py` (append/create helpers) |
+| `.claude/scripts/deploy/` | `install_tasks.ps1`, `uninstall_tasks.ps1`, `start_discord_bot.ps1`, `run_heartbeat.vbs`, `run_index.vbs` |
+| `.claude/chat/` | Discord bot — message cache + `#inbox` / `#finance` / `#vesper` channel router |
 | `.claude/skills/` | Skills the agent invokes — `deadline-tracker`, `lecture-summarizer`, `note-search`, `vault-structure` |
 | `.claude/settings.json` | Wires hooks into Claude Code |
-| `.claude/data/` | Runtime artefacts — OAuth tokens, SQLite memory DB, FastEmbed cache, logs (gitignored) |
+| `.claude/data/` | Runtime artefacts — OAuth tokens, SQLite memory DB, FastEmbed cache, Discord cache, dashboard state, logs (gitignored) |
 | `tests/` | pytest suite |
 | `Dynamous/Memory/` | Personal vault (local-only, gitignored) |
 
 ## Quick commands
 
 ```powershell
-# Integration status
+# Integration status — which features are wired up
 py .claude\scripts\query.py status
 
 # Pull data
@@ -186,4 +322,4 @@ pytest
 
 Most subcommands accept `--json` for machine-readable output.
 
-See `CLAUDE.md` for the full architecture notes, hook lifecycle, and integration-template walkthrough.
+See `CLAUDE.md` for full architecture notes, hook lifecycle, and the integration-template walkthrough.
