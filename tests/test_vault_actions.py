@@ -10,15 +10,14 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".claude" / "scripts"))
 
-from vault import actions, transactions  # noqa: E402
+from vault import actions  # noqa: E402
 
 
 @pytest.fixture
-def isolated_log(tmp_data, monkeypatch):
-    """Redirect the transaction log to tmp_data so tests don't write to real log."""
-    log = tmp_data / "vault_transactions.jsonl"
-    monkeypatch.setattr(transactions, "LOG_PATH", log)
-    return log
+def isolated_log(tmp_vault, tmp_data) -> Path:
+    """tmp_vault sets CLAUDE_PROJECT_DIR, so transactions._log_path() resolves
+    into tmp_data automatically. Just return the path tests should read from."""
+    return tmp_data / "vault_transactions.jsonl"
 
 
 def _read_log(log: Path) -> list[dict]:
