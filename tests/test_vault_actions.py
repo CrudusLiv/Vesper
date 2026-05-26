@@ -77,3 +77,73 @@ def test_create_creates_parent_directories(tmp_vault, isolated_log):
     actions.create("research/new-area/note.md", "content")
     target = tmp_vault / "research" / "new-area" / "note.md"
     assert target.read_text(encoding="utf-8") == "content"
+
+
+# ---------- edit ----------
+
+def test_edit_replaces_single_occurrence(tmp_vault, isolated_log):
+    target = tmp_vault / "notes" / "x.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("alpha beta gamma\n", encoding="utf-8")
+
+    actions.edit("notes/x.md", find="beta", replace="BETA")
+    assert target.read_text(encoding="utf-8") == "alpha BETA gamma\n"
+    log = _read_log(isolated_log)
+    assert log[0]["action"] == "edit"
+    assert log[0]["undo_state"] == {"find_was": "beta", "replace_was": "BETA"}
+
+
+def test_edit_errors_when_find_missing(tmp_vault, isolated_log):
+    target = tmp_vault / "notes" / "x.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("alpha\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="0 matches"):
+        actions.edit("notes/x.md", find="beta", replace="BETA")
+
+
+def test_edit_errors_when_find_ambiguous(tmp_vault, isolated_log):
+    target = tmp_vault / "notes" / "x.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("beta beta\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="2 matches"):
+        actions.edit("notes/x.md", find="beta", replace="BETA")
+
+
+# ---------- rename ----------
+
+def test_rename_moves_file_within_same_dir(tmp_vault, isolated_log):
+    src = tmp_vault / "notes" / "old.md"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text("hi", encoding="utf-8")
+
+    actions.rename("notes/old.md", "new.md")
+    assert not src.exists()
+    assert (tmp_vault / "notes" / "new.md").read_text(encoding="utf-8") == "hi"
+    log = _read_log(isolated_log)
+    assert log[0]["action"] == "rename"
+    assert log[0]["undo_state"]["old_path"] == "notes/old.md"
+    assert log[0]["undo_state"]["new_path"] == "notes/new.md"
+
+
+def test_rename_errors_when_target_exists(tmp_vault, isolated_log):
+    src = tmp_vault / "notes" / "old.md"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text("hi", encoding="utf-8")
+    (tmp_vault / "notes" / "new.md").write_text("taken", encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        actions.rename("notes/old.md", "new.md")
+
+
+# ---------- move ----------
+
+def test_move_relocates_file_to_other_dir(tmp_vault, isolated_log):
+    src = tmp_vault / "notes" / "x.md"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text("hi", encoding="utf-8")
+
+    actions.move("notes/x.md", "research")
+    assert not src.exists()
+    assert (tmp_vault / "research" / "x.md").read_text(encoding="utf-8") == "hi"
+    log = _read_log(isolated_log)
+    assert log[0]["action"] == "move"
+    assert log[0]["undo_state"] == {"from": "notes/x.md", "to": "research/x.md"}
