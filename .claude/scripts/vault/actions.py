@@ -130,6 +130,78 @@ def delete(path: str) -> dict:
     return {"path": path, "trash_path": trash_rel}
 
 
+def undo() -> dict:
+    """Reverse the most recent action. Each inverse is logged as a new entry
+    (so undo-undo works). Returns {"message": str} on no-op or success."""
+    last = transactions.read_last()
+    if last is None:
+        return {"message": "nothing to undo"}
+
+    verb = last["action"]
+    args = last.get("args", {})
+    undo_state = last.get("undo_state", {})
+
+    if verb == "append":
+        target = paths.validate(args["path"])
+        original_length = undo_state["original_length"]
+        with target.open("rb+") as f:
+            f.truncate(original_length)
+        transactions.append({
+            "action": "undo_of_append",
+            "args": {"path": args["path"]},
+            "undo_state": {"text": args["text"]},
+        })
+        return {"message": f"undid append on {args['path']}"}
+
+    if verb == "undo_of_append":
+        # Re-apply the original append
+        return append(args["path"], undo_state["text"])
+
+    if verb == "create":
+        # Undo of create = soft-delete the file we created
+        result = delete(args["path"])
+        # delete() already logged its own entry, so we don't double-log.
+        return {"message": f"undid create of {args['path']} (moved to {result['trash_path']})"}
+
+    if verb == "delete":
+        # Restore from trash to original location
+        trash_rel = undo_state["trash_path"]
+        original = undo_state["original_path"]
+        src = paths.vault() / trash_rel  # trash paths can't go through validate()
+        dst = paths.validate(original)
+        if dst.exists():
+            raise FileExistsError(f"cannot restore {original}: file exists at destination")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(src), str(dst))
+        transactions.append({
+            "action": "undo_of_delete",
+            "args": {"path": original},
+            "undo_state": {"trash_path": trash_rel},
+        })
+        return {"message": f"restored {original} from trash"}
+
+    if verb == "rename":
+        old_path = undo_state["old_path"]
+        new_path = undo_state["new_path"]
+        # rename() inverse: from new_name back to old name
+        old_name = Path(old_path).name
+        rename(new_path, old_name)
+        return {"message": f"undid rename: {new_path} -> {old_path}"}
+
+    if verb == "move":
+        # Inverse of move: from current location back to original dir
+        original_dir = str(Path(undo_state["from"]).parent.as_posix())
+        move(undo_state["to"], original_dir)
+        return {"message": f"undid move: {undo_state['to']} -> {undo_state['from']}"}
+
+    if verb == "edit":
+        # Inverse: swap find/replace
+        edit(args["path"], find=undo_state["replace_was"], replace=undo_state["find_was"])
+        return {"message": f"undid edit on {args['path']}"}
+
+    return {"message": f"don't know how to undo {verb!r}"}
+
+
 def list_dir(directory: str) -> dict:
     """Return non-recursive entry names in `directory`. No log entry.
 

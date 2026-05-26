@@ -225,3 +225,86 @@ def test_list_logs_nothing(tmp_vault, isolated_log):
     (tmp_vault / "notes").mkdir(exist_ok=True)
     actions.list_dir("notes")
     assert _read_log(isolated_log) == []  # read-only verb, no log entry
+
+
+# ---------- undo ----------
+
+def test_undo_returns_message_when_log_empty(tmp_vault, isolated_log):
+    result = actions.undo()
+    assert "nothing to undo" in result["message"].lower()
+
+
+def test_undo_reverses_append(tmp_vault, isolated_log):
+    target = tmp_vault / "notes" / "x.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("hello\n", encoding="utf-8")
+    actions.append("notes/x.md", "world")
+    assert target.read_text(encoding="utf-8") == "hello\nworld"
+
+    actions.undo()
+    assert target.read_text(encoding="utf-8") == "hello\n"
+
+    # Two log entries now: the append and its inverse
+    log = _read_log(isolated_log)
+    assert len(log) == 2
+    assert log[1]["action"] == "undo_of_append"
+
+
+def test_undo_reverses_create_via_soft_delete(tmp_vault, isolated_log):
+    actions.create("notes/new.md", "hi")
+    assert (tmp_vault / "notes" / "new.md").exists()
+    actions.undo()
+    assert not (tmp_vault / "notes" / "new.md").exists()
+    # The file landed in trash via the soft-delete inverse
+    trash = list((tmp_vault / "_trash").rglob("new.md"))
+    assert len(trash) == 1
+
+
+def test_undo_reverses_delete_by_restoring_from_trash(tmp_vault, isolated_log):
+    target = tmp_vault / "notes" / "x.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("alive", encoding="utf-8")
+    actions.delete("notes/x.md")
+    assert not target.exists()
+
+    actions.undo()
+    assert target.read_text(encoding="utf-8") == "alive"
+
+
+def test_undo_reverses_rename(tmp_vault, isolated_log):
+    src = tmp_vault / "notes" / "old.md"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text("hi", encoding="utf-8")
+    actions.rename("notes/old.md", "new.md")
+    actions.undo()
+    assert src.read_text(encoding="utf-8") == "hi"
+    assert not (tmp_vault / "notes" / "new.md").exists()
+
+
+def test_undo_reverses_move(tmp_vault, isolated_log):
+    src = tmp_vault / "notes" / "x.md"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text("hi", encoding="utf-8")
+    actions.move("notes/x.md", "research")
+    actions.undo()
+    assert src.read_text(encoding="utf-8") == "hi"
+    assert not (tmp_vault / "research" / "x.md").exists()
+
+
+def test_undo_reverses_edit(tmp_vault, isolated_log):
+    target = tmp_vault / "notes" / "x.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("alpha BETA gamma\n", encoding="utf-8")
+    actions.edit("notes/x.md", find="BETA", replace="beta")
+    actions.undo()
+    assert target.read_text(encoding="utf-8") == "alpha BETA gamma\n"
+
+
+def test_undo_undo_redoes_the_action(tmp_vault, isolated_log):
+    target = tmp_vault / "notes" / "x.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("hello\n", encoding="utf-8")
+    actions.append("notes/x.md", "world")
+    actions.undo()  # back to "hello\n"
+    actions.undo()  # redo the append → "hello\nworld"
+    assert target.read_text(encoding="utf-8") == "hello\nworld"
