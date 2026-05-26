@@ -24,7 +24,7 @@ PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolv
 STATE_FILE = PROJECT_DIR / ".claude" / "data" / "discord_dashboard_state.json"
 
 DEFAULT_STATE: dict[str, Any] = {
-    "heartbeat": {"last_status": None, "last_tick_ts": 0, "ticks_since_post": 0},
+    "heartbeat": {"last_status": None, "last_tick_ts": 0},
     "deadlines": {},
     "lectures": {},
     "pr_activity": {},

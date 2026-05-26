@@ -116,42 +116,24 @@ def _compute_tick_status(snapshot_data: dict) -> tuple[str, list[str]]:
 
 
 def _maybe_post_heartbeat_tick(curr: dict) -> None:
-    """Throttled #heartbeat post. Fires when status changed, ticks_since_post
-    >= 8 (~4h at 30min cadence), or this is the first tick of the KL day.
-    Otherwise increments the silent-tick counter and returns."""
+    """Post #heartbeat status on every tick."""
     try:
         status, failing = _compute_tick_status(curr)
         now_ts = curr.get("timestamp") or time.time()
         state = dashboard_state.load()
         hb = state.get("heartbeat") or {}
-        last_status = hb.get("last_status")
-        last_ts = hb.get("last_tick_ts") or 0
-        ticks_since = hb.get("ticks_since_post") or 0
 
-        last_day = datetime.fromtimestamp(last_ts, tz=KL).date() if last_ts else None
-        today = datetime.fromtimestamp(now_ts, tz=KL).date()
-        first_today = last_day != today
-
-        if last_status != status or ticks_since >= 8 or first_today:
-            resp = dashboard.notify("heartbeat_tick", {
-                "status": status,
-                "failing": failing,
-                "tick_ts": now_ts,
-            })
-            if resp is not None:
-                # Only advance state when the post actually went out.
-                # Otherwise a transient failure / unset env var would
-                # silently consume the trigger and skip the retry.
-                hb["last_status"] = status
-                hb["ticks_since_post"] = 0
-        else:
-            hb["ticks_since_post"] = ticks_since + 1
+        resp = dashboard.notify("heartbeat_tick", {
+            "status": status,
+            "failing": failing,
+            "tick_ts": now_ts,
+        })
+        if resp is not None:
+            hb["last_status"] = status
         hb["last_tick_ts"] = now_ts
         state["heartbeat"] = hb
         dashboard_state.save(state)
     except Exception as exc:
-        # A failure here must never break the tick. The error route will
-        # catch any uncaught path via main()'s try/except.
         print(f"heartbeat_tick post failed: {exc}", file=sys.stderr)
 
 
