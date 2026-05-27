@@ -278,3 +278,40 @@ def test_lecture_new_no_tldr_shows_placeholder():
     })
     em = body["embeds"][0]
     assert "no Key concepts" in em["description"]
+
+
+def test_morning_digest_amber_with_auto_daily_path():
+    d = _import_dashboard()
+    body = d.format_embed("morning_digest", {
+        "title": "Today's plan", "body": "do stuff", "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["color"] == 0xF39C12
+    # FIXED_TS lands on 2026-05-27 in KL.
+    assert em["url"] == (
+        "obsidian://open?vault=Memory&file=daily/2026-05-27.md"
+    )
+    assert em["title"].startswith("\U0001F305 Morning — ")
+    assert "27 May" in em["title"] or "May 27" in em["title"]
+    assert em["description"] == "do stuff"
+
+
+def test_evening_nudge_purple_routes_daily_path():
+    d = _import_dashboard()
+    body = d.format_embed("evening_nudge", {
+        "title": "x", "body": "wrap up", "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["color"] == 0x8E44AD
+    assert em["title"] == "\U0001F319 Evening nudge"
+    assert "daily/2026-05-27.md" in em["url"]
+
+
+def test_daily_digest_slate():
+    d = _import_dashboard()
+    body = d.format_embed("daily_digest", {
+        "title": "Wrap-up", "body": "summary", "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["color"] == 0x95A5A6
+    assert em["title"] == "\U0001F4DD Wrap-up"

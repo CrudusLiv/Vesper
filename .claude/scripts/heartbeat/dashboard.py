@@ -236,33 +236,45 @@ def _format_deadline(kind: str, p: dict[str, Any]) -> dict[str, Any]:
     )]}
 
 
-_DAILY_STYLES: dict[str, tuple[str, int]] = {
-    # kind -> (emoji prefix, embed color)
-    "morning_digest": ("🌅", 0xF39C12),  # warm amber
-    "evening_nudge":  ("🌙", 0x8E44AD),  # muted purple
-    "daily_digest":   ("📝", 0x95A5A6),  # slate
+_DAILY_STYLES: dict[str, tuple[str, int, str]] = {
+    # kind -> (emoji prefix, color, fixed title label or "" to use payload)
+    "morning_digest": ("\U0001F305", 0xF39C12, "Morning"),       # 🌅 amber
+    "evening_nudge":  ("\U0001F319", 0x8E44AD, "Evening nudge"),  # 🌙 purple
+    "daily_digest":   ("\U0001F4DD", 0x95A5A6, ""),               # 📝 slate
 }
 
 
 def _format_daily(kind: str, p: dict[str, Any]) -> dict[str, Any]:
     """Single embed shape for the three daily-feed kinds.
 
-    All three route to the same channel (DISCORD_HOOK_DAILY). The emoji
-    prefix is the only at-a-glance differentiator -- color is a secondary
-    cue. Payload shape matches what heartbeat.py already produces:
-    {title, body, priority?}."""
-    emoji, color = _DAILY_STYLES.get(kind, ("📝", 0x95A5A6))
-    title = (p.get("title") or "Daily").strip()
+    All three route to DISCORD_HOOK_DAILY and link back to today's daily
+    note. morning_digest builds its own dated title; evening_nudge uses
+    the fixed string; daily_digest defers to the payload-provided title."""
+    emoji, color, fixed_label = _DAILY_STYLES.get(
+        kind, ("\U0001F4DD", 0x95A5A6, "")
+    )
+    ts = p.get("ts")
+    now = datetime.fromtimestamp(ts, tz=KL) if ts else datetime.now(KL)
+    daily_path = f"daily/{now.strftime('%Y-%m-%d')}.md"
+
+    if kind == "morning_digest":
+        title = f"{emoji} Morning — {now.strftime('%a %d %b')}"
+    elif kind == "evening_nudge":
+        title = f"{emoji} {fixed_label}"
+    else:
+        payload_title = (p.get("title") or "Daily").strip()
+        title = f"{emoji} {payload_title}"
+
     body = (p.get("body") or "").strip()
-    now = datetime.now(KL).strftime("%H:%M KL")
     description = body if len(body) <= 4000 else body[:3997] + "..."
-    embed = {
-        "title": f"{emoji} {title}"[:256],
-        "description": description or "_(no body)_",
-        "color": color,
-        "footer": {"text": now},
-    }
-    return {"embeds": [embed]}
+    return {"embeds": [_vesper_embed(
+        title=title,
+        description=description or "_(no body)_",
+        color=color,
+        channel_label="Daily",
+        vault_path=daily_path,
+        ts=ts,
+    )]}
 
 
 _PR_STYLES: dict[str, tuple[str, int, str]] = {
