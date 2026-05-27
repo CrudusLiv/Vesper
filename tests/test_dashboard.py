@@ -290,6 +290,62 @@ def test_lecture_new_no_tldr_shows_placeholder():
     assert "no Key concepts" in em["description"]
 
 
+def test_lecture_new_course_date_study_cards_all_present():
+    d = _import_dashboard()
+    body = d.format_embed("lecture_new", {
+        "name": "DIP215",
+        "title": "Lecture 3: Selection Constructs",
+        "tldr": ["Flow of control", "Boolean expressions", "Switch statement"],
+        "vault_path": "lectures/DIP215/2026-05-11_Lecture_3.md",
+        "source": "Lecture 3.pptx",
+        "date": "2026-05-11",
+        "study_cards": 14,
+        "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    by_name = {f["name"]: f["value"] for f in em["fields"]}
+    assert by_name["Course"] == "DIP215"
+    assert by_name["Date"] == "2026-05-11"
+    assert by_name["Study cards"] == "14"
+    assert all(f["inline"] for f in em["fields"])
+
+
+def test_lecture_new_omits_fields_when_keys_missing():
+    """Backwards compat: callers that don't supply date/study_cards still work."""
+    d = _import_dashboard()
+    body = d.format_embed("lecture_new", {
+        "name": "", "title": "Untitled",
+        "tldr": [], "vault_path": "lectures/x.md",
+        "source": "", "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["fields"] == []
+
+
+def test_lecture_new_partial_fields_only_date():
+    d = _import_dashboard()
+    body = d.format_embed("lecture_new", {
+        "name": "", "title": "T",
+        "tldr": [], "vault_path": "lectures/x.md",
+        "source": "", "date": "2026-05-11", "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert len(em["fields"]) == 1
+    assert em["fields"][0]["name"] == "Date"
+
+
+def test_lecture_new_rejects_bool_study_cards():
+    """isinstance(True, int) is True in Python — guard against booleans."""
+    d = _import_dashboard()
+    body = d.format_embed("lecture_new", {
+        "name": "", "title": "T",
+        "tldr": [], "vault_path": "lectures/x.md",
+        "source": "", "study_cards": True, "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["fields"] == []
+
+
 def test_morning_digest_amber_with_auto_daily_path():
     d = _import_dashboard()
     body = d.format_embed("morning_digest", {
