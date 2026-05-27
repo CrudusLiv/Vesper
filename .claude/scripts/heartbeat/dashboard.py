@@ -348,32 +348,48 @@ def _format_lecture_new(p: dict[str, Any]) -> dict[str, Any]:
     return {"embeds": [embed]}
 
 
-def _format_next3(p: dict[str, Any]) -> dict[str, Any]:
-    """Plain-text rollup of the closest 3 deadlines. Edited in place each
-    tick via dashboard_state.next3.message_id. Lives inside its own forum
-    thread (since #deadlines is a forum channel) so it can be pinned by
-    hand once.
+def _next3_dot(days: Any) -> str:
+    """Red / yellow / green dot for a deadline based on days-until-due."""
+    if not isinstance(days, int) or days < 0:
+        return "\U0001F534"  # red (overdue or unknown)
+    if days <= 3:
+        return "\U0001F7E1"  # yellow (within 72h)
+    return "\U0001F7E2"      # green (later)
 
-    payload keys: items (list of dicts with due/course/title/days)."""
+
+def _format_next3(p: dict[str, Any]) -> dict[str, Any]:
+    """Embed rollup of the next 3 deadlines, edited in place each tick."""
     items = p.get("items") or []
-    now = datetime.now(KL).strftime("%H:%M KL")
     if not items:
-        body = "**Next 3 deadlines**\nNothing in DEADLINES.md ## Active."
+        description = "Nothing in DEADLINES.md ## Active."
     else:
-        lines = ["**Next 3 deadlines**"]
+        lines: list[str] = []
         for i in items:
             course = (i.get("course") or "").strip()
             title = (i.get("title") or "(untitled)").strip()
             due = i.get("due") or "?"
             days = i.get("days")
             if isinstance(days, int):
-                rel = f"{-days}d overdue" if days < 0 else "today" if days == 0 else f"in {days}d"
+                rel = (
+                    f"{-days}d overdue" if days < 0
+                    else "today" if days == 0
+                    else f"in {days}d"
+                )
             else:
                 rel = ""
             tag = f"[{course}] " if course else ""
-            lines.append(f"- `{due}` ({rel}) — {tag}{title}")
-        body = "\n".join(lines)
-    return {"content": f"{body}\n_updated {now}_"}
+            dot = _next3_dot(days)
+            rel_part = f" ({rel})" if rel else ""
+            lines.append(f"{dot} `{due}`{rel_part} — {tag}{title}")
+        description = "\n".join(lines)
+    return {"embeds": [_vesper_embed(
+        title="Next 3 deadlines",
+        description=description,
+        color=0x5865F2,
+        channel_label="Deadlines",
+        vault_path="DEADLINES.md",
+        ts=p.get("ts"),
+    )]}
 
 
 def _format_error(p: dict[str, Any]) -> dict[str, Any]:

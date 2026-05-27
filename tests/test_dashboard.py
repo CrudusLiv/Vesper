@@ -215,3 +215,30 @@ def test_deadline_overdue_red():
     assert em["title"] == "Old thing"  # No course prefix when empty.
     assert em["fields"][0]["value"] == "\U0001F534 OVERDUE"
     assert "7d ago" in em["description"]
+
+
+def test_next3_empty_list():
+    d = _import_dashboard()
+    body = d.format_embed("next3", {"items": [], "ts": FIXED_TS})
+    em = body["embeds"][0]
+    assert em["title"] == "Next 3 deadlines"
+    assert em["color"] == 0x5865F2
+    assert em["url"] == "obsidian://open?vault=Memory&file=DEADLINES.md"
+    assert "Nothing in DEADLINES.md" in em["description"]
+
+
+def test_next3_three_items_coloured():
+    d = _import_dashboard()
+    body = d.format_embed("next3", {
+        "items": [
+            {"due": "2026-05-20", "course": "CS", "title": "Past", "days": -7},
+            {"due": "2026-05-28", "course": "MATH", "title": "Soon", "days": 1},
+            {"due": "2026-06-15", "course": "PHY", "title": "Later", "days": 19},
+        ],
+        "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    lines = em["description"].splitlines()
+    assert any(line.startswith("\U0001F534") and "Past" in line for line in lines)
+    assert any(line.startswith("\U0001F7E1") and "Soon" in line for line in lines)
+    assert any(line.startswith("\U0001F7E2") and "Later" in line for line in lines)
