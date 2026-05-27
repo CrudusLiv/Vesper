@@ -242,3 +242,39 @@ def test_next3_three_items_coloured():
     assert any(line.startswith("\U0001F534") and "Past" in line for line in lines)
     assert any(line.startswith("\U0001F7E1") and "Soon" in line for line in lines)
     assert any(line.startswith("\U0001F7E2") and "Later" in line for line in lines)
+
+
+def test_lecture_new_with_tldr_and_source():
+    d = _import_dashboard()
+    body = d.format_embed("lecture_new", {
+        "name": "CS101", "title": "Intro",
+        "tldr": ["A", "B", "C", "D"],
+        "vault_path": "lectures/CS101/Intro.md",
+        "source": "slides.pptx",
+        "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["title"] == "Intro"
+    assert em["color"] == 0x3498DB
+    assert em["url"] == (
+        "obsidian://open?vault=Memory&file=lectures/CS101/Intro.md"
+    )
+    # Only 3 bullets shown, all three present.
+    assert "- A" in em["description"]
+    assert "- B" in em["description"]
+    assert "- C" in em["description"]
+    assert "- D" not in em["description"]
+    # Source filename surfaces in the footer alongside vault_path.
+    assert "slides.pptx" in em["footer"]["text"]
+    assert "lectures/CS101/Intro.md" in em["footer"]["text"]
+
+
+def test_lecture_new_no_tldr_shows_placeholder():
+    d = _import_dashboard()
+    body = d.format_embed("lecture_new", {
+        "name": "", "title": "Untitled",
+        "tldr": [], "vault_path": "lectures/x.md",
+        "source": "", "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert "no Key concepts" in em["description"]

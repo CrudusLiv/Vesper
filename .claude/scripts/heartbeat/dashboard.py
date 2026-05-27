@@ -321,30 +321,31 @@ def _format_thread_reply(p: dict[str, Any]) -> dict[str, Any]:
 def _format_lecture_new(p: dict[str, Any]) -> dict[str, Any]:
     """Forum-thread starter for a freshly-summarised lecture.
 
-    payload keys: name (course), title, tldr (list of bullets), vault_path
-    (relative posix path), source (original filename)."""
-    course = (p.get("name") or "").strip()
+    payload keys: name (course), title, tldr (list), vault_path, source."""
     title = (p.get("title") or "(untitled)").strip()
     tldr = p.get("tldr") or []
     vault_path = p.get("vault_path") or ""
-    source = p.get("source") or ""
+    source = (p.get("source") or "").strip()
 
-    course_tag = f"[{course}] " if course else ""
-    bullets = "\n".join(f"- {b}" for b in tldr[:3]) if tldr else "_(no Key concepts section)_"
-    description_parts = [bullets]
-    if vault_path:
-        description_parts.append(f"\n`{vault_path}`")
-    description = "\n".join(description_parts)
-    if len(description) > 4000:
-        description = description[:3997] + "..."
+    bullets = (
+        "\n".join(f"- {b}" for b in tldr[:3])
+        if tldr else "_(no Key concepts section)_"
+    )
+    if len(bullets) > 4000:
+        bullets = bullets[:3997] + "..."
 
-    footer_text = f"source: {source}" if source else "see lectures/"
-    embed = {
-        "title": f"📚 {course_tag}{title}"[:256],
-        "description": description,
-        "color": 0x3498DB,  # blue
-        "footer": {"text": footer_text[:2048]},
-    }
+    embed = _vesper_embed(
+        title=title,
+        description=bullets,
+        color=0x3498DB,
+        channel_label="Lectures",
+        vault_path=vault_path or None,
+        ts=p.get("ts"),
+    )
+    if source:
+        embed["footer"]["text"] = (
+            f"{embed['footer']['text']}  ·  source: {source}"
+        )[:2048]
     return {"embeds": [embed]}
 
 
