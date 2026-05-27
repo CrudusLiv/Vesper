@@ -21,27 +21,32 @@ def _seed_cache(db_path: Path, rows: list[dict]) -> None:
             id TEXT PRIMARY KEY, channel_id TEXT, channel_name TEXT,
             guild_id TEXT, guild_name TEXT, is_dm INTEGER, author_id TEXT,
             author_name TEXT, is_self INTEGER, is_bot INTEGER,
-            content TEXT, created_at REAL, fetched_at REAL
+            content TEXT, created_at REAL, fetched_at REAL,
+            referenced_message_id TEXT, referenced_author_id TEXT
         )
     """)
     for r in rows:
         conn.execute(
             "INSERT INTO messages VALUES (:id, :channel_id, :channel_name, :guild_id, "
             ":guild_name, :is_dm, :author_id, :author_name, :is_self, :is_bot, "
-            ":content, :created_at, :fetched_at)",
+            ":content, :created_at, :fetched_at, "
+            ":referenced_message_id, :referenced_author_id)",
             r,
         )
     conn.commit()
     conn.close()
 
 
-def _row(id_, content, *, is_dm=0, is_self=0, is_bot=0, author_name="alice", created_at=100.0):
+def _row(id_, content, *, is_dm=0, is_self=0, is_bot=0, author_name="alice",
+         created_at=100.0, referenced_message_id=None, referenced_author_id=None):
     return {
         "id": id_, "channel_id": "ch", "channel_name": "general",
         "guild_id": "g", "guild_name": "Server", "is_dm": is_dm,
         "author_id": "111" if not is_self else "999",
         "author_name": author_name, "is_self": is_self, "is_bot": is_bot,
         "content": content, "created_at": created_at, "fetched_at": created_at + 1,
+        "referenced_message_id": referenced_message_id,
+        "referenced_author_id": referenced_author_id,
     }
 
 
@@ -137,3 +142,95 @@ def test_format_toast_other_mentions_become_user():
     assert "<@111>" not in body
     assert "@user" in body
     assert "@you" in body
+
+
+# ---------- Reply detection ----------
+
+def test_reply_to_user_without_mention_detected(tmp_path):
+    """Someone replies to a user's server message with the @-toggle off."""
+    dp = _import_module()
+    db = tmp_path / "cache.db"
+    _seed_cache(db, [_row(
+        "10", "sounds good", created_at=200.0,
+        referenced_message_id="orig-1", referenced_author_id="999",
+    )])
+    state_path = tmp_path / "state.json"
+    pings = dp.scan_pings(db, user_id="999", state_path=state_path, now=300.0)
+    assert len(pings) == 1
+    assert pings[0]["id"] == "10"
+    assert pings[0]["referenced_author_id"] == "999"
+
+
+def test_reply_to_someone_else_ignored(tmp_path):
+    """A reply targeting a third party should not trigger a ping."""
+    dp = _import_module()
+    db = tmp_path / "cache.db"
+    _seed_cache(db, [_row(
+        "11", "thanks", created_at=200.0,
+        referenced_message_id="orig-2", referenced_author_id="222",
+    )])
+    state_path = tmp_path / "state.json"
+    pings = dp.scan_pings(db, user_id="999", state_path=state_path, now=300.0)
+    assert pings == []
+
+
+def test_self_reply_not_a_ping(tmp_path):
+    """The user replying to their own message should not ping themselves."""
+    dp = _import_module()
+    db = tmp_path / "cache.db"
+    _seed_cache(db, [_row(
+        "12", "follow-up", is_self=1, created_at=200.0,
+        referenced_message_id="orig-3", referenced_author_id="999",
+    )])
+    state_path = tmp_path / "state.json"
+    pings = dp.scan_pings(db, user_id="999", state_path=state_path, now=300.0)
+    assert pings == []
+
+
+def test_format_toast_titles_reply_distinctly():
+    """Pure replies (no mention) should read as 'reply', not 'ping'."""
+    dp = _import_module()
+    ping = {
+        "author_name": "bob", "is_dm": 0, "channel_name": "general",
+        "content": "good point", "referenced_author_id": "999",
+    }
+    title, body = dp.format_toast(ping, user_id="999")
+    assert title == "Discord reply from bob"
+    assert "good point" in body
+
+
+def test_format_toast_mention_wins_over_reply():
+    """If a reply also contains the mention token, prefer the 'ping' title."""
+    dp = _import_module()
+    ping = {
+        "author_name": "bob", "is_dm": 0, "channel_name": "general",
+        "content": "<@999> good point", "referenced_author_id": "999",
+    }
+    title, _ = dp.format_toast(ping, user_id="999")
+    assert title == "Discord ping from bob"
+
+
+def test_legacy_cache_without_reply_columns_still_scans(tmp_path):
+    """If the cache predates the reply migration, mention-only scan still works."""
+    dp = _import_module()
+    db = tmp_path / "cache.db"
+    conn = sqlite3.connect(str(db))
+    conn.execute("""
+        CREATE TABLE messages (
+            id TEXT PRIMARY KEY, channel_id TEXT, channel_name TEXT,
+            guild_id TEXT, guild_name TEXT, is_dm INTEGER, author_id TEXT,
+            author_name TEXT, is_self INTEGER, is_bot INTEGER,
+            content TEXT, created_at REAL, fetched_at REAL
+        )
+    """)
+    conn.execute(
+        "INSERT INTO messages VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("20", "ch", "general", "g", "Server", 0, "111", "alice", 0, 0,
+         "hey <@999>", 200.0, 201.0),
+    )
+    conn.commit()
+    conn.close()
+    state_path = tmp_path / "state.json"
+    pings = dp.scan_pings(db, user_id="999", state_path=state_path, now=300.0)
+    assert len(pings) == 1
+    assert pings[0]["id"] == "20"
