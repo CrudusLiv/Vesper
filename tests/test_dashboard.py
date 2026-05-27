@@ -315,3 +315,62 @@ def test_daily_digest_slate():
     em = body["embeds"][0]
     assert em["color"] == 0x95A5A6
     assert em["title"] == "\U0001F4DD Wrap-up"
+
+
+def test_inbox_text_teal_with_vault_link():
+    d = _import_dashboard()
+    body = d.format_embed("inbox_text", {
+        "content": "a quick note",
+        "vault_path": "notes/NOTES.md",
+        "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["title"] == "Note saved"
+    assert em["color"] == 0x1ABC9C
+    assert em["url"] == "obsidian://open?vault=Memory&file=notes/NOTES.md"
+    assert em["description"] == "a quick note"
+    assert em["author"]["name"] == "Vesper · Inbox"
+
+
+def test_inbox_text_truncates_long_content():
+    d = _import_dashboard()
+    body = d.format_embed("inbox_text", {
+        "content": "x" * 2000, "vault_path": "notes/NOTES.md", "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert len(em["description"]) <= 1500
+    assert em["description"].endswith("...")
+
+
+def test_inbox_text_fallback_vault_path():
+    d = _import_dashboard()
+    body = d.format_embed("inbox_text", {"content": "hi", "ts": FIXED_TS})
+    em = body["embeds"][0]
+    assert em["url"].endswith("notes/NOTES.md")
+
+
+def test_inbox_attachment_fields_no_link():
+    d = _import_dashboard()
+    body = d.format_embed("inbox_attachment", {
+        "filename": "slides.pptx", "size": 12345,
+        "vault_path": "inbox/slides.pptx", "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["title"] == "Attachment saved"
+    assert em["color"] == 0x1ABC9C
+    # Spec: no Obsidian link on attachments (raw source, not a note).
+    assert "url" not in em
+    by_name = {f["name"]: f["value"] for f in em["fields"]}
+    assert by_name["File"] == "slides.pptx"
+    assert by_name["Size"] == "12,345 bytes"
+    assert by_name["Saved to"] == "inbox/slides.pptx"
+
+
+def test_inbox_attachment_missing_size():
+    d = _import_dashboard()
+    body = d.format_embed("inbox_attachment", {
+        "filename": "x.bin", "vault_path": "inbox/x.bin", "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    by_name = {f["name"]: f["value"] for f in em["fields"]}
+    assert by_name["Size"] == "(unknown)"

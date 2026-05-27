@@ -175,20 +175,35 @@ def _format_heartbeat_tick(p: dict[str, Any]) -> dict[str, Any]:
 def _format_inbox_text(p: dict[str, Any]) -> dict[str, Any]:
     content = (p.get("content") or "").strip()
     vault_path = p.get("vault_path") or "notes/NOTES.md"
-    ts = p.get("ts") or 0
-    when = (datetime.fromtimestamp(ts, tz=KL) if ts else datetime.now(KL)).strftime("%H:%M KL")
     snippet = content if len(content) <= 1500 else content[:1497] + "..."
-    return {"content": f"[note] {when} — `{vault_path}`\n{snippet}"}
+    return {"embeds": [_vesper_embed(
+        title="Note saved",
+        description=snippet,
+        color=0x1ABC9C,
+        channel_label="Inbox",
+        vault_path=vault_path,
+        ts=p.get("ts"),
+    )]}
 
 
 def _format_inbox_attachment(p: dict[str, Any]) -> dict[str, Any]:
     filename = p.get("filename") or "(unknown)"
     size = p.get("size")
     vault_path = p.get("vault_path") or ""
-    ts = p.get("ts") or 0
-    when = (datetime.fromtimestamp(ts, tz=KL) if ts else datetime.now(KL)).strftime("%H:%M KL")
-    size_str = f" ({size:,} bytes)" if isinstance(size, int) else ""
-    return {"content": f"[inbox] {when} — saved `{filename}`{size_str} → `{vault_path}`"}
+    size_str = f"{size:,} bytes" if isinstance(size, int) else "(unknown)"
+    fields = [
+        {"name": "File",     "value": filename,   "inline": True},
+        {"name": "Size",     "value": size_str,   "inline": True},
+        {"name": "Saved to", "value": vault_path, "inline": False},
+    ]
+    return {"embeds": [_vesper_embed(
+        title="Attachment saved",
+        description="",
+        color=0x1ABC9C,
+        channel_label="Inbox",
+        fields=fields,
+        ts=p.get("ts"),
+    )]}
 
 
 _DEADLINE_STYLES: dict[str, tuple[int, str]] = {
