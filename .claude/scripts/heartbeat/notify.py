@@ -19,6 +19,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
@@ -33,6 +34,45 @@ PRIORITY_BADGES = {
     "high":   "[!]",
     "urgent": "[!!]",
 }
+
+KL = timezone(timedelta(hours=8))
+
+# priority -> (embed color, emoji prefix). Used by Discord DMs (embed
+# surface) and lives alongside PRIORITY_BADGES which still drives the
+# ASCII console fallback. Two tables on purpose: emoji renders fine in
+# Discord, terminals downgrade to `[!]`-style badges.
+PRIORITY_STYLES: dict[str, tuple[int, str]] = {
+    "low":    (0x95A5A6, ""),            # slate, no emoji
+    "normal": (0x3498DB, ""),            # blue,  no emoji
+    "high":   (0xE67E22, "⚠"),          # orange, ⚠
+    "urgent": (0xE74C3C, "\U0001F6A8"),  # red,    🚨
+}
+
+
+def _build_dm_embed(
+    title: str,
+    body: str,
+    priority: str,
+    *,
+    ts: float | None = None,
+) -> dict:
+    """Build the inner embed dict for a bot DM.
+
+    DMs don't map to vault files (server pings come from outside the
+    vault), so there's no Obsidian link. The footer carries time and
+    priority so urgency stays visible after the emoji scrolls off."""
+    color, emoji = PRIORITY_STYLES.get(priority, PRIORITY_STYLES["normal"])
+    effective_priority = priority if priority in PRIORITY_STYLES else "normal"
+    now = datetime.fromtimestamp(ts, tz=KL) if ts else datetime.now(KL)
+    when = now.strftime("%H:%M KL")
+    full_title = f"{emoji} {title}".strip() if emoji else title
+    return {
+        "author": {"name": "Vesper"},
+        "title": full_title[:256],
+        "description": body or None,
+        "color": color,
+        "footer": {"text": f"{when}  ·  {effective_priority}"},
+    }
 
 
 def send(title: str, body: str, priority: str = "normal", toast: bool = False) -> None:
