@@ -16,6 +16,7 @@ import json
 import os
 import sys
 import traceback
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "integrations"))
 import _env  # noqa: F401, E402
 
 KL = timezone(timedelta(hours=8))
+
+VAULT_NAME = "Memory"  # Folder under Dynamous/ holding all notes.
+
+
+def _obsidian_url(vault_path: str) -> str:
+    """Build an `obsidian://` deep link for a vault-relative path.
+
+    Slashes stay literal so the URL is human-skimmable; spaces and other
+    reserved chars are percent-encoded by quote()."""
+    encoded = urllib.parse.quote(vault_path, safe="/")
+    return f"obsidian://open?vault={VAULT_NAME}&file={encoded}"
+
 
 ROUTES: dict[str, str] = {
     "heartbeat_tick":   "DISCORD_HOOK_HEARTBEAT",
