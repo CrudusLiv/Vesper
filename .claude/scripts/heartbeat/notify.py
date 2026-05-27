@@ -92,27 +92,22 @@ def send(title: str, body: str, priority: str = "normal", toast: bool = False) -
 
 
 def _send_discord_dm(token: str, user_id: str, title: str, body: str, priority: str) -> bool:
-    badge = PRIORITY_BADGES.get(priority, "[*]")
-    content = f"{badge} **{title}**"
-    if body:
-        content += f"\n{body}"
-    # Discord caps single messages at 2000 chars. Truncation is fine for
-    # notifications -- the full draft/lecture lives in the vault.
-    if len(content) > 1990:
-        content = content[:1987] + "..."
-
+    embed = _build_dm_embed(title, body, priority)
     try:
         channel_id = _ensure_dm_channel(token, user_id)
-        _post_message(token, channel_id, content)
+        _post_message(token, channel_id, embeds=[embed])
         return True
     except urllib.error.HTTPError as exc:
         # Surface Discord's JSON error body so 403/50007 etc. are debuggable.
-        body = ""
+        err_body = ""
         try:
-            body = exc.read().decode("utf-8", errors="replace")
+            err_body = exc.read().decode("utf-8", errors="replace")
         except Exception:
             pass
-        print(f"discord DM failed ({exc} body={body[:300]}); falling back to console", file=sys.stderr)
+        print(
+            f"discord DM failed ({exc} body={err_body[:300]}); falling back to console",
+            file=sys.stderr,
+        )
         return False
     except (urllib.error.URLError, KeyError, OSError) as exc:
         print(f"discord DM failed ({exc}); falling back to console", file=sys.stderr)
@@ -146,11 +141,24 @@ def _ensure_dm_channel(token: str, user_id: str) -> str:
     return channel_id
 
 
-def _post_message(token: str, channel_id: str, content: str) -> None:
+def _post_message(
+    token: str,
+    channel_id: str,
+    content: str | None = None,
+    *,
+    embeds: list[dict] | None = None,
+) -> None:
+    """POST a message to a DM channel. Either `content` or `embeds`
+    must be set; Discord rejects empty messages."""
+    body: dict = {}
+    if content is not None:
+        body["content"] = content
+    if embeds:
+        body["embeds"] = embeds
     req = urllib.request.Request(
         f"{API_BASE}/channels/{channel_id}/messages",
         method="POST",
-        data=json.dumps({"content": content}).encode(),
+        data=json.dumps(body).encode(),
         headers={
             "Authorization": f"Bot {token}",
             "Content-Type": "application/json",
