@@ -146,17 +146,30 @@ def format_embed(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+_HEARTBEAT_COLORS = {
+    "ok":       0x2ECC71,  # green
+    "degraded": 0xF1C40F,  # yellow
+    "red":      0xE74C3C,  # red
+}
+
+
 def _format_heartbeat_tick(p: dict[str, Any]) -> dict[str, Any]:
-    status = p.get("status", "unknown")
+    status = p.get("status", "ok")
     failing = p.get("failing") or []
-    ts = p.get("tick_ts") or 0
-    now = datetime.fromtimestamp(ts, tz=KL) if ts else datetime.now(KL)
-    when = now.strftime("%H:%M KL")
-    if status == "red" and failing:
-        line = f"[heartbeat] red — {', '.join(failing)}  {when}"
+    color = _HEARTBEAT_COLORS.get(status, 0x95A5A6)
+    if failing:
+        title = f"\U0001F534 Degraded — {', '.join(failing)}"
+        description = f"{len(failing)} check(s) failed · other integrations ok"
     else:
-        line = f"[heartbeat] {status}  {when}"
-    return {"content": line}
+        title = "All systems green"
+        description = "all integrations ok"
+    return {"embeds": [_vesper_embed(
+        title=title,
+        description=description,
+        color=color,
+        channel_label="Heartbeat",
+        ts=p.get("tick_ts"),
+    )]}
 
 
 def _format_inbox_text(p: dict[str, Any]) -> dict[str, Any]:

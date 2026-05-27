@@ -105,3 +105,39 @@ def test_vesper_embed_defaults_ts_to_now(monkeypatch):
     em = d._vesper_embed(title="t", description="", color=0, channel_label="X")
     # Just assert the footer has the KL suffix; exact minute is racy.
     assert em["footer"]["text"].endswith(" KL")
+
+
+def test_heartbeat_tick_green_when_no_failing():
+    d = _import_dashboard()
+    body = d.format_embed("heartbeat_tick", {
+        "status": "ok", "failing": [], "tick_ts": FIXED_TS,
+    })
+    assert "content" not in body
+    em = body["embeds"][0]
+    assert em["title"] == "All systems green"
+    assert em["description"] == "all integrations ok"
+    assert em["color"] == 0x2ECC71
+    assert em["author"]["name"] == "Vesper · Heartbeat"
+    assert em["footer"]["text"] == FIXED_WHEN
+
+
+def test_heartbeat_tick_degraded_yellow():
+    d = _import_dashboard()
+    body = d.format_embed("heartbeat_tick", {
+        "status": "degraded", "failing": ["gmail"], "tick_ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["color"] == 0xF1C40F
+    assert em["title"] == "\U0001F534 Degraded — gmail"
+    assert em["description"] == "1 check(s) failed · other integrations ok"
+
+
+def test_heartbeat_tick_red_with_multiple_failing():
+    d = _import_dashboard()
+    body = d.format_embed("heartbeat_tick", {
+        "status": "red", "failing": ["gmail", "gcal"], "tick_ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["color"] == 0xE74C3C
+    assert em["title"] == "\U0001F534 Degraded — gmail, gcal"
+    assert em["description"] == "2 check(s) failed · other integrations ok"
