@@ -173,3 +173,45 @@ def test_error_embed_truncates_long_trace():
     em = body["embeds"][0]
     assert len(em["description"]) < 2000
     assert em["description"].startswith("```\n...\n")
+
+
+def test_deadline_72h_yellow_with_status_field():
+    d = _import_dashboard()
+    body = d.format_embed("deadline_72h", {
+        "due": "2026-05-30", "course": "CS101", "title": "Lab 3",
+        "days": 3, "bucket": "approaching", "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["color"] == 0xF1C40F
+    assert em["title"] == "[CS101] Lab 3"
+    assert em["url"] == "obsidian://open?vault=Memory&file=DEADLINES.md"
+    status_fields = [f for f in em["fields"] if f["name"] == "Status"]
+    assert status_fields == [{
+        "name": "Status", "value": "\U0001F7E1 Approaching (72h)", "inline": True,
+    }]
+    assert "in 3d" in em["description"]
+
+
+def test_deadline_24h_orange():
+    d = _import_dashboard()
+    body = d.format_embed("deadline_24h", {
+        "due": "2026-05-28", "course": "MATH", "title": "Quiz",
+        "days": 1, "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["color"] == 0xE67E22
+    assert em["fields"][0]["value"].startswith("\U0001F7E0")  # 🟠
+    assert "Due today/tomorrow" in em["fields"][0]["value"]
+
+
+def test_deadline_overdue_red():
+    d = _import_dashboard()
+    body = d.format_embed("deadline_overdue", {
+        "due": "2026-05-20", "course": "", "title": "Old thing",
+        "days": -7, "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["color"] == 0xE74C3C
+    assert em["title"] == "Old thing"  # No course prefix when empty.
+    assert em["fields"][0]["value"] == "\U0001F534 OVERDUE"
+    assert "7d ago" in em["description"]

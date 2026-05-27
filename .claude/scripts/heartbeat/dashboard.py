@@ -191,42 +191,49 @@ def _format_inbox_attachment(p: dict[str, Any]) -> dict[str, Any]:
     return {"content": f"[inbox] {when} — saved `{filename}`{size_str} → `{vault_path}`"}
 
 
-def _format_deadline(kind: str, p: dict[str, Any]) -> dict[str, Any]:
-    """Embed for a single deadline threshold post. Used for the forum
-    starter message AND for in-thread follow-ups when a row crosses a new
-    threshold (24h / overdue).
+_DEADLINE_STYLES: dict[str, tuple[int, str]] = {
+    # kind -> (color, status field value)
+    "deadline_72h":     (0xF1C40F, "\U0001F7E1 Approaching (72h)"),
+    "deadline_24h":     (0xE67E22, "\U0001F7E0 Due today/tomorrow"),
+    "deadline_overdue": (0xE74C3C, "\U0001F534 OVERDUE"),
+}
 
-    payload keys: due, course, title, days, key, bucket."""
+
+def _format_deadline(kind: str, p: dict[str, Any]) -> dict[str, Any]:
+    """Embed for a single deadline threshold post (72h / 24h / overdue).
+
+    Title is the assignment (course-tagged) and clicks through to
+    DEADLINES.md. A 'Status' field carries the threshold label; the
+    description carries the due-date phrasing."""
+    color, status_value = _DEADLINE_STYLES.get(
+        kind, (0x95A5A6, "Deadline")
+    )
     course = (p.get("course") or "").strip()
     title = (p.get("title") or "(untitled)").strip()
     due = p.get("due") or "?"
     days = p.get("days")
-    bucket = p.get("bucket") or ""
 
     if kind == "deadline_overdue":
-        emoji = "🔴"
-        color = 0xE74C3C  # red
-        headline = "OVERDUE"
-        when = f"was due **{due}**" if days is None else f"was due **{due}** ({-days}d ago)"
-    elif kind == "deadline_24h":
-        emoji = "🟠"
-        color = 0xE67E22  # orange
-        headline = "Due today" if days == 0 else "Due tomorrow" if days == 1 else "Due soon"
-        when = f"due **{due}** (in {days}d)" if isinstance(days, int) else f"due **{due}**"
-    else:  # deadline_72h covers soon (48h) and approaching (72h)
-        emoji = "🟡"
-        color = 0xF1C40F  # yellow
-        headline = "Due in 48h" if bucket == "soon" else "Due in 72h"
-        when = f"due **{due}** (in {days}d)" if isinstance(days, int) else f"due **{due}**"
+        when = (
+            f"was due **{due}** ({-days}d ago)"
+            if isinstance(days, int) else f"was due **{due}**"
+        )
+    else:
+        when = (
+            f"due **{due}** (in {days}d)"
+            if isinstance(days, int) else f"due **{due}**"
+        )
 
-    course_tag = f"[{course}] " if course else ""
-    embed = {
-        "title": f"{emoji} {headline} — {course_tag}{title}"[:256],
-        "description": when,
-        "color": color,
-        "footer": {"text": "see DEADLINES.md"},
-    }
-    return {"embeds": [embed]}
+    title_text = f"[{course}] {title}" if course else title
+    return {"embeds": [_vesper_embed(
+        title=title_text,
+        description=when,
+        color=color,
+        channel_label="Deadlines",
+        vault_path="DEADLINES.md",
+        fields=[{"name": "Status", "value": status_value, "inline": True}],
+        ts=p.get("ts"),
+    )]}
 
 
 _DAILY_STYLES: dict[str, tuple[str, int]] = {
