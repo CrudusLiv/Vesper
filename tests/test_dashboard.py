@@ -42,3 +42,66 @@ def test_obsidian_url_encodes_spaces_and_specials():
     assert result == (
         "obsidian://open?vault=Memory&file=lectures/CS%20101/Intro%20%26%20basics.md"
     )
+
+
+def test_vesper_embed_minimal():
+    d = _import_dashboard()
+    em = d._vesper_embed(
+        title="hello",
+        description="world",
+        color=0x123456,
+        channel_label="Heartbeat",
+        ts=FIXED_TS,
+    )
+    assert em["author"] == {"name": "Vesper · Heartbeat"}
+    assert em["title"] == "hello"
+    assert em["description"] == "world"
+    assert em["color"] == 0x123456
+    assert em["fields"] == []
+    assert em["footer"] == {"text": FIXED_WHEN}
+    assert "url" not in em  # No vault_path / url -> no clickable title.
+
+
+def test_vesper_embed_with_vault_path():
+    d = _import_dashboard()
+    em = d._vesper_embed(
+        title="t",
+        description="d",
+        color=0,
+        channel_label="Deadlines",
+        vault_path="DEADLINES.md",
+        ts=FIXED_TS,
+    )
+    assert em["url"] == "obsidian://open?vault=Memory&file=DEADLINES.md"
+    assert em["footer"]["text"] == f"{FIXED_WHEN}  ·  \U0001F4C2 DEADLINES.md"
+
+
+def test_vesper_embed_explicit_url_overrides_vault_path():
+    d = _import_dashboard()
+    em = d._vesper_embed(
+        title="t", description="", color=0, channel_label="PRs",
+        vault_path="ignored.md",
+        url="https://github.com/o/r/pull/42",
+        ts=FIXED_TS,
+    )
+    # Explicit url wins; footer falls back to bare time (no vault link).
+    assert em["url"] == "https://github.com/o/r/pull/42"
+    assert em["footer"]["text"] == FIXED_WHEN
+
+
+def test_vesper_embed_fields_preserved():
+    d = _import_dashboard()
+    fields = [{"name": "Status", "value": "OK", "inline": True}]
+    em = d._vesper_embed(
+        title="t", description="", color=0, channel_label="X",
+        fields=fields, ts=FIXED_TS,
+    )
+    assert em["fields"] == fields
+
+
+def test_vesper_embed_defaults_ts_to_now(monkeypatch):
+    """When ts is None, _vesper_embed uses datetime.now(KL)."""
+    d = _import_dashboard()
+    em = d._vesper_embed(title="t", description="", color=0, channel_label="X")
+    # Just assert the footer has the KL suffix; exact minute is racy.
+    assert em["footer"]["text"].endswith(" KL")

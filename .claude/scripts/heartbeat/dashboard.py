@@ -44,6 +44,44 @@ def _obsidian_url(vault_path: str) -> str:
     return f"obsidian://open?vault={VAULT_NAME}&file={encoded}"
 
 
+def _vesper_embed(
+    title: str,
+    description: str,
+    color: int,
+    *,
+    channel_label: str,
+    vault_path: str | None = None,
+    url: str | None = None,
+    fields: list[dict] | None = None,
+    ts: float | None = None,
+) -> dict:
+    """Return the inner embed dict for a Vesper-branded Discord post.
+
+    Caller wraps in `{"embeds": [...]}`. If both `vault_path` and `url`
+    are given, the explicit `url` wins (used for PR events that link to
+    GitHub instead of the vault)."""
+    now = datetime.fromtimestamp(ts, tz=KL) if ts else datetime.now(KL)
+    when = now.strftime("%H:%M KL")
+
+    link = url or (_obsidian_url(vault_path) if vault_path else None)
+    if vault_path and not url:
+        footer_text = f"{when}  ·  \U0001F4C2 {vault_path}"
+    else:
+        footer_text = when
+
+    embed: dict = {
+        "author": {"name": f"Vesper · {channel_label}"},
+        "title": title[:256],
+        "description": description,
+        "color": color,
+        "fields": fields or [],
+        "footer": {"text": footer_text[:2048]},
+    }
+    if link:
+        embed["url"] = link
+    return embed
+
+
 ROUTES: dict[str, str] = {
     "heartbeat_tick":   "DISCORD_HOOK_HEARTBEAT",
     "error":            "DISCORD_HOOK_ERRORS",
