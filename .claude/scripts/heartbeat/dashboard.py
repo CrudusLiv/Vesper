@@ -62,25 +62,16 @@ def _vesper_embed(
     Linking rules:
     - `url` (an http/https URL) goes into `embed.url`, making the title
       clickable. Used for PR events that point at GitHub.
-    - `vault_path` cannot go into `embed.url` — Discord rejects non-http
-      schemes there with HTTP 400. Instead, we prepend a markdown link
-      `[📂 Open in Obsidian](obsidian://...)` to the description, which
-      Discord renders as clickable.
-    - If both `vault_path` and `url` are given, the explicit `url` wins
-      and no Obsidian markdown link is added (the title points to the
-      web resource, and the vault is not the right destination).
+    - `vault_path` cannot be made clickable from Discord: non-http schemes
+      are rejected from `embed.url` (HTTP 400) and Discord doesn't render
+      `[text](obsidian://...)` markdown links as clickable either. We just
+      surface the path in the footer so it can be found in Obsidian by hand.
     """
     now = datetime.fromtimestamp(ts, tz=KL) if ts else datetime.now(KL)
     when = now.strftime("%H:%M KL")
 
     if vault_path and not url:
         footer_text = f"{when}  ·  \U0001F4C2 {vault_path}"
-        obsidian_link = (
-            f"[\U0001F4C2 Open in Obsidian]({_obsidian_url(vault_path)})"
-        )
-        description = (
-            f"{obsidian_link}\n{description}" if description else obsidian_link
-        )
     else:
         footer_text = when
 
@@ -362,11 +353,18 @@ def _format_thread_reply(p: dict[str, Any]) -> dict[str, Any]:
 def _format_lecture_new(p: dict[str, Any]) -> dict[str, Any]:
     """Forum-thread starter for a freshly-summarised lecture.
 
-    payload keys: name (course), title, tldr (list), vault_path, source."""
+    payload keys (required): name (course), title, tldr (list), vault_path, source
+    payload keys (optional): date (YYYY-MM-DD), study_cards (int)
+
+    Optional keys drive three inline fields; omitting them suppresses the
+    corresponding field so older callers keep working unchanged."""
     title = (p.get("title") or "(untitled)").strip()
+    course = (p.get("name") or "").strip()
     tldr = p.get("tldr") or []
     vault_path = p.get("vault_path") or ""
     source = (p.get("source") or "").strip()
+    date = (p.get("date") or "").strip()
+    study_cards = p.get("study_cards")
 
     bullets = (
         "\n".join(f"- {b}" for b in tldr[:3])
@@ -375,12 +373,21 @@ def _format_lecture_new(p: dict[str, Any]) -> dict[str, Any]:
     if len(bullets) > 4000:
         bullets = bullets[:3997] + "..."
 
+    fields: list[dict] = []
+    if course:
+        fields.append({"name": "Course", "value": course, "inline": True})
+    if date:
+        fields.append({"name": "Date", "value": date, "inline": True})
+    if isinstance(study_cards, int) and not isinstance(study_cards, bool):
+        fields.append({"name": "Study cards", "value": str(study_cards), "inline": True})
+
     embed = _vesper_embed(
         title=title,
         description=bullets,
         color=0x3498DB,
         channel_label="Lectures",
         vault_path=vault_path or None,
+        fields=fields or None,
         ts=p.get("ts"),
     )
     if source:

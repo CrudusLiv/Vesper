@@ -92,8 +92,8 @@ def main() -> int:
     inbox_state = curr.get("inbox") or {}
 
     ping_detail = ping_error or f"{ping_count} new pings"
-    github_detail = github.get('error') or f"{github.get('push_count', 0)} pushes"
-    inbox_detail  = inbox_state.get('error') or f"{inbox_state.get('count', 0)} files"
+    github_detail = "(unavailable — carried from last heartbeat)" if github.get("error") else f"{github.get('push_count', 0)} pushes"
+    inbox_detail  = "(error)" if inbox_state.get("error") else f"{inbox_state.get('count', 0)} files"
     lines.append(f"  Discord: {ping_detail}")
     lines.append(f"  GitHub:  {github_detail}")
     lines.append(f"  Inbox:   {inbox_detail}")
