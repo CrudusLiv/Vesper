@@ -17,5 +17,5 @@ def _import_dashboard():
 
 
 # A fixed unix timestamp inside KL (2026-05-27 13:00 KL == 05:00 UTC).
-FIXED_TS = 1779_073_200.0
+FIXED_TS = 1779_858_000.0
 FIXED_WHEN = "13:00 KL"
