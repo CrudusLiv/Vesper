@@ -72,7 +72,13 @@ def test_vesper_embed_with_vault_path():
         vault_path="DEADLINES.md",
         ts=FIXED_TS,
     )
-    assert em["url"] == "obsidian://open?vault=Memory&file=DEADLINES.md"
+    # Discord rejects obsidian:// in embed.url -> we ship it as a
+    # markdown link inside the description instead.
+    assert "url" not in em
+    assert em["description"].startswith(
+        "[\U0001F4C2 Open in Obsidian](obsidian://open?vault=Memory&file=DEADLINES.md)"
+    )
+    assert em["description"].endswith("\nd")
     assert em["footer"]["text"] == f"{FIXED_WHEN}  ·  \U0001F4C2 DEADLINES.md"
 
 
@@ -184,7 +190,8 @@ def test_deadline_72h_yellow_with_status_field():
     em = body["embeds"][0]
     assert em["color"] == 0xF1C40F
     assert em["title"] == "[CS101] Lab 3"
-    assert em["url"] == "obsidian://open?vault=Memory&file=DEADLINES.md"
+    assert "url" not in em  # obsidian:// goes in description, not embed.url
+    assert "obsidian://open?vault=Memory&file=DEADLINES.md" in em["description"]
     status_fields = [f for f in em["fields"] if f["name"] == "Status"]
     assert status_fields == [{
         "name": "Status", "value": "\U0001F7E1 Approaching (72h)", "inline": True,
@@ -223,7 +230,8 @@ def test_next3_empty_list():
     em = body["embeds"][0]
     assert em["title"] == "Next 3 deadlines"
     assert em["color"] == 0x5865F2
-    assert em["url"] == "obsidian://open?vault=Memory&file=DEADLINES.md"
+    assert "url" not in em
+    assert "obsidian://open?vault=Memory&file=DEADLINES.md" in em["description"]
     assert "Nothing in DEADLINES.md" in em["description"]
 
 
@@ -256,8 +264,10 @@ def test_lecture_new_with_tldr_and_source():
     em = body["embeds"][0]
     assert em["title"] == "Intro"
     assert em["color"] == 0x3498DB
-    assert em["url"] == (
+    assert "url" not in em
+    assert (
         "obsidian://open?vault=Memory&file=lectures/CS101/Intro.md"
+        in em["description"]
     )
     # Only 3 bullets shown, all three present.
     assert "- A" in em["description"]
@@ -288,12 +298,14 @@ def test_morning_digest_amber_with_auto_daily_path():
     em = body["embeds"][0]
     assert em["color"] == 0xF39C12
     # FIXED_TS lands on 2026-05-27 in KL.
-    assert em["url"] == (
+    assert "url" not in em
+    assert (
         "obsidian://open?vault=Memory&file=daily/2026-05-27.md"
+        in em["description"]
     )
     assert em["title"].startswith("\U0001F305 Morning — ")
     assert "27 May" in em["title"] or "May 27" in em["title"]
-    assert em["description"] == "do stuff"
+    assert em["description"].endswith("\ndo stuff")
 
 
 def test_evening_nudge_purple_routes_daily_path():
@@ -304,7 +316,8 @@ def test_evening_nudge_purple_routes_daily_path():
     em = body["embeds"][0]
     assert em["color"] == 0x8E44AD
     assert em["title"] == "\U0001F319 Evening nudge"
-    assert "daily/2026-05-27.md" in em["url"]
+    assert "url" not in em
+    assert "daily/2026-05-27.md" in em["description"]
 
 
 def test_daily_digest_slate():
@@ -327,8 +340,12 @@ def test_inbox_text_teal_with_vault_link():
     em = body["embeds"][0]
     assert em["title"] == "Note saved"
     assert em["color"] == 0x1ABC9C
-    assert em["url"] == "obsidian://open?vault=Memory&file=notes/NOTES.md"
-    assert em["description"] == "a quick note"
+    assert "url" not in em
+    assert (
+        "obsidian://open?vault=Memory&file=notes/NOTES.md"
+        in em["description"]
+    )
+    assert em["description"].endswith("\na quick note")
     assert em["author"]["name"] == "Vesper · Inbox"
 
 
@@ -338,7 +355,9 @@ def test_inbox_text_truncates_long_content():
         "content": "x" * 2000, "vault_path": "notes/NOTES.md", "ts": FIXED_TS,
     })
     em = body["embeds"][0]
-    assert len(em["description"]) <= 1500
+    # Snippet is truncated to 1500 chars; the markdown link header pushes
+    # the total a bit higher. Stay well under Discord's 4000-char limit.
+    assert len(em["description"]) <= 1700
     assert em["description"].endswith("...")
 
 
@@ -346,7 +365,8 @@ def test_inbox_text_fallback_vault_path():
     d = _import_dashboard()
     body = d.format_embed("inbox_text", {"content": "hi", "ts": FIXED_TS})
     em = body["embeds"][0]
-    assert em["url"].endswith("notes/NOTES.md")
+    assert "url" not in em
+    assert "notes/NOTES.md" in em["description"]
 
 
 def test_inbox_attachment_fields_no_link():
