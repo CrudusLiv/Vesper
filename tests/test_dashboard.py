@@ -72,13 +72,10 @@ def test_vesper_embed_with_vault_path():
         vault_path="DEADLINES.md",
         ts=FIXED_TS,
     )
-    # Discord rejects obsidian:// in embed.url -> we ship it as a
-    # markdown link inside the description instead.
+    # Discord renders neither obsidian:// in embed.url nor in markdown
+    # link syntax — the path lives in the footer for manual lookup.
     assert "url" not in em
-    assert em["description"].startswith(
-        "[\U0001F4C2 Open in Obsidian](obsidian://open?vault=Memory&file=DEADLINES.md)"
-    )
-    assert em["description"].endswith("\nd")
+    assert em["description"] == "d"
     assert em["footer"]["text"] == f"{FIXED_WHEN}  ·  \U0001F4C2 DEADLINES.md"
 
 
@@ -190,8 +187,8 @@ def test_deadline_72h_yellow_with_status_field():
     em = body["embeds"][0]
     assert em["color"] == 0xF1C40F
     assert em["title"] == "[CS101] Lab 3"
-    assert "url" not in em  # obsidian:// goes in description, not embed.url
-    assert "obsidian://open?vault=Memory&file=DEADLINES.md" in em["description"]
+    assert "url" not in em  # obsidian:// can't be made clickable in Discord
+    assert "DEADLINES.md" in em["footer"]["text"]
     status_fields = [f for f in em["fields"] if f["name"] == "Status"]
     assert status_fields == [{
         "name": "Status", "value": "\U0001F7E1 Approaching (72h)", "inline": True,
@@ -231,7 +228,7 @@ def test_next3_empty_list():
     assert em["title"] == "Next 3 deadlines"
     assert em["color"] == 0x5865F2
     assert "url" not in em
-    assert "obsidian://open?vault=Memory&file=DEADLINES.md" in em["description"]
+    assert "DEADLINES.md" in em["footer"]["text"]
     assert "Nothing in DEADLINES.md" in em["description"]
 
 
@@ -265,10 +262,7 @@ def test_lecture_new_with_tldr_and_source():
     assert em["title"] == "Intro"
     assert em["color"] == 0x3498DB
     assert "url" not in em
-    assert (
-        "obsidian://open?vault=Memory&file=lectures/CS101/Intro.md"
-        in em["description"]
-    )
+    assert "lectures/CS101/Intro.md" in em["footer"]["text"]
     # Only 3 bullets shown, all three present.
     assert "- A" in em["description"]
     assert "- B" in em["description"]
@@ -355,13 +349,10 @@ def test_morning_digest_amber_with_auto_daily_path():
     assert em["color"] == 0xF39C12
     # FIXED_TS lands on 2026-05-27 in KL.
     assert "url" not in em
-    assert (
-        "obsidian://open?vault=Memory&file=daily/2026-05-27.md"
-        in em["description"]
-    )
+    assert "daily/2026-05-27.md" in em["footer"]["text"]
     assert em["title"].startswith("\U0001F305 Morning — ")
     assert "27 May" in em["title"] or "May 27" in em["title"]
-    assert em["description"].endswith("\ndo stuff")
+    assert em["description"] == "do stuff"
 
 
 def test_evening_nudge_purple_routes_daily_path():
@@ -373,7 +364,7 @@ def test_evening_nudge_purple_routes_daily_path():
     assert em["color"] == 0x8E44AD
     assert em["title"] == "\U0001F319 Evening nudge"
     assert "url" not in em
-    assert "daily/2026-05-27.md" in em["description"]
+    assert "daily/2026-05-27.md" in em["footer"]["text"]
 
 
 def test_daily_digest_slate():
@@ -397,11 +388,8 @@ def test_inbox_text_teal_with_vault_link():
     assert em["title"] == "Note saved"
     assert em["color"] == 0x1ABC9C
     assert "url" not in em
-    assert (
-        "obsidian://open?vault=Memory&file=notes/NOTES.md"
-        in em["description"]
-    )
-    assert em["description"].endswith("\na quick note")
+    assert "notes/NOTES.md" in em["footer"]["text"]
+    assert em["description"] == "a quick note"
     assert em["author"]["name"] == "Vesper · Inbox"
 
 
@@ -422,7 +410,7 @@ def test_inbox_text_fallback_vault_path():
     body = d.format_embed("inbox_text", {"content": "hi", "ts": FIXED_TS})
     em = body["embeds"][0]
     assert "url" not in em
-    assert "notes/NOTES.md" in em["description"]
+    assert "notes/NOTES.md" in em["footer"]["text"]
 
 
 def test_inbox_attachment_fields_no_link():

@@ -62,25 +62,16 @@ def _vesper_embed(
     Linking rules:
     - `url` (an http/https URL) goes into `embed.url`, making the title
       clickable. Used for PR events that point at GitHub.
-    - `vault_path` cannot go into `embed.url` — Discord rejects non-http
-      schemes there with HTTP 400. Instead, we prepend a markdown link
-      `[📂 Open in Obsidian](obsidian://...)` to the description, which
-      Discord renders as clickable.
-    - If both `vault_path` and `url` are given, the explicit `url` wins
-      and no Obsidian markdown link is added (the title points to the
-      web resource, and the vault is not the right destination).
+    - `vault_path` cannot be made clickable from Discord: non-http schemes
+      are rejected from `embed.url` (HTTP 400) and Discord doesn't render
+      `[text](obsidian://...)` markdown links as clickable either. We just
+      surface the path in the footer so it can be found in Obsidian by hand.
     """
     now = datetime.fromtimestamp(ts, tz=KL) if ts else datetime.now(KL)
     when = now.strftime("%H:%M KL")
 
     if vault_path and not url:
         footer_text = f"{when}  ·  \U0001F4C2 {vault_path}"
-        obsidian_link = (
-            f"[\U0001F4C2 Open in Obsidian]({_obsidian_url(vault_path)})"
-        )
-        description = (
-            f"{obsidian_link}\n{description}" if description else obsidian_link
-        )
     else:
         footer_text = when
 
