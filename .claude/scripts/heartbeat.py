@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import sys
 import time
 import traceback
@@ -336,10 +337,62 @@ def _persist(curr: dict) -> None:
         print(f"vault_state_writer failed: {exc}", file=sys.stderr)
 
 
+MIN_INTERVAL_SECONDS = 15 * 60  # prevent double-fire on Task Scheduler catch-up
+NETWORK_PROBE_HOST = "discord.com"
+NETWORK_PROBE_RETRIES = 6
+NETWORK_PROBE_INTERVAL = 5  # seconds between retries (max wait ≈ 30 s)
+
+
+def _wait_for_network() -> bool:
+    """Block until DNS resolves or give up after NETWORK_PROBE_RETRIES attempts.
+
+    Returns True if network is up, False if we timed out. Designed for the
+    laptop-wake-up race where Task Scheduler fires before the NIC is ready."""
+    for attempt in range(1, NETWORK_PROBE_RETRIES + 1):
+        try:
+            socket.getaddrinfo(NETWORK_PROBE_HOST, 443)
+            if attempt > 1:
+                print(f"Network ready after {attempt} attempt(s).")
+            return True
+        except OSError:
+            if attempt < NETWORK_PROBE_RETRIES:
+                print(f"DNS not ready (attempt {attempt}/{NETWORK_PROBE_RETRIES}), "
+                      f"retrying in {NETWORK_PROBE_INTERVAL}s…")
+                time.sleep(NETWORK_PROBE_INTERVAL)
+    return False
+
+
+def _too_soon() -> bool:
+    """Return True if the last completed tick was less than MIN_INTERVAL_SECONDS ago.
+
+    Windows Task Scheduler fires missed intervals back-to-back when the machine
+    wakes up late. This guard silently drops any extra run inside the window."""
+    prev = snapshot.load_state()
+    if not prev:
+        return False
+    last_ts = prev.get("timestamp") or prev.get("heartbeat_ran_at")
+    if not last_ts:
+        return False
+    return (time.time() - float(last_ts)) < MIN_INTERVAL_SECONDS
+
+
 def _main_impl() -> int:
     if not in_active_hours():
         print("Outside active hours (09:00-22:00 KL). Exiting.")
         return 0
+
+    if _too_soon():
+        prev = snapshot.load_state()
+        last_ts = prev.get("timestamp") or prev.get("heartbeat_ran_at") or 0
+        age = int(time.time() - float(last_ts))
+        print(f"Skipping tick — last run was {age}s ago (< {MIN_INTERVAL_SECONDS}s). "
+              "Likely a Task Scheduler catch-up fire.")
+        return 0
+
+    if not _wait_for_network():
+        print(f"Network unavailable after {NETWORK_PROBE_RETRIES} retries "
+              f"({NETWORK_PROBE_RETRIES * NETWORK_PROBE_INTERVAL}s). Skipping tick.")
+        return 1
 
     # Auto-classify and summarise anything dropped in inbox/ BEFORE the
     # snapshot runs. Processed files move to inbox/_processed/ so they don't
@@ -445,9 +498,13 @@ def _main_impl() -> int:
         print(f"gcal_sync failed: {exc}", file=sys.stderr)
 
     curr = snapshot.build_snapshot()
-    curr["heartbeat_ran_at"] = curr["timestamp"]  # only set by scheduled heartbeat
+    # heartbeat_ran_at = when integrations finished (and Discord post fires),
+    # not curr["timestamp"] which is stamped before integration calls run.
+    # This keeps Obsidian "Last heartbeat" in sync with Discord message time.
+    curr["heartbeat_ran_at"] = time.time()
+    prev = snapshot.load_state()    # capture before persisting
+    _persist(curr)                  # save state first so _too_soon guards correctly if post crashes
     _maybe_post_heartbeat_tick(curr)
-    prev = snapshot.load_state()
     diff = snapshot.diff_snapshot(prev, curr)
 
     # Always-run signals (independent of snapshot diff): habit auto-check,
