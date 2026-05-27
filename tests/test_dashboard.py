@@ -374,3 +374,44 @@ def test_inbox_attachment_missing_size():
     em = body["embeds"][0]
     by_name = {f["name"]: f["value"] for f in em["fields"]}
     assert by_name["Size"] == "(unknown)"
+
+
+def test_pr_opened_links_to_github():
+    d = _import_dashboard()
+    body = d.format_embed("pr_opened", {
+        "repo": "user/proj", "pr_number": 42, "pr_title": "Add X",
+        "pr_url": "https://github.com/user/proj/pull/42",
+        "actor": "alice", "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["color"] == 0x2ECC71
+    assert em["title"] == "\U0001F7E2 PR opened — user/proj — #42"
+    # URL points to GitHub, not Obsidian.
+    assert em["url"] == "https://github.com/user/proj/pull/42"
+    assert em["author"]["name"] == "Vesper · PRs"
+    assert "Add X" in em["description"]
+    assert "alice" in em["description"]
+    # No vault_path -> footer is bare time.
+    assert em["footer"]["text"] == FIXED_WHEN
+
+
+def test_pr_merged_purple():
+    d = _import_dashboard()
+    body = d.format_embed("pr_merged", {
+        "repo": "r", "pr_number": 1, "pr_title": "t", "pr_url": "https://x",
+        "actor": "bob", "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["color"] == 0x8E44AD
+    assert em["title"].startswith("\U0001F7E3 PR merged")
+
+
+def test_pr_comment_slate():
+    d = _import_dashboard()
+    body = d.format_embed("pr_comment", {
+        "repo": "r", "pr_number": 7, "pr_title": "",
+        "pr_url": "https://x", "actor": "", "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["color"] == 0x95A5A6
+    assert em["title"].startswith("\U0001F4AC PR comment")

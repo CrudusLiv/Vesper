@@ -292,19 +292,19 @@ def _format_daily(kind: str, p: dict[str, Any]) -> dict[str, Any]:
     )]}
 
 
-_PR_STYLES: dict[str, tuple[str, int, str]] = {
-    # kind -> (emoji, color, headline)
-    "pr_opened":  ("🟢", 0x2ECC71, "PR opened"),
-    "pr_merged":  ("🟣", 0x8E44AD, "PR merged"),
-    "pr_comment": ("💬", 0x95A5A6, "PR comment"),
+_PR_STYLES: dict[str, tuple[str, int, str, str]] = {
+    # kind -> (emoji, color, headline, actor verb)
+    "pr_opened":  ("\U0001F7E2", 0x2ECC71, "PR opened",  "opened by"),
+    "pr_merged":  ("\U0001F7E3", 0x8E44AD, "PR merged",  "merged by"),
+    "pr_comment": ("\U0001F4AC", 0x95A5A6, "PR comment", "commented by"),
 }
 
 
 def _format_pr_event(kind: str, p: dict[str, Any]) -> dict[str, Any]:
-    """Embed for one PR event (open / merge / comment).
-
-    payload keys: repo, pr_number, pr_title, pr_url, actor, ts, id."""
-    emoji, color, headline = _PR_STYLES.get(kind, ("🔧", 0x95A5A6, "PR event"))
+    """Embed for one PR event. Title links to the GitHub PR, NOT the vault."""
+    emoji, color, headline, verb = _PR_STYLES.get(
+        kind, ("\U0001F527", 0x95A5A6, "PR event", "by")
+    )
     repo = (p.get("repo") or "").strip()
     pr_number = p.get("pr_number")
     pr_title = (p.get("pr_title") or "").strip()
@@ -313,24 +313,23 @@ def _format_pr_event(kind: str, p: dict[str, Any]) -> dict[str, Any]:
 
     pr_ref = f"#{pr_number}" if pr_number else ""
     title_bits = [f"{emoji} {headline}", repo, pr_ref]
-    title = "  ·  ".join(b for b in title_bits if b)[:256]
+    title = " — ".join(b for b in title_bits if b)
 
     desc_parts: list[str] = []
     if pr_title:
         desc_parts.append(f"**{pr_title}**")
     if actor:
-        verb = {"pr_opened": "opened by", "pr_merged": "merged by", "pr_comment": "commented by"}.get(kind, "by")
         desc_parts.append(f"{verb} `{actor}`")
-    if pr_url:
-        desc_parts.append(pr_url)
     description = "\n".join(desc_parts) or "_(no details)_"
 
-    embed = {
-        "title": title,
-        "description": description,
-        "color": color,
-    }
-    return {"embeds": [embed]}
+    return {"embeds": [_vesper_embed(
+        title=title,
+        description=description,
+        color=color,
+        channel_label="PRs",
+        url=pr_url or None,
+        ts=p.get("ts"),
+    )]}
 
 
 def _format_thread_reply(p: dict[str, Any]) -> dict[str, Any]:
