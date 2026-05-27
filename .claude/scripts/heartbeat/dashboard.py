@@ -16,6 +16,7 @@ import json
 import os
 import sys
 import traceback
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,71 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "integrations"))
 import _env  # noqa: F401, E402
 
 KL = timezone(timedelta(hours=8))
+
+VAULT_NAME = "Memory"  # Folder under Dynamous/ holding all notes.
+
+
+def _obsidian_url(vault_path: str) -> str:
+    """Build an `obsidian://` deep link for a vault-relative path.
+
+    Slashes stay literal so the URL is human-skimmable; spaces and other
+    reserved chars are percent-encoded by quote()."""
+    encoded = urllib.parse.quote(vault_path, safe="/")
+    return f"obsidian://open?vault={VAULT_NAME}&file={encoded}"
+
+
+def _vesper_embed(
+    title: str,
+    description: str,
+    color: int,
+    *,
+    channel_label: str,
+    vault_path: str | None = None,
+    url: str | None = None,
+    fields: list[dict] | None = None,
+    ts: float | None = None,
+) -> dict:
+    """Return the inner embed dict for a Vesper-branded Discord post.
+
+    Caller wraps in `{"embeds": [...]}`.
+
+    Linking rules:
+    - `url` (an http/https URL) goes into `embed.url`, making the title
+      clickable. Used for PR events that point at GitHub.
+    - `vault_path` cannot go into `embed.url` — Discord rejects non-http
+      schemes there with HTTP 400. Instead, we prepend a markdown link
+      `[📂 Open in Obsidian](obsidian://...)` to the description, which
+      Discord renders as clickable.
+    - If both `vault_path` and `url` are given, the explicit `url` wins
+      and no Obsidian markdown link is added (the title points to the
+      web resource, and the vault is not the right destination).
+    """
+    now = datetime.fromtimestamp(ts, tz=KL) if ts else datetime.now(KL)
+    when = now.strftime("%H:%M KL")
+
+    if vault_path and not url:
+        footer_text = f"{when}  ·  \U0001F4C2 {vault_path}"
+        obsidian_link = (
+            f"[\U0001F4C2 Open in Obsidian]({_obsidian_url(vault_path)})"
+        )
+        description = (
+            f"{obsidian_link}\n{description}" if description else obsidian_link
+        )
+    else:
+        footer_text = when
+
+    embed: dict = {
+        "author": {"name": f"Vesper · {channel_label}"},
+        "title": title[:256],
+        "description": description,
+        "color": color,
+        "fields": fields or [],
+        "footer": {"text": footer_text[:2048]},
+    }
+    if url:
+        embed["url"] = url
+    return embed
+
 
 ROUTES: dict[str, str] = {
     "heartbeat_tick":   "DISCORD_HOOK_HEARTBEAT",
@@ -95,118 +161,165 @@ def format_embed(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+_HEARTBEAT_COLORS = {
+    "ok":       0x2ECC71,  # green
+    "degraded": 0xF1C40F,  # yellow
+    "red":      0xE74C3C,  # red
+}
+
+
 def _format_heartbeat_tick(p: dict[str, Any]) -> dict[str, Any]:
-    status = p.get("status", "unknown")
+    status = p.get("status", "ok")
     failing = p.get("failing") or []
-    ts = p.get("tick_ts") or 0
-    now = datetime.fromtimestamp(ts, tz=KL) if ts else datetime.now(KL)
-    when = now.strftime("%H:%M KL")
-    if status == "red" and failing:
-        line = f"[heartbeat] red — {', '.join(failing)}  {when}"
+    color = _HEARTBEAT_COLORS.get(status, 0x95A5A6)
+    if failing:
+        title = f"\U0001F534 Degraded — {', '.join(failing)}"
+        description = f"{len(failing)} check(s) failed · other integrations ok"
     else:
-        line = f"[heartbeat] {status}  {when}"
-    return {"content": line}
+        title = "All systems green"
+        description = "all integrations ok"
+    return {"embeds": [_vesper_embed(
+        title=title,
+        description=description,
+        color=color,
+        channel_label="Heartbeat",
+        ts=p.get("tick_ts"),
+    )]}
 
 
 def _format_inbox_text(p: dict[str, Any]) -> dict[str, Any]:
     content = (p.get("content") or "").strip()
     vault_path = p.get("vault_path") or "notes/NOTES.md"
-    ts = p.get("ts") or 0
-    when = (datetime.fromtimestamp(ts, tz=KL) if ts else datetime.now(KL)).strftime("%H:%M KL")
     snippet = content if len(content) <= 1500 else content[:1497] + "..."
-    return {"content": f"[note] {when} — `{vault_path}`\n{snippet}"}
+    return {"embeds": [_vesper_embed(
+        title="Note saved",
+        description=snippet,
+        color=0x1ABC9C,
+        channel_label="Inbox",
+        vault_path=vault_path,
+        ts=p.get("ts"),
+    )]}
 
 
 def _format_inbox_attachment(p: dict[str, Any]) -> dict[str, Any]:
     filename = p.get("filename") or "(unknown)"
     size = p.get("size")
     vault_path = p.get("vault_path") or ""
-    ts = p.get("ts") or 0
-    when = (datetime.fromtimestamp(ts, tz=KL) if ts else datetime.now(KL)).strftime("%H:%M KL")
-    size_str = f" ({size:,} bytes)" if isinstance(size, int) else ""
-    return {"content": f"[inbox] {when} — saved `{filename}`{size_str} → `{vault_path}`"}
+    size_str = f"{size:,} bytes" if isinstance(size, int) else "(unknown)"
+    fields = [
+        {"name": "File",     "value": filename,   "inline": True},
+        {"name": "Size",     "value": size_str,   "inline": True},
+        {"name": "Saved to", "value": vault_path, "inline": False},
+    ]
+    return {"embeds": [_vesper_embed(
+        title="Attachment saved",
+        description="",
+        color=0x1ABC9C,
+        channel_label="Inbox",
+        fields=fields,
+        ts=p.get("ts"),
+    )]}
+
+
+_DEADLINE_STYLES: dict[str, tuple[int, str]] = {
+    # kind -> (color, status field value)
+    "deadline_72h":     (0xF1C40F, "\U0001F7E1 Approaching (72h)"),
+    "deadline_24h":     (0xE67E22, "\U0001F7E0 Due today/tomorrow"),
+    "deadline_overdue": (0xE74C3C, "\U0001F534 OVERDUE"),
+}
 
 
 def _format_deadline(kind: str, p: dict[str, Any]) -> dict[str, Any]:
-    """Embed for a single deadline threshold post. Used for the forum
-    starter message AND for in-thread follow-ups when a row crosses a new
-    threshold (24h / overdue).
+    """Embed for a single deadline threshold post (72h / 24h / overdue).
 
-    payload keys: due, course, title, days, key, bucket."""
+    Title is the assignment (course-tagged) and clicks through to
+    DEADLINES.md. A 'Status' field carries the threshold label; the
+    description carries the due-date phrasing."""
+    color, status_value = _DEADLINE_STYLES.get(
+        kind, (0x95A5A6, "Deadline")
+    )
     course = (p.get("course") or "").strip()
     title = (p.get("title") or "(untitled)").strip()
     due = p.get("due") or "?"
     days = p.get("days")
-    bucket = p.get("bucket") or ""
 
     if kind == "deadline_overdue":
-        emoji = "🔴"
-        color = 0xE74C3C  # red
-        headline = "OVERDUE"
-        when = f"was due **{due}**" if days is None else f"was due **{due}** ({-days}d ago)"
-    elif kind == "deadline_24h":
-        emoji = "🟠"
-        color = 0xE67E22  # orange
-        headline = "Due today" if days == 0 else "Due tomorrow" if days == 1 else "Due soon"
-        when = f"due **{due}** (in {days}d)" if isinstance(days, int) else f"due **{due}**"
-    else:  # deadline_72h covers soon (48h) and approaching (72h)
-        emoji = "🟡"
-        color = 0xF1C40F  # yellow
-        headline = "Due in 48h" if bucket == "soon" else "Due in 72h"
-        when = f"due **{due}** (in {days}d)" if isinstance(days, int) else f"due **{due}**"
+        when = (
+            f"was due **{due}** ({-days}d ago)"
+            if isinstance(days, int) else f"was due **{due}**"
+        )
+    else:
+        when = (
+            f"due **{due}** (in {days}d)"
+            if isinstance(days, int) else f"due **{due}**"
+        )
 
-    course_tag = f"[{course}] " if course else ""
-    embed = {
-        "title": f"{emoji} {headline} — {course_tag}{title}"[:256],
-        "description": when,
-        "color": color,
-        "footer": {"text": "see DEADLINES.md"},
-    }
-    return {"embeds": [embed]}
+    title_text = f"[{course}] {title}" if course else title
+    return {"embeds": [_vesper_embed(
+        title=title_text,
+        description=when,
+        color=color,
+        channel_label="Deadlines",
+        vault_path="DEADLINES.md",
+        fields=[{"name": "Status", "value": status_value, "inline": True}],
+        ts=p.get("ts"),
+    )]}
 
 
-_DAILY_STYLES: dict[str, tuple[str, int]] = {
-    # kind -> (emoji prefix, embed color)
-    "morning_digest": ("🌅", 0xF39C12),  # warm amber
-    "evening_nudge":  ("🌙", 0x8E44AD),  # muted purple
-    "daily_digest":   ("📝", 0x95A5A6),  # slate
+_DAILY_STYLES: dict[str, tuple[str, int, str]] = {
+    # kind -> (emoji prefix, color, fixed title label or "" to use payload)
+    "morning_digest": ("\U0001F305", 0xF39C12, "Morning"),       # 🌅 amber
+    "evening_nudge":  ("\U0001F319", 0x8E44AD, "Evening nudge"),  # 🌙 purple
+    "daily_digest":   ("\U0001F4DD", 0x95A5A6, ""),               # 📝 slate
 }
 
 
 def _format_daily(kind: str, p: dict[str, Any]) -> dict[str, Any]:
     """Single embed shape for the three daily-feed kinds.
 
-    All three route to the same channel (DISCORD_HOOK_DAILY). The emoji
-    prefix is the only at-a-glance differentiator -- color is a secondary
-    cue. Payload shape matches what heartbeat.py already produces:
-    {title, body, priority?}."""
-    emoji, color = _DAILY_STYLES.get(kind, ("📝", 0x95A5A6))
-    title = (p.get("title") or "Daily").strip()
+    All three route to DISCORD_HOOK_DAILY and link back to today's daily
+    note. morning_digest builds its own dated title; evening_nudge uses
+    the fixed string; daily_digest defers to the payload-provided title."""
+    emoji, color, fixed_label = _DAILY_STYLES.get(
+        kind, ("\U0001F4DD", 0x95A5A6, "")
+    )
+    ts = p.get("ts")
+    now = datetime.fromtimestamp(ts, tz=KL) if ts else datetime.now(KL)
+    daily_path = f"daily/{now.strftime('%Y-%m-%d')}.md"
+
+    if kind == "morning_digest":
+        title = f"{emoji} Morning — {now.strftime('%a %d %b')}"
+    elif kind == "evening_nudge":
+        title = f"{emoji} {fixed_label}"
+    else:
+        payload_title = (p.get("title") or "Daily").strip()
+        title = f"{emoji} {payload_title}"
+
     body = (p.get("body") or "").strip()
-    now = datetime.now(KL).strftime("%H:%M KL")
     description = body if len(body) <= 4000 else body[:3997] + "..."
-    embed = {
-        "title": f"{emoji} {title}"[:256],
-        "description": description or "_(no body)_",
-        "color": color,
-        "footer": {"text": now},
-    }
-    return {"embeds": [embed]}
+    return {"embeds": [_vesper_embed(
+        title=title,
+        description=description or "_(no body)_",
+        color=color,
+        channel_label="Daily",
+        vault_path=daily_path,
+        ts=ts,
+    )]}
 
 
-_PR_STYLES: dict[str, tuple[str, int, str]] = {
-    # kind -> (emoji, color, headline)
-    "pr_opened":  ("🟢", 0x2ECC71, "PR opened"),
-    "pr_merged":  ("🟣", 0x8E44AD, "PR merged"),
-    "pr_comment": ("💬", 0x95A5A6, "PR comment"),
+_PR_STYLES: dict[str, tuple[str, int, str, str]] = {
+    # kind -> (emoji, color, headline, actor verb)
+    "pr_opened":  ("\U0001F7E2", 0x2ECC71, "PR opened",  "opened by"),
+    "pr_merged":  ("\U0001F7E3", 0x8E44AD, "PR merged",  "merged by"),
+    "pr_comment": ("\U0001F4AC", 0x95A5A6, "PR comment", "commented by"),
 }
 
 
 def _format_pr_event(kind: str, p: dict[str, Any]) -> dict[str, Any]:
-    """Embed for one PR event (open / merge / comment).
-
-    payload keys: repo, pr_number, pr_title, pr_url, actor, ts, id."""
-    emoji, color, headline = _PR_STYLES.get(kind, ("🔧", 0x95A5A6, "PR event"))
+    """Embed for one PR event. Title links to the GitHub PR, NOT the vault."""
+    emoji, color, headline, verb = _PR_STYLES.get(
+        kind, ("\U0001F527", 0x95A5A6, "PR event", "by")
+    )
     repo = (p.get("repo") or "").strip()
     pr_number = p.get("pr_number")
     pr_title = (p.get("pr_title") or "").strip()
@@ -215,24 +328,23 @@ def _format_pr_event(kind: str, p: dict[str, Any]) -> dict[str, Any]:
 
     pr_ref = f"#{pr_number}" if pr_number else ""
     title_bits = [f"{emoji} {headline}", repo, pr_ref]
-    title = "  ·  ".join(b for b in title_bits if b)[:256]
+    title = " — ".join(b for b in title_bits if b)
 
     desc_parts: list[str] = []
     if pr_title:
         desc_parts.append(f"**{pr_title}**")
     if actor:
-        verb = {"pr_opened": "opened by", "pr_merged": "merged by", "pr_comment": "commented by"}.get(kind, "by")
         desc_parts.append(f"{verb} `{actor}`")
-    if pr_url:
-        desc_parts.append(pr_url)
     description = "\n".join(desc_parts) or "_(no details)_"
 
-    embed = {
-        "title": title,
-        "description": description,
-        "color": color,
-    }
-    return {"embeds": [embed]}
+    return {"embeds": [_vesper_embed(
+        title=title,
+        description=description,
+        color=color,
+        channel_label="PRs",
+        url=pr_url or None,
+        ts=p.get("ts"),
+    )]}
 
 
 def _format_thread_reply(p: dict[str, Any]) -> dict[str, Any]:
@@ -250,73 +362,91 @@ def _format_thread_reply(p: dict[str, Any]) -> dict[str, Any]:
 def _format_lecture_new(p: dict[str, Any]) -> dict[str, Any]:
     """Forum-thread starter for a freshly-summarised lecture.
 
-    payload keys: name (course), title, tldr (list of bullets), vault_path
-    (relative posix path), source (original filename)."""
-    course = (p.get("name") or "").strip()
+    payload keys: name (course), title, tldr (list), vault_path, source."""
     title = (p.get("title") or "(untitled)").strip()
     tldr = p.get("tldr") or []
     vault_path = p.get("vault_path") or ""
-    source = p.get("source") or ""
+    source = (p.get("source") or "").strip()
 
-    course_tag = f"[{course}] " if course else ""
-    bullets = "\n".join(f"- {b}" for b in tldr[:3]) if tldr else "_(no Key concepts section)_"
-    description_parts = [bullets]
-    if vault_path:
-        description_parts.append(f"\n`{vault_path}`")
-    description = "\n".join(description_parts)
-    if len(description) > 4000:
-        description = description[:3997] + "..."
+    bullets = (
+        "\n".join(f"- {b}" for b in tldr[:3])
+        if tldr else "_(no Key concepts section)_"
+    )
+    if len(bullets) > 4000:
+        bullets = bullets[:3997] + "..."
 
-    footer_text = f"source: {source}" if source else "see lectures/"
-    embed = {
-        "title": f"📚 {course_tag}{title}"[:256],
-        "description": description,
-        "color": 0x3498DB,  # blue
-        "footer": {"text": footer_text[:2048]},
-    }
+    embed = _vesper_embed(
+        title=title,
+        description=bullets,
+        color=0x3498DB,
+        channel_label="Lectures",
+        vault_path=vault_path or None,
+        ts=p.get("ts"),
+    )
+    if source:
+        embed["footer"]["text"] = (
+            f"{embed['footer']['text']}  ·  source: {source}"
+        )[:2048]
     return {"embeds": [embed]}
 
 
-def _format_next3(p: dict[str, Any]) -> dict[str, Any]:
-    """Plain-text rollup of the closest 3 deadlines. Edited in place each
-    tick via dashboard_state.next3.message_id. Lives inside its own forum
-    thread (since #deadlines is a forum channel) so it can be pinned by
-    hand once.
+def _next3_dot(days: Any) -> str:
+    """Red / yellow / green dot for a deadline based on days-until-due."""
+    if not isinstance(days, int) or days < 0:
+        return "\U0001F534"  # red (overdue or unknown)
+    if days <= 3:
+        return "\U0001F7E1"  # yellow (within 72h)
+    return "\U0001F7E2"      # green (later)
 
-    payload keys: items (list of dicts with due/course/title/days)."""
+
+def _format_next3(p: dict[str, Any]) -> dict[str, Any]:
+    """Embed rollup of the next 3 deadlines, edited in place each tick."""
     items = p.get("items") or []
-    now = datetime.now(KL).strftime("%H:%M KL")
     if not items:
-        body = "**Next 3 deadlines**\nNothing in DEADLINES.md ## Active."
+        description = "Nothing in DEADLINES.md ## Active."
     else:
-        lines = ["**Next 3 deadlines**"]
+        lines: list[str] = []
         for i in items:
             course = (i.get("course") or "").strip()
             title = (i.get("title") or "(untitled)").strip()
             due = i.get("due") or "?"
             days = i.get("days")
             if isinstance(days, int):
-                rel = f"{-days}d overdue" if days < 0 else "today" if days == 0 else f"in {days}d"
+                rel = (
+                    f"{-days}d overdue" if days < 0
+                    else "today" if days == 0
+                    else f"in {days}d"
+                )
             else:
                 rel = ""
             tag = f"[{course}] " if course else ""
-            lines.append(f"- `{due}` ({rel}) — {tag}{title}")
-        body = "\n".join(lines)
-    return {"content": f"{body}\n_updated {now}_"}
+            dot = _next3_dot(days)
+            rel_part = f" ({rel})" if rel else ""
+            lines.append(f"{dot} `{due}`{rel_part} — {tag}{title}")
+        description = "\n".join(lines)
+    return {"embeds": [_vesper_embed(
+        title="Next 3 deadlines",
+        description=description,
+        color=0x5865F2,
+        channel_label="Deadlines",
+        vault_path="DEADLINES.md",
+        ts=p.get("ts"),
+    )]}
 
 
 def _format_error(p: dict[str, Any]) -> dict[str, Any]:
     script = p.get("script") or "unknown"
     trace = (p.get("trace") or "").strip()
-    # Tail of the trace is usually more informative than the top frame.
     if len(trace) > 1800:
         trace = "...\n" + trace[-1797:]
-    embed = {
-        "title": f"Error in {script}",
-        "description": f"```\n{trace}\n```" if trace else "(no trace captured)",
-        "color": 0xE74C3C,
-    }
-    return {"embeds": [embed]}
+    description = f"```\n{trace}\n```" if trace else "(no trace captured)"
+    return {"embeds": [_vesper_embed(
+        title=f"Error in {script}",
+        description=description,
+        color=0xE74C3C,
+        channel_label="Errors",
+        ts=p.get("ts"),
+    )]}
 
 
 def _route_url(kind: str) -> str | None:
