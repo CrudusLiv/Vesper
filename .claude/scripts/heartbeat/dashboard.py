@@ -372,15 +372,16 @@ def _format_next3(p: dict[str, Any]) -> dict[str, Any]:
 def _format_error(p: dict[str, Any]) -> dict[str, Any]:
     script = p.get("script") or "unknown"
     trace = (p.get("trace") or "").strip()
-    # Tail of the trace is usually more informative than the top frame.
     if len(trace) > 1800:
         trace = "...\n" + trace[-1797:]
-    embed = {
-        "title": f"Error in {script}",
-        "description": f"```\n{trace}\n```" if trace else "(no trace captured)",
-        "color": 0xE74C3C,
-    }
-    return {"embeds": [embed]}
+    description = f"```\n{trace}\n```" if trace else "(no trace captured)"
+    return {"embeds": [_vesper_embed(
+        title=f"Error in {script}",
+        description=description,
+        color=0xE74C3C,
+        channel_label="Errors",
+        ts=p.get("ts"),
+    )]}
 
 
 def _route_url(kind: str) -> str | None:

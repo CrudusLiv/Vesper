@@ -141,3 +141,35 @@ def test_heartbeat_tick_red_with_multiple_failing():
     assert em["color"] == 0xE74C3C
     assert em["title"] == "\U0001F534 Degraded — gmail, gcal"
     assert em["description"] == "2 check(s) failed · other integrations ok"
+
+
+def test_error_embed_carries_trace():
+    d = _import_dashboard()
+    body = d.format_embed("error", {
+        "script": "heartbeat.py", "trace": "Traceback...\nValueError: x",
+        "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert em["title"] == "Error in heartbeat.py"
+    assert em["color"] == 0xE74C3C
+    assert "ValueError: x" in em["description"]
+    assert em["description"].startswith("```")
+    assert em["author"]["name"] == "Vesper · Errors"
+
+
+def test_error_embed_no_trace():
+    d = _import_dashboard()
+    body = d.format_embed("error", {"script": "x.py", "ts": FIXED_TS})
+    em = body["embeds"][0]
+    assert em["description"] == "(no trace captured)"
+
+
+def test_error_embed_truncates_long_trace():
+    d = _import_dashboard()
+    long_trace = "x" * 3000
+    body = d.format_embed("error", {
+        "script": "x.py", "trace": long_trace, "ts": FIXED_TS,
+    })
+    em = body["embeds"][0]
+    assert len(em["description"]) < 2000
+    assert em["description"].startswith("```\n...\n")
