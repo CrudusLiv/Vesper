@@ -299,6 +299,7 @@ def _process_one(src: Path) -> dict | None:
 
     title = _extract_title(note_md) or classification.get("title") or src.stem
     tldr = _extract_tldr(note_md) if doc_type == "lecture" else []
+    study_cards = _extract_study_card_count(note_md) if doc_type == "lecture" else 0
     return {
         "path": note_path,
         "type": doc_type,
@@ -308,6 +309,8 @@ def _process_one(src: Path) -> dict | None:
         "source": src.name,
         "deadlines": deadlines,
         "tldr": tldr,
+        "date": date,
+        "study_cards": study_cards,
     }
 
 
@@ -456,6 +459,25 @@ def _extract_tldr(note_md: str, n: int = 3) -> list[str]:
             if len(out) >= n:
                 break
     return out
+
+
+def _extract_study_card_count(note_md: str) -> int:
+    """Count Q: lines under '## Study cards'.
+
+    Returns 0 if the section is missing or has no Q: lines. Counting stops
+    at the next ## heading."""
+    in_section = False
+    count = 0
+    for line in note_md.splitlines():
+        if line.startswith("## "):
+            in_section = (line.strip() == "## Study cards")
+            continue
+        if not in_section:
+            continue
+        stripped = line.lstrip()
+        if stripped.startswith(("- Q:", "* Q:", "Q:")):
+            count += 1
+    return count
 
 
 DAILY = VAULT / "daily"
