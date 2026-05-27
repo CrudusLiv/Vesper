@@ -108,12 +108,12 @@ def execute(actions: dict | None) -> dict:
 def _compute_tick_status(snapshot_data: dict) -> tuple[str, list[str]]:
     """Inspect the snapshot dict for per-integration error fields. Returns
     ('red', [failing names]) if any integration reported an error this tick,
-    else ('green', [])."""
+    else ('ok', []). Status keys match dashboard._HEARTBEAT_COLORS."""
     failing: list[str] = []
     for name, data in snapshot_data.items():
         if isinstance(data, dict) and "error" in data:
             failing.append(name)
-    return ("red" if failing else "green", failing)
+    return ("red" if failing else "ok", failing)
 
 
 def _maybe_post_heartbeat_tick(curr: dict) -> None:
