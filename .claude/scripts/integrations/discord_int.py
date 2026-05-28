@@ -20,6 +20,7 @@ Query cache:    py query.py discord recent
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import sqlite3
@@ -201,6 +202,8 @@ def recent(hours: int = 24, limit: int = 50, dms_only: bool = False) -> list[dic
 # ---------- CLI ----------
 
 def handle_query(argv: list[str]) -> int:
+    if isinstance(sys.stdout, io.TextIOWrapper):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(prog="query.py discord")
     parser.add_argument("subcommand", choices=["recent", "dms", "bot"])
     parser.add_argument("--hours", type=int, default=24)
