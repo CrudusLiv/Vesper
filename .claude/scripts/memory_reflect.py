@@ -74,7 +74,7 @@ def reflect() -> dict:
         f"---\n\nCURRENT MEMORY.md:\n\n{memory}\n\n"
         f"Return JSON per the schema."
     )
-    return llm.call_json(prompt, system_prompt=REFLECT_SYSTEM, model="haiku") or {}
+    return llm.call_json(prompt, system_prompt=REFLECT_SYSTEM, model="haiku", task="memory_reflect") or {}
 
 
 def _insert_into_section(text: str, section_name: str, new_items: list[str], date_prefix: str) -> tuple[str, int]:
@@ -198,7 +198,7 @@ def curate_about() -> int:
         f"---\n\nCURRENT ABOUT.md:\n\n{current}\n\n"
         f"Return JSON per the schema."
     )
-    result = llm.call_json(prompt, system_prompt=ABOUT_SYSTEM, model="haiku") or {}
+    result = llm.call_json(prompt, system_prompt=ABOUT_SYSTEM, model="haiku", task="memory_about") or {}
     new_bullets = result.get("new_bullets") or []
     if not isinstance(new_bullets, list):
         return 0

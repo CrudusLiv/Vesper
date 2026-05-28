@@ -20,6 +20,8 @@ import os
 import shutil
 import subprocess
 import sys
+import urllib.request
+import urllib.error
 from pathlib import Path
 from typing import Optional
 
@@ -27,6 +29,84 @@ CLAUDE_BIN = shutil.which("claude") or "claude"
 DEFAULT_MODEL = "haiku"
 DEFAULT_TIMEOUT = 120
 TOKEN_FILE = Path(__file__).resolve().parents[2] / "data" / "claude-token.txt"
+
+_CONFIG_PATH = Path(__file__).resolve().parents[2] / "data" / "llm-config.json"
+_DEFAULTS: dict = {
+    "default_backend": "claude",
+    "fallback_backend": None,
+    "backends": {
+        "claude": {"type": "claude"},
+        "ollama": {
+            "type": "ollama",
+            "base_url": "http://localhost:11434",
+            "default_model": "qwen2.5:7b",
+        },
+    },
+    "routing": {},
+}
+_config_cache: dict | None = None
+
+
+def _load_config() -> dict:
+    global _config_cache
+    if _config_cache is not None:
+        return _config_cache
+    try:
+        raw = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+        _config_cache = {**_DEFAULTS, **raw}
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        print(f"[llm] config load failed ({exc}), using defaults", file=sys.stderr)
+        _config_cache = dict(_DEFAULTS)
+    return _config_cache
+
+
+def _start_ollama_server() -> None:
+    import time
+    subprocess.Popen(
+        ["ollama", "serve"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    time.sleep(2)
+
+
+def _call_ollama(
+    prompt: str,
+    *,
+    system_prompt: Optional[str] = None,
+    model: str = "qwen2.5:7b",
+    timeout: int = DEFAULT_TIMEOUT,
+) -> str:
+    config = _load_config()
+    base_url = config["backends"].get("ollama", {}).get("base_url", "http://localhost:11434")
+    url = f"{base_url}/api/chat"
+
+    messages: list[dict] = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
+    payload = json.dumps({"model": model, "messages": messages, "stream": False}).encode()
+
+    for attempt in range(2):
+        try:
+            req = urllib.request.Request(
+                url, data=payload, headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode())
+                return data.get("message", {}).get("content", "").strip()
+        except (ConnectionRefusedError, urllib.error.URLError):
+            if attempt == 0:
+                print("[llm] ollama not running, attempting to start", file=sys.stderr)
+                _start_ollama_server()
+                continue
+            print("[llm._call_ollama] connection failed after start attempt", file=sys.stderr)
+            return ""
+        except Exception as exc:
+            print(f"[llm._call_ollama] {type(exc).__name__}: {exc}", file=sys.stderr)
+            return ""
+    return ""
 
 
 def _build_env() -> dict[str, str]:
@@ -59,17 +139,13 @@ def is_available() -> bool:
         return False
 
 
-def call(
+def _call_claude(
     prompt: str,
     *,
     system_prompt: Optional[str] = None,
     model: str = DEFAULT_MODEL,
     timeout: int = DEFAULT_TIMEOUT,
 ) -> str:
-    """Send `prompt` to `claude -p`, return text result. Empty string on failure."""
-    # Pipe the prompt via stdin instead of argv. Windows CreateProcess caps
-    # the command line at ~32K; transcript distillation prompts can run much
-    # longer than that. Stdin has no such limit.
     cmd: list[str] = [
         CLAUDE_BIN, "-p",
         "--setting-sources", "user",
@@ -106,17 +182,63 @@ def call(
     return (data.get("result") or "").strip()
 
 
+def _resolve_backend(task: Optional[str]) -> tuple[str, Optional[str]]:
+    """Return (backend_name, model_override_or_None)."""
+    force = os.environ.get("LLM_FORCE_BACKEND")
+    if force:
+        return force, None
+    config = _load_config()
+    if task:
+        route = config.get("routing", {}).get(task)
+        if route:
+            return route["backend"], route.get("model")
+    return config.get("default_backend", "claude"), None
+
+
+def call(
+    prompt: str,
+    *,
+    system_prompt: Optional[str] = None,
+    model: str = DEFAULT_MODEL,
+    task: Optional[str] = None,
+    timeout: int = DEFAULT_TIMEOUT,
+) -> str:
+    """Send prompt to the configured backend, return text. Empty string on failure."""
+    backend, model_override = _resolve_backend(task)
+    effective_model = model_override or model
+
+    if backend == "ollama":
+        config = _load_config()
+        ollama_default = config["backends"].get("ollama", {}).get("default_model", "qwen2.5:7b")
+        ollama_model = model_override or ollama_default
+        result = _call_ollama(prompt, system_prompt=system_prompt, model=ollama_model, timeout=timeout)
+        if result:
+            return result
+        fallback = config.get("fallback_backend")
+        if fallback and fallback != "ollama":
+            print(f"[llm.call] ollama failed for task {task}, retrying on {fallback}", file=sys.stderr)
+            backend = fallback
+        else:
+            return ""
+
+    if backend == "claude":
+        return _call_claude(prompt, system_prompt=system_prompt, model=effective_model, timeout=timeout)
+
+    return ""
+
+
 def call_json(
     prompt: str,
     *,
     system_prompt: Optional[str] = None,
     model: str = DEFAULT_MODEL,
+    task: Optional[str] = None,
     timeout: int = DEFAULT_TIMEOUT,
 ):
     """Convenience: parse the LLM's response as JSON. Returns None on parse failure.
 
     Strips markdown code fences if the model wraps JSON in them despite instructions."""
-    text = call(prompt, system_prompt=system_prompt, model=model, timeout=timeout)
+    text = call(prompt, system_prompt=system_prompt, model=model, task=task, timeout=timeout)
     if not text:
         return None
     if text.startswith("```"):

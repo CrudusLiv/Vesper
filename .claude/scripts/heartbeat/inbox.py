@@ -264,7 +264,7 @@ def _process_one(src: Path) -> dict | None:
         f"Source content follows. Convert it to the note format from the system prompt.\n\n"
         f"---\n{truncated}\n---"
     )
-    note_md = llm.call(prompt, system_prompt=system, model="haiku", timeout=180)
+    note_md = llm.call(prompt, system_prompt=system, model="haiku", task="inbox_format", timeout=180)
     if not note_md:
         print(f"inbox: LLM returned nothing for {src.name}; leaving source in inbox", file=sys.stderr)
         return None
@@ -331,7 +331,7 @@ def _classify(filename: str, peek_text: str) -> dict | None:
         + f"First chars of document:\n---\n{peek_text}\n---\n\n"
         + f"Return JSON per the schema in the system prompt."
     )
-    return llm.call_json(prompt, system_prompt=CLASSIFY_SYSTEM, model="haiku", timeout=60)
+    return llm.call_json(prompt, system_prompt=CLASSIFY_SYSTEM, model="haiku", task="inbox_classify", timeout=60)
 
 
 def _existing_categories() -> list[str]:

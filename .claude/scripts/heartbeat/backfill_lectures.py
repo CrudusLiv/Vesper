@@ -25,7 +25,7 @@ VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 LECTURES = VAULT / "lectures"
 MANIFEST = VAULT / "state" / "discord-lectures-posted.json"
 
-from heartbeat import dashboard  # noqa: E402
+from heartbeat import dashboard, dashboard_state  # noqa: E402
 from heartbeat.inbox import (  # noqa: E402
     _extract_study_card_count,
     _extract_title,
@@ -118,6 +118,9 @@ def main() -> None:
         if result and result.get("id"):
             manifest[rel_path] = result["id"]
             _save_manifest(manifest)
+            state = dashboard_state.load()
+            state.setdefault("lectures", {})[rel_path] = {"thread_id": result["id"], "kind": "lecture"}
+            dashboard_state.save(state)
             print(f"post  {rel_path}")
             posted += 1
         else:

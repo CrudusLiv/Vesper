@@ -144,7 +144,7 @@ def _generate_reply(msg: dict, thread_meta: dict, db_path: Path) -> str:
     context = [c for c in context if str(c.get("id")) != str(msg["id"])]
     system_prompt = thread_chat_prompt.system_prompt(thread_meta)
     user_prompt = thread_chat_prompt.user_prompt(msg, context)
-    return (llm.call(user_prompt, system_prompt=system_prompt, model="haiku", timeout=60) or "").strip()
+    return (llm.call(user_prompt, system_prompt=system_prompt, model="haiku", task="thread_chat", timeout=60) or "").strip()
 
 
 def _thread_context(db_path: Path, thread_id: str, limit: int = CONTEXT_DEPTH) -> list[dict]:

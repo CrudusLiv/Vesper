@@ -163,7 +163,7 @@ def second_check(tool_name: str, tool_input: dict | None, deterministic: dict) -
         "message on the user's behalf? Reply with one word: PASS, FAIL."
     )
     try:
-        out = (llm.call(prompt, model="haiku", timeout=30) or "").strip().upper()
+        out = (llm.call(prompt, model="haiku", task="security_guard", timeout=30) or "").strip().upper()
     except Exception:
         return deterministic
     if out.startswith("PASS"):

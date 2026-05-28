@@ -82,9 +82,9 @@ def scan_pings(
                 FROM messages
                 WHERE created_at >= ?
                   AND is_bot = 0
-                  AND is_dm = 0
+                  AND is_self = 0
                   AND author_id != ?
-                  AND (content LIKE ? OR referenced_author_id = ?)
+                  AND (is_dm = 1 OR content LIKE ? OR referenced_author_id = ?)
                 ORDER BY created_at ASC
                 """,
                 (cutoff, user_id, f"%{mention_token}%", user_id),
@@ -96,8 +96,8 @@ def scan_pings(
                 FROM messages
                 WHERE created_at >= ?
                   AND is_bot = 0
-                  AND is_dm = 0
-                  AND content LIKE ?
+                  AND is_self = 0
+                  AND (is_dm = 1 OR content LIKE ?)
                 ORDER BY created_at ASC
                 """,
                 (cutoff, f"%{mention_token}%"),

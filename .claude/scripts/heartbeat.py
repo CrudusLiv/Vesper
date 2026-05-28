@@ -542,6 +542,7 @@ def _main_impl() -> int:
         build_prompt(diff),
         system_prompt=heartbeat_system_prompt(),
         model="haiku",
+        task="heartbeat_actions",
     )
 
     result = execute(actions)
