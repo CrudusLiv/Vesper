@@ -141,6 +141,9 @@ def run_bot() -> int:
             except Exception as exc:
                 print(f"inline dm_capture error: {exc}", file=sys.stderr)
 
+    deleted = prune()
+    if deleted:
+        print(f"[prune] removed {deleted} messages older than {RETENTION_DAYS}d")
     client.run(token)
     return 0
 
