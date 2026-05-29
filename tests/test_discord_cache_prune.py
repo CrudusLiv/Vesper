@@ -108,7 +108,7 @@ def test_prune_subcommand_prints_deleted_count(monkeypatch, capsys):
     monkeypatch.setattr(di, "prune", lambda **_: 5)
     result = di.handle_query(["prune"])
     out = capsys.readouterr().out
-    assert "5" in out
+    assert "Pruned 5 " in out
     assert result == 0
 
 
@@ -117,5 +117,5 @@ def test_prune_subcommand_prints_zero_when_nothing_deleted(monkeypatch, capsys):
     monkeypatch.setattr(di, "prune", lambda **_: 0)
     result = di.handle_query(["prune"])
     out = capsys.readouterr().out
-    assert "0" in out
+    assert "Pruned 0 " in out
     assert result == 0
