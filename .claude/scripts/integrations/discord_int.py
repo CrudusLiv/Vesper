@@ -34,6 +34,7 @@ import _env  # noqa: F401, E402  -- loads .env
 
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
 CACHE_DB = PROJECT_DIR / ".claude" / "data" / "discord_cache.db"
+RETENTION_DAYS = 7
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS messages (
@@ -58,9 +59,10 @@ CREATE INDEX IF NOT EXISTS idx_msg_dm      ON messages(is_dm);
 """
 
 
-def _connect() -> sqlite3.Connection:
-    CACHE_DB.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(CACHE_DB))
+def _connect(db_path: Path | None = None) -> sqlite3.Connection:
+    path = db_path or CACHE_DB
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
     # Migrate older caches that pre-date the reply-tracking columns.
@@ -71,6 +73,21 @@ def _connect() -> sqlite3.Connection:
         conn.execute("ALTER TABLE messages ADD COLUMN referenced_author_id TEXT")
     conn.commit()
     return conn
+
+
+def prune(retention_days: int = RETENTION_DAYS, db_path: Path | None = None) -> int:
+    """Delete messages older than retention_days. Returns deleted row count."""
+    cutoff = time.time() - retention_days * 86400
+    conn = _connect(db_path)
+    try:
+        deleted = conn.execute(
+            "DELETE FROM messages WHERE created_at < ?", (cutoff,)
+        ).rowcount
+        conn.commit()
+        conn.execute("VACUUM")
+        return deleted
+    finally:
+        conn.close()
 
 
 # ---------- Bot (long-running) ----------
