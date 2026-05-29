@@ -61,8 +61,12 @@ Turn a raw `.pptx` or `.pdf` into a study-friendly markdown note under `Dynamous
    Move-Item "Dynamous\Memory\inbox\<filename>" "Dynamous\Memory\inbox\_processed\"
    ```
 
-6. **Append a line** to today's `daily/YYYY-MM-DD.md` log:
-   `[HH:MM] Summarised <filename> -> lectures/<course>/<slug>.md`
+6. **Record the lecture in the daily note** by running:
+   ```
+   py .claude/scripts/vault/daily.py lecture <course> "<topic>" "lectures/<course>/<slug>.md"
+   ```
+   `<topic>` is the lesson title used as the note heading (e.g. `"Sorting Algorithms"`).
+
 
 7. **Tick the habit.** If `HABITS.md` `Lecture engagement` is unchecked today, check it off.
 
