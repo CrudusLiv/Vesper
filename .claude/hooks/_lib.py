@@ -63,6 +63,31 @@ def recent_daily_logs(n: int = 3) -> str:
     return "\n\n".join(blocks)
 
 
+def today_schedule() -> str:
+    """Extract today's bullet blocks from SCHEDULE.md day breakdown.
+
+    Returns the raw bullet lines joined by newlines, or "" if the file is
+    missing or today's section isn't present. Caller adds the ## header.
+    """
+    content = safe_read(VAULT / "SCHEDULE.md")
+    if not content:
+        return ""
+    today_name = datetime.now().strftime("%A")
+    lines = content.splitlines()
+    in_section = False
+    blocks: list[str] = []
+    for line in lines:
+        if line.strip() == f"### {today_name}":
+            in_section = True
+            continue
+        if in_section:
+            if line.startswith("### "):
+                break
+            if line.startswith("- "):
+                blocks.append(line)
+    return "\n".join(blocks)
+
+
 def build_session_context() -> str:
     """Pack SOUL + USER + MEMORY + DEADLINES + PROJECTS + last 3 daily logs into one context block."""
     parts: list[str] = []
