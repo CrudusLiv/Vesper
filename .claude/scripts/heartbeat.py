@@ -33,6 +33,7 @@ from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot,
 # Deadlines are now sourced from inbox classification (project documents
 # mentioning dated milestones), not Gmail/Calendar.
 from security import sanitize  # noqa: E402
+from vault import daily  # noqa: E402
 
 VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 KL = timezone(timedelta(hours=8))
@@ -91,6 +92,13 @@ def build_prompt(diff: dict) -> str:
     )
 
 
+def _log_commits(diff: dict) -> None:
+    assignment_repos = set(os.environ.get("GITHUB_ASSIGNMENT_REPOS", "").split(","))
+    for push in (diff.get("new_pushes") or []):
+        label = "assignment" if push.get("repo") in assignment_repos else "personal"
+        daily.append_line(f"Commit [{label}]: {push['repo']} — {push['message']}")
+
+
 def execute(actions: dict | None) -> dict:
     summary = {"notifications": 0}
     if not actions:
@@ -101,6 +109,7 @@ def execute(actions: dict | None) -> dict:
             "body": n.get("body") or "",
             "priority": n.get("priority") or "normal",
         })
+        daily.append_line(f"Alert: {n.get('title', '')} — {n.get('body', '')}")
         summary["notifications"] += 1
     return summary
 
@@ -506,6 +515,7 @@ def _main_impl() -> int:
     _persist(curr)                  # save state first so _too_soon guards correctly if post crashes
     _maybe_post_heartbeat_tick(curr)
     diff = snapshot.diff_snapshot(prev, curr)
+    _log_commits(diff)
 
     # Always-run signals (independent of snapshot diff): habit auto-check,
     # imminent-deadline scan, late-day nudge. These shouldn't be gated by
