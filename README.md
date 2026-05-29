@@ -14,7 +14,7 @@ Agent operates in **Advisor mode**: it drafts replies and writes into the vault,
 - **Deadline tracking** — project documents dropped into `inbox/` are classified, dated milestones get promoted into `DEADLINES.md`, mirrored to Google Calendar, and routed into forum threads at 72h / 24h / overdue thresholds.
 - **Lecture summarisation** — drop a `.pptx` or `.pdf` into `Dynamous/Memory/inbox/`, get a structured Obsidian note under `lectures/<course>/` and a new forum thread in `#lectures`.
 - **Hybrid-RAG note search** — 70% vector + 30% BM25 over the whole vault. Embeddings are local (FastEmbed / ONNX, no API calls).
-- **Heartbeat reasoning** — every 30 min during active hours, Python builds a snapshot diff and an LLM decides what (if anything) is worth notifying you about. Cheap tasks (inbox classification, heartbeat actions, memory reflection) route to a local Ollama instance; security-sensitive and in-thread chat tasks stay on Claude Haiku. Routing is configurable via `.claude/data/llm-config.json`.
+- **Heartbeat reasoning** — every 30 min during active hours, Python builds a snapshot diff and an LLM decides what (if anything) is worth notifying you about. All tasks route through Claude Haiku; task-level model overrides are configurable via `.claude/data/llm-config.json`.
 - **Discord embed redesign** — all webhook posts and bot DMs now use a unified Vesper embed style: consistent colour palette, structured fields, and Obsidian deep-link buttons where applicable.
 - **Daily reflection** — at 08:00 KL, promotes durable items from yesterday's `daily/` log into `MEMORY.md`; rolls `HABITS.md`.
 - **Vault guardrails** — a path validator with hard-coded forbidden prefixes, an append-only JSONL transaction log, and a `suggest_for_missing` typo-recovery layer protect the vault from accidental writes.
@@ -285,7 +285,7 @@ Removes all four tasks. Logs and vault data are preserved — delete `.claude\da
 |------|---------|
 | `.claude/hooks/` | SessionStart, PreCompact, SessionEnd, PreToolUse, UserPromptSubmit |
 | `.claude/scripts/` | `query.py` CLI dispatcher, `heartbeat.py`, `memory_reflect.py`, integrations, memory (RAG), deploy scripts |
-| `.claude/scripts/heartbeat/` | Tick sub-modules — `dashboard.py` (Vesper embed router), `discord_ping.py` (@mention + reply scanner), `deadlines.py`, `inbox.py`, `imminent.py`, `gcal_sync.py`, `toast.py`, `notify.py`, `llm.py` (Ollama/Claude routing), `thread_chat.py`, `backfill_lectures.py` (one-shot vault → `#lectures` poster), etc. |
+| `.claude/scripts/heartbeat/` | Tick sub-modules — `dashboard.py` (Vesper embed router), `discord_ping.py` (@mention + reply scanner), `deadlines.py`, `inbox.py`, `imminent.py`, `gcal_sync.py`, `toast.py`, `notify.py`, `llm.py` (Claude routing), `thread_chat.py`, `backfill_lectures.py` (one-shot vault → `#lectures` poster), etc. |
 | `.claude/scripts/vault/` | Vault guardrails — `paths.py` (path validator), `transactions.py` (append-only JSONL log), `actions.py` (append/create helpers) |
 | `.claude/scripts/deploy/` | `install_tasks.ps1`, `uninstall_tasks.ps1`, `start_discord_bot.ps1`, `run_heartbeat.vbs`, `run_index.vbs` |
 | `.claude/chat/` | Discord bot — message cache + `#inbox` / `#finance` / `#vesper` channel router |
