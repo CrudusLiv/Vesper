@@ -143,7 +143,7 @@ def run_bot() -> int:
 
     deleted = prune()
     if deleted:
-        print(f"[prune] removed {deleted} messages older than {RETENTION_DAYS}d")
+        print(f"[prune] removed {deleted} messages older than {RETENTION_DAYS}d", file=sys.stderr)
     client.run(token)
     return 0
 
