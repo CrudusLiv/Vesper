@@ -16,6 +16,9 @@ PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolv
 VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 DAILY_DIR = VAULT / "daily"
 
+import sys as _sys
+_sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
+
 MAX_CONTEXT_CHARS = 16000
 MAX_TRANSCRIPT_CHARS = 80000
 
@@ -170,16 +173,8 @@ def distill_with_claude(transcript_text: str) -> str:
 
 
 def append_to_daily(content: str, label: str) -> None:
-    DAILY_DIR.mkdir(parents=True, exist_ok=True)
-    today = datetime.now().strftime("%Y-%m-%d")
-    target = DAILY_DIR / f"{today}.md"
-    timestamp = datetime.now().strftime("%H:%M")
-    block = f"\n\n## [{timestamp}] {label}\n\n{content}\n"
-    if target.exists():
-        with target.open("a", encoding="utf-8") as f:
-            f.write(block)
-    else:
-        target.write_text(f"# {today}\n{block}", encoding="utf-8")
+    from vault.daily import append_block
+    append_block(label, content)
 
 
 def read_stdin_payload() -> dict:

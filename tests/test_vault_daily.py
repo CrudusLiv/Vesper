@@ -117,3 +117,19 @@ def test_cli_alert(tmp_vault, monkeypatch):
     daily_mod._cli()
     assert "Alert: New Discord DM — someone replied in #general" in \
         _daily_file(tmp_vault).read_text(encoding="utf-8")
+
+
+# --- _lib delegation ---
+
+def test_lib_append_to_daily_delegates_to_vault_daily(tmp_vault):
+    """_lib.append_to_daily must produce the same file as vault/daily.append_block."""
+    import importlib
+    sys.path.insert(0, str(ROOT / ".claude" / "hooks"))
+    import _lib  # type: ignore
+    importlib.reload(_lib)  # re-derives PROJECT_DIR with CLAUDE_PROJECT_DIR set
+
+    _lib.append_to_daily("### Decisions\n- x", "Pre-compact flush (exit)")
+    text = _daily_file(tmp_vault).read_text(encoding="utf-8")
+    assert "Pre-compact flush (exit)" in text
+    assert "### Decisions" in text
+    assert re.search(r"## \[\d{2}:\d{2}\] Pre-compact flush \(exit\)", text)
