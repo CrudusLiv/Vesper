@@ -99,3 +99,23 @@ def test_prune_empty_db_returns_zero(tmp_path):
     _seed_db(db, [])
     deleted = di.prune(retention_days=7, db_path=db)
     assert deleted == 0
+
+
+# ---------- CLI subcommand ----------
+
+def test_prune_subcommand_prints_deleted_count(monkeypatch, capsys):
+    di = _import_module()
+    monkeypatch.setattr(di, "prune", lambda **_: 5)
+    result = di.handle_query(["prune"])
+    out = capsys.readouterr().out
+    assert "5" in out
+    assert result == 0
+
+
+def test_prune_subcommand_prints_zero_when_nothing_deleted(monkeypatch, capsys):
+    di = _import_module()
+    monkeypatch.setattr(di, "prune", lambda **_: 0)
+    result = di.handle_query(["prune"])
+    out = capsys.readouterr().out
+    assert "0" in out
+    assert result == 0

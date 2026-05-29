@@ -226,7 +226,7 @@ def handle_query(argv: list[str]) -> int:
     if isinstance(sys.stdout, io.TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(prog="query.py discord")
-    parser.add_argument("subcommand", choices=["recent", "dms", "bot"])
+    parser.add_argument("subcommand", choices=["recent", "dms", "bot", "prune"])
     parser.add_argument("--hours", type=int, default=24)
     parser.add_argument("--limit", type=int, default=50)
     parser.add_argument("--json", action="store_true")
@@ -234,6 +234,11 @@ def handle_query(argv: list[str]) -> int:
 
     if args.subcommand == "bot":
         return run_bot()
+
+    if args.subcommand == "prune":
+        deleted = prune()
+        print(f"Pruned {deleted} messages older than {RETENTION_DAYS} days.")
+        return 0
 
     rows = recent(hours=args.hours, limit=args.limit, dms_only=(args.subcommand == "dms"))
 
