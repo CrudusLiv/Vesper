@@ -89,7 +89,7 @@ def today_schedule() -> str:
 
 
 def build_session_context() -> str:
-    """Pack SOUL + USER + MEMORY + DEADLINES + PROJECTS + last 3 daily logs into one context block."""
+    """Pack SOUL + USER + MEMORY + DEADLINES + PROJECTS + schedule + last 3 daily logs into one context block."""
     parts: list[str] = []
     for label, fname in (
         ("SOUL", "SOUL.md"),
@@ -101,6 +101,10 @@ def build_session_context() -> str:
         body = safe_read(VAULT / fname)
         if body:
             parts.append(f"## {label}\n\n{body}")
+    schedule = today_schedule()
+    if schedule:
+        today_name = datetime.now().strftime("%A")
+        parts.append(f"## Today's Schedule ({today_name})\n\n{schedule}")
     daily = recent_daily_logs(3)
     if daily:
         parts.append(f"## Recent daily logs (last 3 days)\n\n{daily}")
