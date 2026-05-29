@@ -84,7 +84,8 @@ def prune(retention_days: int = RETENTION_DAYS, db_path: Path | None = None) -> 
             "DELETE FROM messages WHERE created_at < ?", (cutoff,)
         ).rowcount
         conn.commit()
-        conn.execute("VACUUM")
+        if deleted:
+            conn.execute("VACUUM")
         return deleted
     finally:
         conn.close()
