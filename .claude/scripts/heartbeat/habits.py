@@ -100,6 +100,11 @@ def auto_check(snapshot: dict) -> list[str]:
 
     if newly:
         HABITS.write_text(text, encoding="utf-8")
+        import sys as _sys
+        _sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
+        from vault import daily  # type: ignore
+        for pillar in newly:
+            daily.append_line(f"Habit: {pillar}")
     return newly
 
 
