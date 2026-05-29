@@ -16,6 +16,7 @@ functions here.
 
 Run the bot:    py discord_int.py        (or: py query.py discord bot)
 Query cache:    py query.py discord recent
+Prune old msgs: py query.py discord prune
 """
 from __future__ import annotations
 
