@@ -6,17 +6,20 @@
 
 $ProjectDir = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent | Split-Path -Parent
 $TrayApp    = Join-Path $ProjectDir '.claude\scripts\tray_app.py'
-$Pythonw    = Join-Path ([System.IO.Path]::GetDirectoryName((Get-Command py.exe).Source)) 'pythonw.exe'
-if (-not (Test-Path $Pythonw)) { $Pythonw = (Get-Command py.exe).Source }
 
-# 1. Disable the old bot task (leave it so it can be re-enabled if needed)
+# Resolve pythonw.exe from the real Python installation, not the py.exe launcher
+$PythonExe = & py -c "import sys; print(sys.executable)"
+$Pythonw   = Join-Path ([System.IO.Path]::GetDirectoryName($PythonExe)) 'pythonw.exe'
+if (-not (Test-Path $Pythonw)) { $Pythonw = $PythonExe }
+
+# 1. Disable the old bot task using schtasks.exe (works without admin elevation)
 $taskName = '\secondbrain-discord'
-$task = Get-ScheduledTask -TaskName 'secondbrain-discord' -ErrorAction SilentlyContinue
-if ($task) {
-    Disable-ScheduledTask -TaskName 'secondbrain-discord' | Out-Null
+$result = schtasks /change /tn $taskName /disable 2>&1
+if ($LASTEXITCODE -eq 0) {
     Write-Host "Disabled Task Scheduler task: $taskName"
 } else {
-    Write-Host "Task $taskName not found — skipping."
+    Write-Host "Could not disable $taskName`: $result"
+    Write-Host "Try running as Administrator if this fails."
 }
 
 # 2. Write tray app to Windows startup registry
