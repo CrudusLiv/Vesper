@@ -14,4 +14,5 @@ py -m PyInstaller `
   --hidden-import "PIL._tkinter_finder" `
   ".claude/scripts/tray_app.py"
 
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host "Build complete: dist\VesperTray.exe"
