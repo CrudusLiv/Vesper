@@ -1,7 +1,6 @@
 from __future__ import annotations
 import os
 import subprocess
-import sys
 from pathlib import Path
 from typing import Literal
 
@@ -38,27 +37,34 @@ def bot_status() -> Literal["running", "stopped"]:
 
 
 def start_bot() -> None:
-    """Spawn discord_bot.py. No-op if a live PID is already recorded."""
+    """Launch the bot via the VBS restart wrapper. No-op if already running."""
     pid = _read_pid()
     if pid is not None and _pid_alive(pid):
         return
     proj = _proj()
-    bot = proj / ".claude" / "chat" / "discord_bot.py"
+    vbs = proj / ".claude" / "scripts" / "deploy" / "start_discord_bot.vbs"
     env = {**os.environ, "CLAUDE_PROJECT_DIR": str(proj)}
-    proc = subprocess.Popen([sys.executable, str(bot)], cwd=str(proj), env=env)
+    proc = subprocess.Popen(["wscript.exe", str(vbs)], cwd=str(proj), env=env)
     pf = _pid_file()
     pf.parent.mkdir(parents=True, exist_ok=True)
     pf.write_text(str(proc.pid), encoding="utf-8")
 
 
 def stop_bot() -> None:
-    """Terminate the bot process and remove the PID file."""
+    """Terminate the restart wrapper and its full process tree, then remove PID file."""
     pid = _read_pid()
     if pid is None:
         return
     if _pid_alive(pid):
         try:
-            psutil.Process(pid).terminate()
+            proc = psutil.Process(pid)
+            children = proc.children(recursive=True)
+            proc.terminate()
+            for child in children:
+                try:
+                    child.terminate()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
     try:

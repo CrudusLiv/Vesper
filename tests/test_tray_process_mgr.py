@@ -63,3 +63,29 @@ def test_stop_bot_terminates_and_removes_pid(tmp_path):
         process_mgr.stop_bot()
     assert not _pid_file(tmp_path).exists()
     mock_proc.terminate.assert_called_once()
+
+
+def test_start_bot_launches_vbs(tmp_path):
+    from tray import process_mgr
+    mock_proc = MagicMock()
+    mock_proc.pid = 9999
+    with patch("tray.process_mgr._pid_alive", return_value=False), \
+         patch("subprocess.Popen", return_value=mock_proc) as mock_popen:
+        process_mgr.start_bot()
+    call_args = mock_popen.call_args[0][0]  # first positional arg is the command list
+    assert call_args[0].lower().endswith("wscript.exe")
+    assert "start_discord_bot.vbs" in call_args[1]
+
+
+def test_stop_bot_terminates_process_tree(tmp_path):
+    _pid_file(tmp_path).write_text("1234", encoding="utf-8")
+    from tray import process_mgr
+    mock_child = MagicMock()
+    mock_proc = MagicMock()
+    mock_proc.children.return_value = [mock_child]
+    with patch("tray.process_mgr._pid_alive", return_value=True), \
+         patch("psutil.Process", return_value=mock_proc):
+        process_mgr.stop_bot()
+    assert not _pid_file(tmp_path).exists()
+    mock_proc.terminate.assert_called_once()
+    mock_child.terminate.assert_called_once()
