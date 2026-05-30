@@ -72,9 +72,10 @@ def main() -> int:
             pings = discord_ping.scan_pings(db_path, user_id=user_id, state_path=state_path)
             ping_count = len(pings)
             for ping in pings:
-                title, body = discord_ping.format_toast(ping, user_id=user_id)
-                toast.show(title, body)
-                notify.send(title, body, priority="high")
+                toast_title, toast_body = discord_ping.format_toast(ping, user_id=user_id)
+                dm_title, dm_body, _ = discord_ping.format_dm(ping, user_id=user_id)
+                toast.show(toast_title, toast_body)
+                notify.send(dm_title, dm_body, priority="high")
         except Exception as exc:
             ping_error = str(exc)
 

@@ -454,13 +454,14 @@ def _main_impl() -> int:
         state_path = PROJECT_DIR / ".claude" / "data" / "discord_last_tick.json"
         try:
             for ping in discord_ping.scan_pings(db_path, user_id=user_id, state_path=state_path):
-                title, body = discord_ping.format_toast(ping, user_id=user_id)
+                toast_title, toast_body = discord_ping.format_toast(ping, user_id=user_id)
+                dm_title, dm_body, _ = discord_ping.format_dm(ping, user_id=user_id)
                 try:
-                    toast.show(title, body)
+                    toast.show(toast_title, toast_body)
                 except Exception as exc:
                     print(f"discord_ping toast failed: {exc}", file=sys.stderr)
                 try:
-                    notify.send(title, body, priority="high")
+                    notify.send(dm_title, dm_body, priority="high")
                 except Exception as exc:
                     print(f"discord_ping DM failed: {exc}", file=sys.stderr)
         except Exception as exc:

@@ -77,14 +77,16 @@ def scan_pings(
         if has_reply_cols:
             cursor = conn.execute(
                 """
-                SELECT id, channel_name, is_dm, author_id, author_name, content,
+                SELECT id, channel_id, channel_name, guild_id, is_dm,
+                       author_id, author_name, content,
                        created_at, referenced_author_id
                 FROM messages
                 WHERE created_at >= ?
                   AND is_bot = 0
                   AND is_self = 0
                   AND author_id != ?
-                  AND (is_dm = 1 OR content LIKE ? OR referenced_author_id = ?)
+                  AND is_dm = 0
+                  AND (content LIKE ? OR referenced_author_id = ?)
                 ORDER BY created_at ASC
                 """,
                 (cutoff, user_id, f"%{mention_token}%", user_id),
@@ -92,12 +94,14 @@ def scan_pings(
         else:
             cursor = conn.execute(
                 """
-                SELECT id, channel_name, is_dm, author_id, author_name, content, created_at
+                SELECT id, channel_id, channel_name, guild_id, is_dm,
+                       author_id, author_name, content, created_at
                 FROM messages
                 WHERE created_at >= ?
                   AND is_bot = 0
                   AND is_self = 0
-                  AND (is_dm = 1 OR content LIKE ?)
+                  AND is_dm = 0
+                  AND content LIKE ?
                 ORDER BY created_at ASC
                 """,
                 (cutoff, f"%{mention_token}%"),
@@ -129,7 +133,7 @@ def _humanize_mentions(content: str, user_id: Optional[str]) -> str:
 def format_toast(ping: dict, *, user_id: Optional[str] = None) -> tuple[str, str]:
     """Render (title, body) for winotify."""
     sender = ping.get("author_name") or "unknown"
-    channel = "DM" if ping.get("is_dm") else (ping.get("channel_name") or "channel")
+    channel = ping.get("channel_name") or "channel"
     content = (ping.get("content") or "").strip().replace("\n", " ")
     has_mention = bool(user_id) and (
         f"<@{user_id}>" in content or f"<@!{user_id}>" in content
@@ -147,3 +151,50 @@ def format_toast(ping: dict, *, user_id: Optional[str] = None) -> tuple[str, str
     cleaned = _humanize_mentions(content, user_id).strip()
     body = f"{channel}: {cleaned[:120]}" if cleaned else f"{channel}: {fallback}".rstrip(": ")
     return title, body
+
+
+def message_jump_url(ping: dict) -> Optional[str]:
+    """Build a discord.com jump URL for a server message. Returns None for DMs."""
+    gid = ping.get("guild_id")
+    cid = ping.get("channel_id")
+    mid = ping.get("id")
+    if gid and cid and mid:
+        return f"https://discord.com/channels/{gid}/{cid}/{mid}"
+    return None
+
+
+def format_dm(ping: dict, *, user_id: Optional[str] = None) -> tuple[str, str, Optional[str]]:
+    """Render (title, body, jump_url) for a Discord DM notification.
+
+    Body includes a blockquote of the original message and a Discord
+    timestamp tag that renders in the reader's local timezone.
+    jump_url is a direct link back to the server message (None for DMs).
+    """
+    sender = ping.get("author_name") or "unknown"
+    channel = ping.get("channel_name") or "channel"
+    raw = (ping.get("content") or "").strip()
+    created_at = ping.get("created_at") or time.time()
+
+    has_mention = bool(user_id) and (
+        f"<@{user_id}>" in raw or f"<@!{user_id}>" in raw
+    )
+    is_reply = bool(user_id) and ping.get("referenced_author_id") == user_id
+
+    if has_mention:
+        title = f"Discord ping from {sender}"
+    elif is_reply:
+        title = f"Discord reply from {sender}"
+    else:
+        title = f"Discord message from {sender}"
+
+    cleaned = _humanize_mentions(raw, user_id)
+    quote = f"> {cleaned}" if cleaned else "> (no text)"
+    discord_ts = f"<t:{int(created_at)}:F>"
+    jump = message_jump_url(ping)
+
+    location_parts = [f"#{channel}", discord_ts]
+    if jump:
+        location_parts.append(f"[Jump to message ↗]({jump})")
+    body = f"{quote}\n\n{' · '.join(location_parts)}"
+
+    return title, body, jump
