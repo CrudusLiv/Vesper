@@ -256,6 +256,10 @@ def main() -> int:
                             f"You already have a schedule. Here's what I parsed:\n{summary}\n"
                             "Send `schedule: yes` to replace it."
                         )
+                        try:
+                            await message.add_reaction("❓")
+                        except Exception as exc:
+                            print(f"_handle_inbox schedule-react failed: {exc}", file=sys.stderr)
                     else:
                         await asyncio.to_thread(schedule_parser.write_schedule, entries)
                         await message.channel.send(summary)
