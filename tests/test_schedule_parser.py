@@ -44,3 +44,41 @@ def test_parse_timetable_raises_on_malformed_entries():
     with patch("schedule_parser.llm.call_json", return_value=[{}]):
         with pytest.raises(ValueError):
             schedule_parser.parse_timetable("bad entries")
+
+
+def test_write_schedule_creates_file(tmp_vault):
+    with patch("schedule_parser.llm.call_json", return_value=_SAMPLE_ENTRIES):
+        schedule_parser.write_schedule(_SAMPLE_ENTRIES)
+    path = tmp_vault / "SCHEDULE.md"
+    assert path.exists()
+
+
+def test_write_schedule_fresh_uses_tbd_semester(tmp_vault):
+    schedule_parser.write_schedule(_SAMPLE_ENTRIES)
+    content = (tmp_vault / "SCHEDULE.md").read_text(encoding="utf-8")
+    assert "semester: TBD" in content
+
+
+def test_write_schedule_sets_updated_today(tmp_vault):
+    from datetime import date
+    schedule_parser.write_schedule(_SAMPLE_ENTRIES)
+    content = (tmp_vault / "SCHEDULE.md").read_text(encoding="utf-8")
+    assert f"updated: {date.today().isoformat()}" in content
+
+
+def test_write_schedule_day_breakdown_has_sections(tmp_vault):
+    schedule_parser.write_schedule(_SAMPLE_ENTRIES)
+    content = (tmp_vault / "SCHEDULE.md").read_text(encoding="utf-8")
+    assert "## Day Breakdown" in content
+    assert "### Monday" in content
+    assert "### Wednesday" in content
+    assert "### Friday" in content
+    assert "### Tuesday" in content
+    assert "### Thursday" in content
+
+
+def test_write_schedule_day_breakdown_has_class_lines(tmp_vault):
+    schedule_parser.write_schedule(_SAMPLE_ENTRIES)
+    content = (tmp_vault / "SCHEDULE.md").read_text(encoding="utf-8")
+    assert "08:00–09:30 CS101 (class)" in content
+    assert "10:00–11:30 MAT101 (class)" in content
