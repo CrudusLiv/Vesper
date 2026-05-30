@@ -1,7 +1,6 @@
 """Parse timetable text via LLM into structured schedule entries."""
 from __future__ import annotations
 
-import json
 import os
 import re
 from datetime import date

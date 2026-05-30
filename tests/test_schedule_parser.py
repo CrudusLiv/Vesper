@@ -47,8 +47,7 @@ def test_parse_timetable_raises_on_malformed_entries():
 
 
 def test_write_schedule_creates_file(tmp_vault):
-    with patch("schedule_parser.llm.call_json", return_value=_SAMPLE_ENTRIES):
-        schedule_parser.write_schedule(_SAMPLE_ENTRIES)
+    schedule_parser.write_schedule(_SAMPLE_ENTRIES)
     path = tmp_vault / "SCHEDULE.md"
     assert path.exists()
 
