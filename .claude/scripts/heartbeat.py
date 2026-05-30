@@ -35,6 +35,13 @@ from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot,
 from security import sanitize  # noqa: E402
 from vault import daily  # noqa: E402
 
+try:
+    from tray import config as _tray_config
+    _TRAY_CONFIG_AVAILABLE = True
+except ImportError:
+    _tray_config = None  # type: ignore
+    _TRAY_CONFIG_AVAILABLE = False
+
 VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 KL = timezone(timedelta(hours=8))
 ACTIVE_HOURS = (9, 22)
@@ -42,7 +49,16 @@ ACTIVE_HOURS = (9, 22)
 
 def in_active_hours(now: datetime | None = None) -> bool:
     now = now or datetime.now(KL)
-    return ACTIVE_HOURS[0] <= now.hour < ACTIVE_HOURS[1]
+    active_hours = ACTIVE_HOURS
+    if _TRAY_CONFIG_AVAILABLE:
+        try:
+            cfg = _tray_config.load()
+            ah_start = int(cfg.get("active_hours_start", "09:00").split(":")[0])
+            ah_end = int(cfg.get("active_hours_end", "22:00").split(":")[0])
+            active_hours = (ah_start, ah_end)
+        except Exception:
+            pass
+    return active_hours[0] <= now.hour < active_hours[1]
 
 
 HEARTBEAT_TASK = """You are CrudusLiv's heartbeat reasoner. Every 30 min, Python
@@ -403,27 +419,36 @@ def _main_impl() -> int:
               f"({NETWORK_PROBE_RETRIES * NETWORK_PROBE_INTERVAL}s). Skipping tick.")
         return 1
 
+    # Feature flags — read fresh each tick so toggles take effect without restart
+    _features: dict = {}
+    if _TRAY_CONFIG_AVAILABLE:
+        try:
+            _features = _tray_config.load().get("features", {})
+        except Exception:
+            pass
+
     # Auto-classify and summarise anything dropped in inbox/ BEFORE the
     # snapshot runs. Processed files move to inbox/_processed/ so they don't
     # show as "new" in the diff below. Extracted deadlines get promoted into
     # DEADLINES.md ## Active.
     inbox_deadlines: list[dict] = []
-    for summary in inbox.process_new_files():
-        rel = summary["path"].relative_to(VAULT).as_posix()
-        label = "Lecture summarised" if summary["type"] == "lecture" else "Project filed"
-        bucket = summary["name"]
-        if summary.get("subcategory"):
-            bucket += f" / {summary['subcategory']}"
-        if summary["type"] == "lecture":
-            _route_lecture(summary, rel)
-        else:
-            dashboard.notify("daily_digest", {
-                "title": f"{label}: {bucket}",
-                "body": f"{summary['title']}\nsaved to {rel}",
-                "priority": "normal",
-            })
-        print(f"{label} ({summary['source']}) -> {rel}")
-        inbox_deadlines.extend(summary.get("deadlines") or [])
+    if _features.get("inbox", True):
+        for summary in inbox.process_new_files():
+            rel = summary["path"].relative_to(VAULT).as_posix()
+            label = "Lecture summarised" if summary["type"] == "lecture" else "Project filed"
+            bucket = summary["name"]
+            if summary.get("subcategory"):
+                bucket += f" / {summary['subcategory']}"
+            if summary["type"] == "lecture":
+                _route_lecture(summary, rel)
+            else:
+                dashboard.notify("daily_digest", {
+                    "title": f"{label}: {bucket}",
+                    "body": f"{summary['title']}\nsaved to {rel}",
+                    "priority": "normal",
+                })
+            print(f"{label} ({summary['source']}) -> {rel}")
+            inbox_deadlines.extend(summary.get("deadlines") or [])
 
     promoted = deadlines.promote(inbox_deadlines)
     if promoted:
@@ -456,10 +481,11 @@ def _main_impl() -> int:
             for ping in discord_ping.scan_pings(db_path, user_id=user_id, state_path=state_path):
                 toast_title, toast_body = discord_ping.format_toast(ping, user_id=user_id)
                 dm_title, dm_body, _ = discord_ping.format_dm(ping, user_id=user_id)
-                try:
-                    toast.show(toast_title, toast_body)
-                except Exception as exc:
-                    print(f"discord_ping toast failed: {exc}", file=sys.stderr)
+                if _features.get("toast_notifications", True):
+                    try:
+                        toast.show(toast_title, toast_body)
+                    except Exception as exc:
+                        print(f"discord_ping toast failed: {exc}", file=sys.stderr)
                 try:
                     notify.send(dm_title, dm_body, priority="high")
                 except Exception as exc:
@@ -488,24 +514,26 @@ def _main_impl() -> int:
         # Slice 7: reply in agent-owned forum threads (deadlines + lectures).
         # Shares state_path with the two scanners above; an LLM/post failure
         # still marks the source row seen so the loop can't get stuck.
-        try:
-            posted = thread_chat.scan_and_reply(
-                db_path,
-                user_id=user_id,
-                state_path=state_path,
-            )
-            if posted:
-                print(f"thread_chat: posted {posted} in-thread reply/replies")
-        except Exception as exc:
-            print(f"thread_chat failed: {exc}", file=sys.stderr)
+        if _features.get("thread_chat", True):
+            try:
+                posted = thread_chat.scan_and_reply(
+                    db_path,
+                    user_id=user_id,
+                    state_path=state_path,
+                )
+                if posted:
+                    print(f"thread_chat: posted {posted} in-thread reply/replies")
+            except Exception as exc:
+                print(f"thread_chat failed: {exc}", file=sys.stderr)
 
     # Section 6: push new DEADLINES.md rows and gcal: tags to Google Calendar.
-    try:
-        new_events = gcal_sync.run()
-        if new_events:
-            print(f"GCal sync: created {new_events} event(s)")
-    except Exception as exc:
-        print(f"gcal_sync failed: {exc}", file=sys.stderr)
+    if _features.get("gcal_sync", True):
+        try:
+            new_events = gcal_sync.run()
+            if new_events:
+                print(f"GCal sync: created {new_events} event(s)")
+        except Exception as exc:
+            print(f"gcal_sync failed: {exc}", file=sys.stderr)
 
     curr = snapshot.build_snapshot()
     # heartbeat_ran_at = when integrations finished (and Discord post fires),
