@@ -14,7 +14,8 @@ Agent operates in **Advisor mode**: it drafts replies and writes into the vault,
 - **Deadline tracking** — project documents dropped into `inbox/` are classified, dated milestones get promoted into `DEADLINES.md`, mirrored to Google Calendar, and routed into forum threads at 72h / 24h / overdue thresholds.
 - **Lecture summarisation** — drop a `.pptx` or `.pdf` into `Dynamous/Memory/inbox/`, get a structured Obsidian note under `lectures/<course>/` and a new forum thread in `#lectures`.
 - **Hybrid-RAG note search** — 70% vector + 30% BM25 over the whole vault. Embeddings are local (FastEmbed / ONNX, no API calls).
-- **Heartbeat reasoning** — every 30 min during active hours, Python builds a snapshot diff and an LLM decides what (if anything) is worth notifying you about. All tasks route through Claude Haiku; task-level model overrides are configurable via `.claude/data/llm-config.json`.
+- **Vesper Tray** — a Windows system tray app (`pystray` + `CustomTkinter`) that starts/stops the Discord bot, triggers heartbeat ticks on demand, and exposes feature toggles and active-hours config in a three-tab settings window. Settings persist to `.claude/data/tray_settings.json`; the heartbeat reads them on every tick.
+- **Heartbeat reasoning** — every 30 min during active hours, Python builds a snapshot diff and an LLM decides what (if anything) is worth notifying you about. All tasks route through Claude Haiku; task-level model overrides are configurable via `.claude/data/llm-config.json`. Feature slices (inbox, GCal sync, thread chat, toast notifications) can be toggled live from the tray settings.
 - **Discord embed redesign** — all webhook posts and bot DMs now use a unified Vesper embed style: consistent colour palette, structured fields, and Obsidian deep-link buttons where applicable.
 - **Daily reflection** — at 08:00 KL, promotes durable items from yesterday's `daily/` log into `MEMORY.md`; rolls `HABITS.md`.
 - **Vault guardrails** — a path validator with hard-coded forbidden prefixes, an append-only JSONL transaction log, and a `suggest_for_missing` typo-recovery layer protect the vault from accidental writes.
@@ -190,6 +191,37 @@ Recommended folders (created on first use, but worth knowing):
 
 The vault is gitignored — copy your own in, or start fresh from templates.
 
+## Vesper Tray (recommended)
+
+The tray app is the preferred way to run the bot on your own machine. It replaces the `secondbrain-discord` Task Scheduler task with a system tray icon that gives you live start/stop control, a "Run Heartbeat Now" button, and per-feature toggles without editing files.
+
+**One-time setup** (after `install_tasks.ps1` has been run at least once):
+
+```powershell
+# Disable the old Task Scheduler discord task and wire up the tray app at logon
+.claude\scripts\deploy\migrate_to_tray.ps1
+```
+
+**Launch manually:**
+
+```powershell
+py .claude\scripts\tray_app.py
+```
+
+The tray icon is green when the bot is running, red when stopped. Right-click for the menu; click **Open Settings** for feature toggles and active-hours config.
+
+**Uninstall options:**
+
+```powershell
+# Undo migration — re-enable Task Scheduler discord task, remove tray from startup
+.claude\scripts\deploy\uninstall_tray.ps1
+
+# Nuclear — stop everything, disable all four tasks, remove startup entry
+.claude\scripts\deploy\uninstall_full.ps1
+```
+
+---
+
 ## Deploying the background bot
 
 Four scheduled tasks live in `.claude/scripts/deploy/`. Open PowerShell **as Administrator**:
@@ -274,10 +306,14 @@ The Discord task will fire again at your next logon (or run `Start-ScheduledTask
 ### Fully uninstalling
 
 ```powershell
+# Remove all four scheduled tasks
 pwsh -ExecutionPolicy Bypass -File .claude\scripts\deploy\uninstall_tasks.ps1
+
+# If you were using the tray app, also stop everything and remove the startup entry
+.claude\scripts\deploy\uninstall_full.ps1
 ```
 
-Removes all four tasks. Logs and vault data are preserved — delete `.claude\data\logs\` and `Dynamous\Memory\` manually if you want those gone too.
+Logs and vault data are preserved — delete `.claude\data\logs\` and `Dynamous\Memory\` manually if you want those gone too.
 
 ## Layout
 
@@ -287,7 +323,9 @@ Removes all four tasks. Logs and vault data are preserved — delete `.claude\da
 | `.claude/scripts/` | `query.py` CLI dispatcher, `heartbeat.py`, `memory_reflect.py`, integrations, memory (RAG), deploy scripts |
 | `.claude/scripts/heartbeat/` | Tick sub-modules — `dashboard.py` (Vesper embed router), `discord_ping.py` (@mention + reply scanner), `deadlines.py`, `inbox.py`, `imminent.py`, `gcal_sync.py`, `toast.py`, `notify.py`, `llm.py` (Claude routing), `thread_chat.py`, `backfill_lectures.py` (one-shot vault → `#lectures` poster), etc. |
 | `.claude/scripts/vault/` | Vault guardrails — `paths.py` (path validator), `transactions.py` (append-only JSONL log), `actions.py` (append/create helpers) |
-| `.claude/scripts/deploy/` | `install_tasks.ps1`, `uninstall_tasks.ps1`, `start_discord_bot.ps1`, `run_heartbeat.vbs`, `run_index.vbs` |
+| `.claude/scripts/deploy/` | `install_tasks.ps1`, `uninstall_tasks.ps1`, `migrate_to_tray.ps1`, `uninstall_tray.ps1`, `uninstall_full.ps1`, `start_discord_bot.ps1`, `run_heartbeat.vbs`, `run_index.vbs` |
+| `.claude/scripts/tray/` | Tray app package — `config.py`, `process_mgr.py`, `icon.py`, `settings_window.py` |
+| `.claude/scripts/tray_app.py` | Tray app entry point — run directly or via `migrate_to_tray.ps1` for logon startup |
 | `.claude/chat/` | Discord bot — message cache + `#inbox` / `#finance` / `#vesper` channel router |
 | `.claude/skills/` | Skills the agent invokes — `deadline-tracker`, `lecture-summarizer`, `note-search`, `vault-structure` |
 | `.claude/settings.json` | Wires hooks into Claude Code |
