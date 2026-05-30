@@ -152,8 +152,11 @@ def test_clear_pending_removes_file(tmp_vault):
 
 
 def test_read_pending_returns_none_on_malformed_json(tmp_vault):
-    import os
-    data_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR", "")) / ".claude" / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    (data_dir / "schedule_pending.json").write_text("not json", encoding="utf-8")
+    path = schedule_parser._pending_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("not json", encoding="utf-8")
     assert schedule_parser.read_pending() is None
+
+
+def test_clear_pending_is_idempotent_when_missing(tmp_vault):
+    schedule_parser.clear_pending()  # must not raise when file never existed
