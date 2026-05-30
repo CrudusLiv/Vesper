@@ -116,3 +116,44 @@ def test_write_schedule_weekly_grid_shows_course_in_correct_cell(tmp_vault):
             break
     else:
         pytest.fail("08:00 row not found in Weekly Grid")
+
+
+def test_has_existing_schedule_false_when_file_missing(tmp_vault):
+    assert schedule_parser.has_existing_schedule() is False
+
+
+def test_has_existing_schedule_false_when_no_day_sections(tmp_vault):
+    (tmp_vault / "SCHEDULE.md").write_text(
+        "---\nsemester: TBD\n---\n\n## Day Breakdown\n\n<!-- placeholder -->\n",
+        encoding="utf-8",
+    )
+    assert schedule_parser.has_existing_schedule() is False
+
+
+def test_has_existing_schedule_true_after_write(tmp_vault):
+    schedule_parser.write_schedule(_SAMPLE_ENTRIES)
+    assert schedule_parser.has_existing_schedule() is True
+
+
+def test_read_pending_returns_none_when_missing(tmp_vault):
+    assert schedule_parser.read_pending() is None
+
+
+def test_write_and_read_pending_roundtrip(tmp_vault):
+    schedule_parser.write_pending(_SAMPLE_ENTRIES)
+    result = schedule_parser.read_pending()
+    assert result == _SAMPLE_ENTRIES
+
+
+def test_clear_pending_removes_file(tmp_vault):
+    schedule_parser.write_pending(_SAMPLE_ENTRIES)
+    schedule_parser.clear_pending()
+    assert schedule_parser.read_pending() is None
+
+
+def test_read_pending_returns_none_on_malformed_json(tmp_vault):
+    import os
+    data_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR", "")) / ".claude" / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "schedule_pending.json").write_text("not json", encoding="utf-8")
+    assert schedule_parser.read_pending() is None

@@ -1,9 +1,10 @@
 """Parse timetable text via LLM into structured schedule entries."""
 from __future__ import annotations
 
+import json
 import os
 import re
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from heartbeat import llm
@@ -145,3 +146,45 @@ def write_schedule(entries: list[dict]) -> None:
     )
     schedule_path.parent.mkdir(parents=True, exist_ok=True)
     schedule_path.write_text(content, encoding="utf-8")
+
+
+_DAY_SECTION_RE = re.compile(
+    r"^### (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)",
+    re.MULTILINE,
+)
+
+
+def has_existing_schedule() -> bool:
+    """True iff SCHEDULE.md contains any ### DayName sections."""
+    path = _vault() / "SCHEDULE.md"
+    if not path.exists():
+        return False
+    return bool(_DAY_SECTION_RE.search(path.read_text(encoding="utf-8")))
+
+
+def read_pending() -> list[dict] | None:
+    """Return pending entries from schedule_pending.json, or None if missing/malformed."""
+    try:
+        data = json.loads(_pending_path().read_text(encoding="utf-8"))
+        return data.get("entries")
+    except (FileNotFoundError, json.JSONDecodeError, AttributeError):
+        return None
+
+
+def write_pending(entries: list[dict]) -> None:
+    """Persist parsed entries to schedule_pending.json to await confirmation."""
+    path = _pending_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "parsed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+        "entries": entries,
+    }
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def clear_pending() -> None:
+    """Delete schedule_pending.json (no-ops silently if already gone)."""
+    try:
+        _pending_path().unlink()
+    except FileNotFoundError:
+        pass
