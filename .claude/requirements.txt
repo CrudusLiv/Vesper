@@ -22,3 +22,9 @@ winotify>=1.1.0
 
 # Plan 2026-05-13: test framework (first tests in project)
 pytest>=8.0
+
+# Tray app
+pystray>=0.19
+customtkinter>=5.2
+psutil>=5.9
+pyinstaller>=6.0
