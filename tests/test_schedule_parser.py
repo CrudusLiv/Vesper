@@ -38,3 +38,9 @@ def test_parse_timetable_raises_on_empty_list():
     with patch("schedule_parser.llm.call_json", return_value=[]):
         with pytest.raises(ValueError):
             schedule_parser.parse_timetable("empty")
+
+
+def test_parse_timetable_raises_on_malformed_entries():
+    with patch("schedule_parser.llm.call_json", return_value=[{}]):
+        with pytest.raises(ValueError):
+            schedule_parser.parse_timetable("bad entries")

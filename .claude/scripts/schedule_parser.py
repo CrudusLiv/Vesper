@@ -1,10 +1,7 @@
 """Parse timetable text via LLM into structured schedule entries."""
 from __future__ import annotations
 
-import json
 import os
-import re
-from datetime import date, datetime, timezone
 from pathlib import Path
 
 from heartbeat import llm
@@ -49,7 +46,10 @@ def parse_timetable(text: str) -> tuple[list[dict], str]:
     if not isinstance(entries, list) or not entries:
         raise ValueError("empty or malformed JSON from LLM")
     parts: list[str] = []
-    for e in entries:
-        days_str = "/".join(e.get("days", []))
-        parts.append(f"{e['course']} {days_str} {e['start']}–{e['end']}")
+    try:
+        for e in entries:
+            days_str = "/".join(e.get("days", []))
+            parts.append(f"{e['course']} {days_str} {e['start']}–{e['end']}")
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise ValueError(f"empty or malformed JSON from LLM: {exc}") from exc
     return entries, ", ".join(parts)
