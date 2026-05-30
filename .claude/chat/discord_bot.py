@@ -56,6 +56,7 @@ from finance import tracker as finance_tracker  # noqa: E402
 from heartbeat import discord_dm_capture  # noqa: E402
 from integrations import discord_int  # noqa: E402
 from vault import actions as vault_actions  # noqa: E402
+import schedule_parser  # noqa: E402
 
 from datetime import datetime, timedelta, timezone  # noqa: E402
 
@@ -221,6 +222,62 @@ def main() -> int:
                 except Exception:
                     pass
                 return
+
+        # schedule: prefix — parse timetable or confirm pending overwrite
+        if not handled and content.lower().startswith("schedule:"):
+            handled = True
+            raw = content[len("schedule:"):].strip()
+            try:
+                if raw.lower() == "yes":
+                    entries = await asyncio.to_thread(schedule_parser.read_pending)
+                    if entries is None:
+                        await message.channel.send(
+                            "Nothing pending. Send `schedule: [text]` first."
+                        )
+                        try:
+                            await message.add_reaction("❓")
+                        except Exception as exc:
+                            print(f"_handle_inbox schedule-react failed: {exc}", file=sys.stderr)
+                    else:
+                        await asyncio.to_thread(schedule_parser.write_schedule, entries)
+                        await asyncio.to_thread(schedule_parser.clear_pending)
+                        await message.channel.send("Done — schedule updated.")
+                        try:
+                            await message.add_reaction("✅")
+                        except Exception as exc:
+                            print(f"_handle_inbox schedule-react failed: {exc}", file=sys.stderr)
+                else:
+                    entries, summary = await asyncio.to_thread(
+                        schedule_parser.parse_timetable, raw
+                    )
+                    if await asyncio.to_thread(schedule_parser.has_existing_schedule):
+                        await asyncio.to_thread(schedule_parser.write_pending, entries)
+                        await message.channel.send(
+                            f"You already have a schedule. Here's what I parsed:\n{summary}\n"
+                            "Send `schedule: yes` to replace it."
+                        )
+                    else:
+                        await asyncio.to_thread(schedule_parser.write_schedule, entries)
+                        await message.channel.send(summary)
+                        try:
+                            await message.add_reaction("✅")
+                        except Exception as exc:
+                            print(f"_handle_inbox schedule-react failed: {exc}", file=sys.stderr)
+            except ValueError:
+                try:
+                    await message.add_reaction("❌")
+                    await message.channel.send(
+                        "[schedule] Failed to parse timetable — try again or paste in a different format."
+                    )
+                except Exception as exc:
+                    print(f"_handle_inbox schedule-error-react failed: {exc}", file=sys.stderr)
+            except Exception as exc:
+                print(f"_handle_inbox schedule failed: {exc}", file=sys.stderr)
+                try:
+                    await message.add_reaction("❌")
+                    await message.channel.send(f"[schedule] Write error: {type(exc).__name__}")
+                except Exception:
+                    pass
 
         # Deterministic verb dispatch: `undo`, `delete: <path>`, `list: <dir>`.
         # No LLM. These call into vault.actions (Tasks 4-7 infrastructure).
