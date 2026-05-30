@@ -241,11 +241,15 @@ class SettingsWindow:
 def _set_windows_startup(enabled: bool) -> None:
     import winreg
     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
-    exe = sys.executable
+    pythonw = Path(sys.executable).with_name("pythonw.exe")
+    if not pythonw.exists():
+        pythonw = Path(sys.executable)
+    tray_app = PROJECT_DIR / ".claude" / "scripts" / "tray_app.py"
+    cmd = f'"{pythonw}" "{tray_app}"'
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)
         if enabled:
-            winreg.SetValueEx(key, "VesperTray", 0, winreg.REG_SZ, exe)
+            winreg.SetValueEx(key, "VesperTray", 0, winreg.REG_SZ, cmd)
         else:
             try:
                 winreg.DeleteValue(key, "VesperTray")
