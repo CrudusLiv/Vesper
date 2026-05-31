@@ -238,7 +238,32 @@ class SettingsWindow:
         self._update_task_card(task_key, status)
 
     def _build_feats(self, parent: ctk.CTkFrame, cfg: dict) -> None:
-        pass
+        feats = cfg.get("features", {})
+        for i, (key, name, desc) in enumerate(self._FEATURE_META):
+            is_last = i == len(self._FEATURE_META) - 1
+            row = ctk.CTkFrame(parent, fg_color="transparent", corner_radius=0)
+            row.pack(fill="x")
+
+            sw = ctk.CTkSwitch(row, text="",
+                               command=lambda k=key: self._toggle_feature(k))
+            sw.pack(side="right", padx=16)
+
+            content = ctk.CTkFrame(row, fg_color="transparent", corner_radius=0)
+            content.pack(side="left", fill="both", expand=True, padx=16, pady=12)
+            ctk.CTkLabel(content, text=name, font=("Segoe UI", 12, "bold"),
+                         anchor="w").pack(anchor="w")
+            ctk.CTkLabel(content, text=desc, text_color="gray",
+                         font=("Segoe UI", 10), anchor="w").pack(anchor="w")
+
+            if feats.get(key, True):
+                sw.select()
+            else:
+                sw.deselect()
+
+            if not is_last:
+                div = ctk.CTkFrame(parent, height=1, fg_color=_C["divider"], corner_radius=0)
+                div.pack(fill="x")
+                div.pack_propagate(False)
 
     def _build_hours(self, parent: ctk.CTkFrame, cfg: dict) -> None:
         pass
@@ -360,10 +385,10 @@ class SettingsWindow:
     # ── Features tab ──────────────────────────────────────────────────────────
 
     _FEATURE_META = [
-        ("inbox",               "Inbox Processing",      "Summarise files dropped in inbox/ each tick"),
-        ("gcal_sync",           "GCal Sync",             "Push deadlines to Google Calendar"),
-        ("thread_chat",         "Thread Chat",           "Reply in Discord forum threads"),
-        ("toast_notifications", "Toast Notifications",   "Desktop toasts for Discord pings"),
+        ("inbox",               "Inbox",       "Process dropped files each tick"),
+        ("gcal_sync",           "GCal Sync",   "Push deadlines to calendar"),
+        ("thread_chat",         "Thread Chat", "Reply in Discord threads"),
+        ("toast_notifications", "Toast",       "Desktop notifications"),
     ]
 
     def _build_features(self, parent: ctk.CTkFrame) -> None:
