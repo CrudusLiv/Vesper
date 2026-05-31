@@ -32,6 +32,9 @@ CASES: list[tuple[str, str, dict, str]] = [
     ("DROP TABLE",           "Bash",  {"command": "sqlite3 db.db \"DROP TABLE messages\""},                          "fail"),
     ("git rm",               "Bash",  {"command": "git rm foo.py"},                                                  "fail"),
     ("UPPERCASE rm",         "Bash",  {"command": "RM -RF foo"},                                                     "fail"),
+    ("pathlib unlink",       "Bash",  {"command": "py -c \"from pathlib import Path; Path('x.md').unlink()\""},       "fail"),
+    ("pathlib rmdir",        "Bash",  {"command": "py -c \"from pathlib import Path; Path('d').rmdir()\""},           "fail"),
+    ("os.removedirs",        "Bash",  {"command": "py -c \"import os; os.removedirs('d')\""},                         "fail"),
     ("Read Memory file",     "Read",  {"file_path": SOUL_PATH},                                                      "pass"),
     ("Write Memory log",     "Write", {"file_path": "Dynamous/Memory/daily/foo.md", "content": "note"},              "pass"),
 ]
