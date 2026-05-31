@@ -69,6 +69,10 @@ class SettingsWindow:
         self._nav_btns: list[tuple[str, ctk.CTkButton]] = []
         self._sections: dict[str, ctk.CTkFrame] = {}
         self._content: ctk.CTkFrame | None = None
+        self._bot_badge: ctk.CTkLabel | None = None
+        self._bot_btn: ctk.CTkButton | None = None
+        self._last_tick_badge: ctk.CTkLabel | None = None
+        self._next_tick_badge: ctk.CTkLabel | None = None
 
     def lift(self) -> None:
         if self._root:
@@ -184,29 +188,45 @@ class SettingsWindow:
     # ── Status tab ────────────────────────────────────────────────────────────
 
     def _build_status(self, parent: ctk.CTkFrame) -> None:
-        bot_frame = ctk.CTkFrame(parent)
-        bot_frame.pack(fill="x", padx=8, pady=(12, 6))
-        ctk.CTkLabel(bot_frame, text="🤖  Discord Bot", anchor="w",
-                     font=("Segoe UI", 13, "bold")).pack(side="left", padx=12, pady=10)
-        self._bot_badge = ctk.CTkLabel(bot_frame, text="● Checking…", text_color="gray")
-        self._bot_badge.pack(side="right", padx=(0, 12))
-        self._bot_btn = ctk.CTkButton(bot_frame, text="Stop", width=64,
+        # Bot row
+        row, _ = self._make_stripe_row(parent, stripe_color="transparent")
+        self._bot_btn = ctk.CTkButton(row, text="Stop", width=64,
                                       fg_color="#450a0a", hover_color="#7f1d1d",
                                       command=self._toggle_bot)
-        self._bot_btn.pack(side="right", padx=(0, 6))
+        self._bot_btn.pack(side="right", padx=16)
+        self._bot_badge = ctk.CTkLabel(row, text="● Checking…", text_color="gray",
+                                       font=("Segoe UI", 10))
+        self._bot_badge.pack(side="right", padx=(0, 8))
+        content = ctk.CTkFrame(row, fg_color="transparent", corner_radius=0)
+        content.pack(side="left", fill="both", expand=True, padx=(14, 0), pady=12)
+        ctk.CTkLabel(content, text="Discord Bot", font=("Segoe UI", 12, "bold"),
+                     anchor="w").pack(anchor="w")
 
-        hb_frame = ctk.CTkFrame(parent)
-        hb_frame.pack(fill="x", padx=8, pady=6)
-        ctk.CTkLabel(hb_frame, text="💓  Heartbeat", anchor="w",
-                     font=("Segoe UI", 13, "bold")).pack(side="left", padx=12, pady=10)
-        ctk.CTkButton(hb_frame, text="Run now", width=80,
-                      command=self._run_heartbeat_now).pack(side="right", padx=12)
+        # Last tick row
+        row2, _ = self._make_stripe_row(parent, stripe_color="transparent")
+        self._last_tick_badge = ctk.CTkLabel(
+            row2, text="…", fg_color=_C["badge_blue_bg"],
+            text_color=_C["badge_blue_fg"], corner_radius=4,
+            font=("Segoe UI", 10), padx=6, pady=2,
+        )
+        self._last_tick_badge.pack(side="right", padx=16)
+        content2 = ctk.CTkFrame(row2, fg_color="transparent", corner_radius=0)
+        content2.pack(side="left", fill="both", expand=True, padx=(14, 0), pady=12)
+        ctk.CTkLabel(content2, text="Last tick", font=("Segoe UI", 11),
+                     anchor="w").pack(anchor="w")
 
-        info_frame = ctk.CTkFrame(parent)
-        info_frame.pack(fill="x", padx=8, pady=6)
-        self._tick_label = ctk.CTkLabel(info_frame, text="Loading…",
-                                        text_color="gray", anchor="w", justify="left")
-        self._tick_label.pack(padx=12, pady=8, anchor="w")
+        # Next tick row
+        row3, _ = self._make_stripe_row(parent, stripe_color="transparent", divider=False)
+        self._next_tick_badge = ctk.CTkLabel(
+            row3, text="…", fg_color=_C["badge_green_bg"],
+            text_color=_C["badge_green_fg"], corner_radius=4,
+            font=("Segoe UI", 10), padx=6, pady=2,
+        )
+        self._next_tick_badge.pack(side="right", padx=16)
+        content3 = ctk.CTkFrame(row3, fg_color="transparent", corner_radius=0)
+        content3.pack(side="left", fill="both", expand=True, padx=(14, 0), pady=12)
+        ctk.CTkLabel(content3, text="Next tick", font=("Segoe UI", 11),
+                     anchor="w").pack(anchor="w")
 
     def _toggle_bot(self) -> None:
         if process_mgr.bot_status() == "running":
@@ -224,24 +244,37 @@ class SettingsWindow:
     def _poll_status(self) -> None:
         if not self._root or not self.alive:
             return
+
+        # Bot badge + button
         status = process_mgr.bot_status()
         if status == "running":
-            self._bot_badge.configure(text="● Running", text_color="#22c55e")
+            self._bot_badge.configure(text="● Running", text_color=_C["badge_green_fg"])
             self._bot_btn.configure(text="Stop", fg_color="#450a0a", hover_color="#7f1d1d")
         else:
             self._bot_badge.configure(text="● Stopped", text_color="#ef4444")
             self._bot_btn.configure(text="Start", fg_color="#14532d", hover_color="#166534")
 
+        # Last tick badge
         snap = snapshot.load_state() or {}
         ts = snap.get("heartbeat_ran_at") or snap.get("timestamp") or 0
         if ts:
             mins = int((time.time() - float(ts)) // 60)
-            err_keys = [k for k, v in snap.items() if isinstance(v, dict) and "error" in v]
-            tick_text = f"Last tick: {mins}m ago  •  {'✓ ok' if not err_keys else '✗ errors'}"
+            self._last_tick_badge.configure(text=f"{mins}m ago")
         else:
-            tick_text = "No tick data yet"
-        self._tick_label.configure(text=tick_text)
+            self._last_tick_badge.configure(text="N/A")
 
+        # Next tick badge (from heartbeat task scheduler)
+        hb_status = task_scheduler.get_status(task_scheduler.TASK_NAMES["heartbeat"])
+        next_raw = hb_status.get("next_run", "N/A")
+        try:
+            from datetime import datetime
+            dt = datetime.strptime(next_raw, "%m/%d/%Y %I:%M:%S %p")
+            next_text = dt.strftime("%H:%M")
+        except Exception:
+            next_text = next_raw if next_raw and next_raw != "N/A" else "N/A"
+        self._next_tick_badge.configure(text=next_text)
+
+        # Task cards
         for task_key, task_name in task_scheduler.TASK_NAMES.items():
             if task_key in self._task_widgets:
                 self._update_task_card(task_key, task_scheduler.get_status(task_name))
