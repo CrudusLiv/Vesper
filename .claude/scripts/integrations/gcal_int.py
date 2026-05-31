@@ -29,14 +29,18 @@ def upcoming(days: int = 14, max_results: int = 50) -> list[dict]:
         return []
     now = datetime.now(timezone.utc)
     later = now + timedelta(days=days)
-    resp = svc.events().list(
-        calendarId="primary",
-        timeMin=now.isoformat(),
-        timeMax=later.isoformat(),
-        maxResults=max_results,
-        singleEvents=True,
-        orderBy="startTime",
-    ).execute()
+    try:
+        resp = svc.events().list(
+            calendarId="primary",
+            timeMin=now.isoformat(),
+            timeMax=later.isoformat(),
+            maxResults=max_results,
+            singleEvents=True,
+            orderBy="startTime",
+        ).execute()
+    except Exception as exc:
+        print(f"gcal_int.upcoming: API call failed: {exc}", file=sys.stderr)
+        return []
     out: list[dict] = []
     for e in resp.get("items", []):
         start = e.get("start", {}).get("dateTime") or e.get("start", {}).get("date")
