@@ -1,6 +1,5 @@
 from __future__ import annotations
 import os
-import subprocess
 import sys
 import threading
 import time
@@ -397,13 +396,6 @@ class SettingsWindow:
             process_mgr.stop_bot()
         else:
             process_mgr.start_bot()
-
-    def _run_heartbeat_now(self) -> None:
-        env = {**os.environ, "CLAUDE_PROJECT_DIR": str(PROJECT_DIR)}
-        subprocess.Popen(
-            [sys.executable, str(PROJECT_DIR / ".claude" / "scripts" / "heartbeat.py")],
-            cwd=str(PROJECT_DIR), env=env,
-        )
 
     def _poll_status(self) -> None:
         if not self._root or not self.alive:
