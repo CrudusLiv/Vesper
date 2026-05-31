@@ -162,6 +162,25 @@ class SettingsWindow:
     def _build_hours(self, parent: ctk.CTkFrame, cfg: dict) -> None:
         pass
 
+    # ── Row helper ────────────────────────────────────────────────────────────
+
+    def _make_stripe_row(self, parent: ctk.CTkFrame,
+                         stripe_color: str = "",
+                         divider: bool = True) -> tuple[ctk.CTkFrame, ctk.CTkFrame]:
+        """Return (row_frame, stripe_frame). Pack toggle (side='right') then content into row_frame."""
+        if not stripe_color:
+            stripe_color = _C["stripe_off"]
+        row = ctk.CTkFrame(parent, fg_color="transparent", corner_radius=0)
+        row.pack(fill="x")
+        stripe = ctk.CTkFrame(row, width=2, fg_color=stripe_color, corner_radius=0)
+        stripe.pack(side="left", fill="y")
+        stripe.pack_propagate(False)
+        if divider:
+            div = ctk.CTkFrame(parent, height=1, fg_color=_C["divider"], corner_radius=0)
+            div.pack(fill="x")
+            div.pack_propagate(False)
+        return row, stripe
+
     # ── Status tab ────────────────────────────────────────────────────────────
 
     def _build_status(self, parent: ctk.CTkFrame) -> None:
