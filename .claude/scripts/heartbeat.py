@@ -362,6 +362,13 @@ def _persist(curr: dict) -> None:
         print(f"vault_state_writer failed: {exc}", file=sys.stderr)
 
 
+def _mark_tick_started() -> None:
+    """Stamp the state file so a concurrent second tick sees this one in flight."""
+    state = snapshot.load_state() or {}
+    state["tick_started_at"] = time.time()
+    snapshot.save_state(state)
+
+
 MIN_INTERVAL_SECONDS = 15 * 60  # prevent double-fire on Task Scheduler catch-up
 NETWORK_PROBE_HOST = "discord.com"
 NETWORK_PROBE_RETRIES = 6
@@ -388,14 +395,20 @@ def _wait_for_network() -> bool:
 
 
 def _too_soon() -> bool:
-    """Return True if the last completed tick was less than MIN_INTERVAL_SECONDS ago.
+    """Return True if a tick started or completed less than MIN_INTERVAL_SECONDS ago.
 
     Windows Task Scheduler fires missed intervals back-to-back when the machine
-    wakes up late. This guard silently drops any extra run inside the window."""
+    wakes up late. This guard silently drops any extra run inside the window.
+    tick_started_at is written at the very start of a tick so concurrent
+    second instances see it even before the tick completes."""
     prev = snapshot.load_state()
     if not prev:
         return False
-    last_ts = prev.get("timestamp") or prev.get("heartbeat_ran_at")
+    last_ts = (
+        prev.get("heartbeat_ran_at")
+        or prev.get("timestamp")
+        or prev.get("tick_started_at")
+    )
     if not last_ts:
         return False
     return (time.time() - float(last_ts)) < MIN_INTERVAL_SECONDS
@@ -413,6 +426,8 @@ def _main_impl() -> int:
         print(f"Skipping tick — last run was {age}s ago (< {MIN_INTERVAL_SECONDS}s). "
               "Likely a Task Scheduler catch-up fire.")
         return 0
+
+    _mark_tick_started()
 
     if not _wait_for_network():
         print(f"Network unavailable after {NETWORK_PROBE_RETRIES} retries "
