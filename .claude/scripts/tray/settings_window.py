@@ -86,7 +86,7 @@ class SettingsWindow:
         try:
             self._root = ctk.CTk()
             self._root.title("Vesper Settings")
-            self._root.geometry("460x580")
+            self._root.geometry("460x300")
             self._root.resizable(False, False)
             self._root.configure(fg_color=_C["bg"])
             self._root.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -106,6 +106,7 @@ class SettingsWindow:
             self._build_sections()
 
             self._show_section("Status")
+            self._root.after(10, self._fit_window)
             self._poll_status()
             self._root.mainloop()
         finally:
@@ -145,9 +146,20 @@ class SettingsWindow:
                 btn.configure(fg_color="transparent", text_color="gray", border_width=0)
         for sec_name, frame in self._sections.items():
             if sec_name == name:
-                frame.pack(fill="both", expand=True)
+                frame.pack(fill="x")
             else:
                 frame.pack_forget()
+        if self._root:
+            self._root.after(10, self._fit_window)
+
+    def _fit_window(self) -> None:
+        if not self._root:
+            return
+        self._root.update_idletasks()
+        # Sidebar needs at least 4 nav buttons; content drives the height
+        nav_min = len(_NAV) * 72 + 16
+        h = max(self._root.winfo_reqheight(), nav_min)
+        self._root.geometry(f"460x{h}")
 
     def _build_sections(self) -> None:
         cfg = tray_config.load()
