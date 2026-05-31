@@ -135,6 +135,8 @@ def _ensure_dm_channel(token: str, user_id: str) -> str:
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
         payload = json.loads(resp.read())
+    if not isinstance(payload, dict) or "id" not in payload:
+        raise KeyError(f"Discord /users/@me/channels returned unexpected payload: {str(payload)[:200]}")
     channel_id = payload["id"]
     DM_CHANNEL_CACHE.parent.mkdir(parents=True, exist_ok=True)
     DM_CHANNEL_CACHE.write_text(channel_id)
