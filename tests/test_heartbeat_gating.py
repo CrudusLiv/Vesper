@@ -25,8 +25,10 @@ _STUBS = [
     "security", "security.sanitize",
     "vault", "vault.daily",
 ]
+_PREV = {}
 for _name in _STUBS:
     if _name not in sys.modules:
+        _PREV[_name] = None
         sys.modules[_name] = MagicMock()
 
 # heartbeat.py is a script that lives alongside the heartbeat/ package.
@@ -35,6 +37,10 @@ os.environ.setdefault("CLAUDE_PROJECT_DIR", str(ROOT))
 _spec = importlib.util.spec_from_file_location("heartbeat_script", SCRIPTS / "heartbeat.py")
 heartbeat = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(heartbeat)
+
+# Remove stubs so they don't pollute sys.modules for other test files.
+for _name in list(_PREV):
+    sys.modules.pop(_name, None)
 
 
 def test_in_active_hours_respects_config_start():

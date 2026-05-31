@@ -64,12 +64,6 @@
         ]
       },
       {
-        "matcher": "resume",
-        "hooks": [
-          { "type": "command", "command": "py \"$CLAUDE_PROJECT_DIR\\.claude\\hooks\\session-end-flush.py\"" }
-        ]
-      },
-      {
         "matcher": "logout",
         "hooks": [
           { "type": "command", "command": "py \"$CLAUDE_PROJECT_DIR\\.claude\\hooks\\session-end-flush.py\"" }
