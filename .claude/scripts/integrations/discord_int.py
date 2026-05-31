@@ -216,9 +216,12 @@ def recent(hours: int = 24, limit: int = 50, dms_only: bool = False) -> list[dic
             f"SELECT * FROM messages WHERE {where} ORDER BY created_at DESC LIMIT ?",
             params + [limit],
         ).fetchall()
+        return [dict(r) for r in rows]
+    except Exception as exc:
+        print(f"discord_int.recent: DB query failed: {exc}", file=sys.stderr)
+        return []
     finally:
         conn.close()
-    return [dict(r) for r in rows]
 
 
 # ---------- CLI ----------
