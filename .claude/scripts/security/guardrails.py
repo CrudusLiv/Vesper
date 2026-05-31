@@ -37,8 +37,8 @@ _DELETE_PATTERNS: list[str] = [
 
 # --- Hard-to-reverse git ---
 _FORCE_GIT_PATTERNS: list[str] = [
-    r"\bgit\s+push\b[^\n]*--force",
-    r"\bgit\s+push\b[^\n]*\s-f\b",
+    r"\bgit\s+push\b[\s\S]*?--force",
+    r"\bgit\s+push\b[\s\S]*?\s-f\b",
     r"\bgit\s+reset\s+--hard\b",
     r"\bgit\s+clean\s+-[a-z]*f",
     r"\bgit\s+checkout\s+--\s",
