@@ -73,6 +73,8 @@ class SettingsWindow:
         self._bot_btn: ctk.CTkButton | None = None
         self._last_tick_badge: ctk.CTkLabel | None = None
         self._next_tick_badge: ctk.CTkLabel | None = None
+        self._start_entry: ctk.CTkEntry | None = None
+        self._end_entry: ctk.CTkEntry | None = None
 
     def lift(self) -> None:
         if self._root:
@@ -266,7 +268,67 @@ class SettingsWindow:
                 div.pack_propagate(False)
 
     def _build_hours(self, parent: ctk.CTkFrame, cfg: dict) -> None:
-        pass
+        # Active Window sub-section label
+        hdr = ctk.CTkFrame(parent, fg_color="transparent", corner_radius=0)
+        hdr.pack(fill="x", padx=16, pady=(14, 4))
+        ctk.CTkLabel(hdr, text="Active Window", font=("Segoe UI", 11, "bold"),
+                     text_color="gray", anchor="w").pack(anchor="w")
+
+        # Time inputs
+        time_row = ctk.CTkFrame(parent, fg_color="transparent", corner_radius=0)
+        time_row.pack(fill="x", padx=16, pady=(0, 12))
+        ctk.CTkLabel(time_row, text="Start", font=("Segoe UI", 10)).pack(side="left")
+        self._start_entry = ctk.CTkEntry(time_row, width=64, placeholder_text="09:00")
+        self._start_entry.insert(0, cfg.get("active_hours_start", "09:00"))
+        self._start_entry.pack(side="left", padx=(6, 12))
+        ctk.CTkLabel(time_row, text="End", font=("Segoe UI", 10)).pack(side="left")
+        self._end_entry = ctk.CTkEntry(time_row, width=64, placeholder_text="22:00")
+        self._end_entry.insert(0, cfg.get("active_hours_end", "22:00"))
+        self._end_entry.pack(side="left", padx=(6, 12))
+        ctk.CTkButton(time_row, text="Save Hours", width=80, height=28,
+                      command=self._save_hours).pack(side="left")
+
+        # Divider before startup rows
+        div = ctk.CTkFrame(parent, height=1, fg_color=_C["divider"], corner_radius=0)
+        div.pack(fill="x")
+        div.pack_propagate(False)
+
+        # Startup sub-section label
+        hdr2 = ctk.CTkFrame(parent, fg_color="transparent", corner_radius=0)
+        hdr2.pack(fill="x", padx=16, pady=(10, 4))
+        ctk.CTkLabel(hdr2, text="Startup", font=("Segoe UI", 11, "bold"),
+                     text_color="gray", anchor="w").pack(anchor="w")
+
+        # Auto-start Bot row
+        auto_on = cfg.get("auto_start_bot", True)
+        row_auto, _ = self._make_stripe_row(
+            parent,
+            stripe_color=_C["stripe_on"] if auto_on else _C["stripe_off"],
+        )
+        auto_sw = ctk.CTkSwitch(row_auto, text="", command=self._toggle_auto_start)
+        auto_sw.pack(side="right", padx=16)
+        content_a = ctk.CTkFrame(row_auto, fg_color="transparent", corner_radius=0)
+        content_a.pack(side="left", fill="both", expand=True, padx=(14, 0), pady=12)
+        ctk.CTkLabel(content_a, text="Auto-start Bot", font=("Segoe UI", 12, "bold"),
+                     anchor="w").pack(anchor="w")
+        if auto_on:
+            auto_sw.select()
+
+        # Start with Windows row
+        startup_on = cfg.get("start_with_windows", True)
+        row_startup, _ = self._make_stripe_row(
+            parent,
+            stripe_color=_C["stripe_on"] if startup_on else _C["stripe_off"],
+            divider=False,
+        )
+        startup_sw = ctk.CTkSwitch(row_startup, text="", command=self._toggle_startup)
+        startup_sw.pack(side="right", padx=16)
+        content_s = ctk.CTkFrame(row_startup, fg_color="transparent", corner_radius=0)
+        content_s.pack(side="left", fill="both", expand=True, padx=(14, 0), pady=12)
+        ctk.CTkLabel(content_s, text="Start with Windows", font=("Segoe UI", 12, "bold"),
+                     anchor="w").pack(anchor="w")
+        if startup_on:
+            startup_sw.select()
 
     # ── Row helper ────────────────────────────────────────────────────────────
 
