@@ -19,6 +19,9 @@ Dynamous/Memory/
 __pycache__/
 *.pyc
 
+# Tray smoke-test screenshot artifacts
+.claude/scripts/tray/_smoke_*.png
+
 # Generated plans
 .agent/
 
