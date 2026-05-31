@@ -158,7 +158,84 @@ class SettingsWindow:
         self._build_hours(self._sections["Hours"], cfg)
 
     def _build_tasks(self, parent: ctk.CTkFrame, cfg: dict) -> None:
-        pass
+        self._task_widgets = {}
+
+        # Heartbeat — expanded row (no toggle; Run Now + interval controls instead)
+        hb_name = task_scheduler.TASK_NAMES["heartbeat"]
+        hb_status = task_scheduler.get_status(hb_name)
+        stripe_color = _C["stripe_on"] if hb_status["enabled"] else _C["stripe_off"]
+        row, stripe = self._make_stripe_row(parent, stripe_color=stripe_color)
+
+        content = ctk.CTkFrame(row, fg_color="transparent", corner_radius=0)
+        content.pack(side="left", fill="both", expand=True, padx=(14, 16), pady=(10, 8))
+
+        line1 = ctk.CTkFrame(content, fg_color="transparent", corner_radius=0)
+        line1.pack(fill="x")
+        ctk.CTkLabel(line1, text="Heartbeat", font=("Segoe UI", 12, "bold"),
+                     anchor="w").pack(side="left")
+        hb_badge = ctk.CTkLabel(line1, text="● …", text_color="gray",
+                                font=("Segoe UI", 10))
+        hb_badge.pack(side="left", padx=(8, 0))
+
+        line2 = ctk.CTkFrame(content, fg_color="transparent", corner_radius=0)
+        line2.pack(fill="x", pady=(2, 0))
+        hb_last = ctk.CTkLabel(line2, text="Last: …", text_color="gray",
+                               font=("Segoe UI", 10), anchor="w")
+        hb_last.pack(side="left")
+        ctk.CTkLabel(line2, text=" → ", text_color="gray",
+                     font=("Segoe UI", 10)).pack(side="left")
+        hb_next = ctk.CTkLabel(line2, text="Next: …", text_color="gray",
+                               font=("Segoe UI", 10), anchor="w")
+        hb_next.pack(side="left")
+
+        line3 = ctk.CTkFrame(content, fg_color="transparent", corner_radius=0)
+        line3.pack(fill="x", pady=(4, 0))
+        ctk.CTkButton(line3, text="▶ Run Now", width=80, height=26,
+                      command=lambda: self._run_task_now(hb_name)).pack(side="left")
+        interval_entry = ctk.CTkEntry(line3, width=36, height=26)
+        interval_entry.insert(0, str(cfg.get("heartbeat_interval_minutes", 30)))
+        interval_entry.pack(side="left", padx=(8, 0))
+        ctk.CTkLabel(line3, text="min", font=("Segoe UI", 10)).pack(side="left", padx=(4, 0))
+        ctk.CTkButton(line3, text="Save", width=46, height=26,
+                      command=lambda e=interval_entry: self._save_interval(e)).pack(side="left", padx=(6, 0))
+
+        self._task_widgets["heartbeat"] = {
+            "badge": hb_badge, "last": hb_last, "next": hb_next,
+            "switch": None, "stripe": stripe,
+        }
+        self._update_task_card("heartbeat", hb_status)
+
+        # Reflect and Index — single-line rows with toggles
+        self._build_simple_task_row(parent, "reflect", "Memory Reflect")
+        self._build_simple_task_row(parent, "index", "Index", divider=False)
+
+    def _build_simple_task_row(self, parent: ctk.CTkFrame, task_key: str,
+                               label: str, divider: bool = True) -> None:
+        task_name = task_scheduler.TASK_NAMES[task_key]
+        status = task_scheduler.get_status(task_name)
+        stripe_color = _C["stripe_on"] if status["enabled"] else _C["stripe_off"]
+        row, stripe = self._make_stripe_row(parent, stripe_color=stripe_color, divider=divider)
+
+        sw = ctk.CTkSwitch(row, text="",
+                           command=lambda k=task_key: self._toggle_task(k))
+        sw.pack(side="right", padx=16)
+
+        content = ctk.CTkFrame(row, fg_color="transparent", corner_radius=0)
+        content.pack(side="left", fill="both", expand=True, padx=(14, 0), pady=12)
+
+        line1 = ctk.CTkFrame(content, fg_color="transparent", corner_radius=0)
+        line1.pack(fill="x")
+        ctk.CTkLabel(line1, text=label, font=("Segoe UI", 12, "bold"),
+                     anchor="w").pack(side="left")
+        badge = ctk.CTkLabel(line1, text="● …", text_color="gray",
+                             font=("Segoe UI", 10))
+        badge.pack(side="left", padx=(8, 0))
+
+        self._task_widgets[task_key] = {
+            "badge": badge, "last": None, "next": None,
+            "switch": sw, "stripe": stripe,
+        }
+        self._update_task_card(task_key, status)
 
     def _build_feats(self, parent: ctk.CTkFrame, cfg: dict) -> None:
         pass
@@ -412,16 +489,20 @@ class SettingsWindow:
         if not w:
             return
         st = status["status"]
-        color = "#22c55e" if st.lower() == "ready" else (
-            "#ef4444" if st.lower() in ("disabled", "unknown") else "#f59e0b"
+        color = _C["badge_green_fg"] if st.lower() == "ready" else (
+            _C["badge_off_fg"] if st.lower() in ("disabled", "unknown") else "#f59e0b"
         )
         w["badge"].configure(text=f"● {st}", text_color=color)
-        w["last"].configure(text=f"Last: {_fmt_time(status['last_run'])}")
-        w["next"].configure(text=f"Next: {_fmt_time(status['next_run'])}")
-        if status["enabled"]:
-            w["switch"].select()
-        else:
-            w["switch"].deselect()
+        if w["last"] is not None:
+            w["last"].configure(text=f"Last: {_fmt_time(status['last_run'])}")
+        if w["next"] is not None:
+            w["next"].configure(text=f"Next: {_fmt_time(status['next_run'])}")
+        if w["switch"] is not None:
+            if status["enabled"]:
+                w["switch"].select()
+            else:
+                w["switch"].deselect()
+        w["stripe"].configure(fg_color=_C["stripe_on"] if status["enabled"] else _C["stripe_off"])
 
     def _toggle_task(self, task_key: str) -> None:
         task_name = task_scheduler.TASK_NAMES[task_key]
