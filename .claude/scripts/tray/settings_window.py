@@ -66,6 +66,9 @@ class SettingsWindow:
         self.alive = False
         self._root: ctk.CTk | None = None
         self._task_widgets: dict = {}
+        self._nav_btns: list[tuple[str, ctk.CTkButton]] = []
+        self._sections: dict[str, ctk.CTkFrame] = {}
+        self._content: ctk.CTkFrame | None = None
 
     def lift(self) -> None:
         if self._root:
@@ -126,6 +129,8 @@ class SettingsWindow:
             self._nav_btns.append((label, btn))
 
     def _show_section(self, name: str) -> None:
+        if name not in self._sections:
+            return
         for sec_name, btn in self._nav_btns:
             if sec_name == name:
                 btn.configure(fg_color=_C["nav_active_bg"], text_color="white",
@@ -140,7 +145,7 @@ class SettingsWindow:
 
     def _build_sections(self) -> None:
         cfg = tray_config.load()
-        for sec_name in ("Status", "Tasks", "Feats", "Hours"):
+        for _, sec_name in _NAV:
             frame = ctk.CTkFrame(self._content, fg_color=_C["bg"], corner_radius=0)
             self._sections[sec_name] = frame
         self._build_status(self._sections["Status"])
