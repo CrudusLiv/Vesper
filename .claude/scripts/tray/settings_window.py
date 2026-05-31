@@ -11,7 +11,7 @@ import customtkinter as ctk
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 
-from tray import config as tray_config, process_mgr
+from tray import config as tray_config, process_mgr, task_scheduler
 from heartbeat import snapshot
 
 ctk.set_appearance_mode("dark")
@@ -33,10 +33,22 @@ def open_settings() -> None:
     threading.Thread(target=win.run, daemon=True).start()
 
 
+def _fmt_time(raw: str) -> str:
+    """Format a schtasks datetime string to 'Mon DD HH:MM', or return 'N/A'."""
+    if not raw or raw == "N/A":
+        return "N/A"
+    try:
+        from datetime import datetime
+        return datetime.strptime(raw, "%m/%d/%Y %I:%M:%S %p").strftime("%b %d %H:%M")
+    except ValueError:
+        return raw
+
+
 class SettingsWindow:
     def __init__(self) -> None:
         self.alive = False
         self._root: ctk.CTk | None = None
+        self._task_widgets: dict = {}
 
     def lift(self) -> None:
         if self._root:
@@ -132,13 +144,16 @@ class SettingsWindow:
             tick_text = "No tick data yet"
         self._tick_label.configure(text=tick_text)
 
+        for task_key, task_name in task_scheduler.TASK_NAMES.items():
+            if task_key in self._task_widgets:
+                self._update_task_card(task_key, task_scheduler.get_status(task_name))
+
         self._root.after(3000, self._poll_status)
 
     # ── Features tab ──────────────────────────────────────────────────────────
 
     _FEATURE_META = [
         ("inbox",               "Inbox Processing",      "Summarise files dropped in inbox/ each tick"),
-        ("reflect",             "Memory Reflect",        "memory_reflect.py (wired when enabled)"),
         ("gcal_sync",           "GCal Sync",             "Push deadlines to Google Calendar"),
         ("thread_chat",         "Thread Chat",           "Reply in Discord forum threads"),
         ("toast_notifications", "Toast Notifications",   "Desktop toasts for Discord pings"),
@@ -175,6 +190,13 @@ class SettingsWindow:
     def _build_schedule(self, parent: ctk.CTkFrame) -> None:
         cfg = tray_config.load()
 
+        for task_key, label in [
+            ("heartbeat", "Heartbeat"),
+            ("reflect",   "Memory Reflect"),
+            ("index",     "Index"),
+        ]:
+            self._build_task_card(parent, task_key, label, cfg)
+
         hours_frame = ctk.CTkFrame(parent)
         hours_frame.pack(fill="x", padx=8, pady=(12, 6))
         ctk.CTkLabel(hours_frame, text="Active Hours",
@@ -194,13 +216,6 @@ class SettingsWindow:
         ctk.CTkButton(time_row, text="Save", width=60,
                       command=self._save_hours).pack(side="left", padx=8)
 
-        interval_frame = ctk.CTkFrame(parent)
-        interval_frame.pack(fill="x", padx=8, pady=6)
-        ctk.CTkLabel(interval_frame, text="Heartbeat Interval", anchor="w",
-                     font=("Segoe UI", 12, "bold")).pack(side="left", padx=12, pady=10)
-        ctk.CTkLabel(interval_frame, text="30 min  (set in Task Scheduler)",
-                     text_color="gray").pack(side="right", padx=12)
-
         auto_frame = ctk.CTkFrame(parent)
         auto_frame.pack(fill="x", padx=8, pady=6)
         ctk.CTkLabel(auto_frame, text="Auto-start Bot on Launch", anchor="w",
@@ -218,6 +233,83 @@ class SettingsWindow:
         startup_sw.pack(side="right", padx=12)
         if cfg.get("start_with_windows", True):
             startup_sw.select()
+
+    def _build_task_card(self, parent: ctk.CTkFrame, task_key: str, label: str, cfg: dict) -> None:
+        task_name = task_scheduler.TASK_NAMES[task_key]
+
+        card = ctk.CTkFrame(parent)
+        card.pack(fill="x", padx=8, pady=4)
+
+        header = ctk.CTkFrame(card, fg_color="transparent")
+        header.pack(fill="x", padx=12, pady=(8, 2))
+        ctk.CTkLabel(header, text=label, font=("Segoe UI", 12, "bold"),
+                     anchor="w").pack(side="left")
+        badge = ctk.CTkLabel(header, text="● …", text_color="gray")
+        badge.pack(side="right")
+
+        time_row = ctk.CTkFrame(card, fg_color="transparent")
+        time_row.pack(fill="x", padx=12, pady=2)
+        last_lbl = ctk.CTkLabel(time_row, text="Last: …", text_color="gray",
+                                font=("Segoe UI", 10), anchor="w")
+        last_lbl.pack(side="left")
+        next_lbl = ctk.CTkLabel(time_row, text="Next: …", text_color="gray",
+                                font=("Segoe UI", 10), anchor="w")
+        next_lbl.pack(side="left", padx=(16, 0))
+
+        ctrl = ctk.CTkFrame(card, fg_color="transparent")
+        ctrl.pack(fill="x", padx=12, pady=(2, 8))
+
+        sw = ctk.CTkSwitch(ctrl, text="Enabled",
+                           command=lambda k=task_key: self._toggle_task(k))
+        sw.pack(side="left")
+
+        if task_key == "heartbeat":
+            ctk.CTkLabel(ctrl, text="Every", fg_color="transparent").pack(side="left", padx=(16, 4))
+            interval_entry = ctk.CTkEntry(ctrl, width=48)
+            interval_entry.insert(0, str(cfg.get("heartbeat_interval_minutes", 30)))
+            interval_entry.pack(side="left")
+            ctk.CTkLabel(ctrl, text="min").pack(side="left", padx=(4, 8))
+            ctk.CTkButton(ctrl, text="Save", width=50,
+                          command=lambda e=interval_entry: self._save_interval(e)).pack(side="left", padx=(0, 8))
+            ctk.CTkButton(ctrl, text="Run Now", width=80,
+                          command=lambda n=task_name: self._run_task_now(n)).pack(side="left")
+
+        self._task_widgets[task_key] = {"badge": badge, "last": last_lbl, "next": next_lbl, "switch": sw}
+        self._update_task_card(task_key, task_scheduler.get_status(task_name))
+
+    def _update_task_card(self, task_key: str, status: dict) -> None:
+        w = self._task_widgets.get(task_key)
+        if not w:
+            return
+        st = status["status"]
+        color = "#22c55e" if st.lower() == "ready" else (
+            "#ef4444" if st.lower() in ("disabled", "unknown") else "#f59e0b"
+        )
+        w["badge"].configure(text=f"● {st}", text_color=color)
+        w["last"].configure(text=f"Last: {_fmt_time(status['last_run'])}")
+        w["next"].configure(text=f"Next: {_fmt_time(status['next_run'])}")
+        if status["enabled"]:
+            w["switch"].select()
+        else:
+            w["switch"].deselect()
+
+    def _toggle_task(self, task_key: str) -> None:
+        task_name = task_scheduler.TASK_NAMES[task_key]
+        status = task_scheduler.get_status(task_name)
+        task_scheduler.set_enabled(task_name, not status["enabled"])
+
+    def _save_interval(self, entry: ctk.CTkEntry) -> None:
+        try:
+            minutes = int(entry.get().strip())
+        except ValueError:
+            return
+        cfg = tray_config.load()
+        cfg["heartbeat_interval_minutes"] = minutes
+        tray_config.save(cfg)
+        task_scheduler.set_interval(task_scheduler.TASK_NAMES["heartbeat"], minutes)
+
+    def _run_task_now(self, task_name: str) -> None:
+        task_scheduler.run_now(task_name)
 
     def _save_hours(self) -> None:
         cfg = tray_config.load()
