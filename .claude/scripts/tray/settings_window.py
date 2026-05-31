@@ -17,6 +17,23 @@ from heartbeat import snapshot
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
 
+_C = {
+    "bg":             "#161618",
+    "sidebar":        "#1a1a1c",
+    "divider":        "#212123",
+    "stripe_on":      "#3b82f6",
+    "stripe_off":     "#2e2e36",
+    "badge_green_bg": "#052e16",
+    "badge_green_fg": "#4ade80",
+    "badge_blue_bg":  "#0c1d3d",
+    "badge_blue_fg":  "#93c5fd",
+    "badge_off_fg":   "#505058",
+    "nav_active_bg":  "#1e2d4a",
+    "nav_active_bdr": "#3b82f6",
+}
+
+_NAV = [("🤖", "Status"), ("📋", "Tasks"), ("🔧", "Feats"), ("⏰", "Hours")]
+
 _WINDOW_LOCK = threading.Lock()
 _current: "SettingsWindow | None" = None
 
@@ -60,20 +77,26 @@ class SettingsWindow:
         try:
             self._root = ctk.CTk()
             self._root.title("Vesper Settings")
-            self._root.geometry("440x540")
+            self._root.geometry("460x580")
             self._root.resizable(False, False)
+            self._root.configure(fg_color=_C["bg"])
             self._root.protocol("WM_DELETE_WINDOW", self._on_close)
 
-            tabs = ctk.CTkTabview(self._root, width=420)
-            tabs.pack(fill="both", expand=True, padx=10, pady=10)
-            tabs.add("Status")
-            tabs.add("Features")
-            tabs.add("Schedule")
+            sidebar = ctk.CTkFrame(self._root, width=64, fg_color=_C["sidebar"],
+                                   corner_radius=0)
+            sidebar.pack(side="left", fill="y")
+            sidebar.pack_propagate(False)
 
-            self._build_status(tabs.tab("Status"))
-            self._build_features(tabs.tab("Features"))
-            self._build_schedule(tabs.tab("Schedule"))
+            self._content = ctk.CTkFrame(self._root, fg_color=_C["bg"], corner_radius=0)
+            self._content.pack(side="left", fill="both", expand=True)
 
+            self._nav_btns: list[tuple[str, ctk.CTkButton]] = []
+            self._sections: dict[str, ctk.CTkFrame] = {}
+
+            self._build_sidebar(sidebar)
+            self._build_sections()
+
+            self._show_section("Status")
             self._poll_status()
             self._root.mainloop()
         finally:
@@ -82,6 +105,57 @@ class SettingsWindow:
     def _on_close(self) -> None:
         if self._root:
             self._root.destroy()
+
+    # ── Sidebar nav ───────────────────────────────────────────────────────────
+
+    def _build_sidebar(self, sidebar: ctk.CTkFrame) -> None:
+        for icon, label in _NAV:
+            btn = ctk.CTkButton(
+                sidebar,
+                text=f"{icon}\n{label}",
+                width=56, height=64,
+                fg_color="transparent",
+                hover_color=_C["nav_active_bg"],
+                text_color="gray",
+                font=("Segoe UI", 8),
+                corner_radius=6,
+                border_width=0,
+                command=lambda s=label: self._show_section(s),
+            )
+            btn.pack(padx=4, pady=2)
+            self._nav_btns.append((label, btn))
+
+    def _show_section(self, name: str) -> None:
+        for sec_name, btn in self._nav_btns:
+            if sec_name == name:
+                btn.configure(fg_color=_C["nav_active_bg"], text_color="white",
+                              border_width=1, border_color=_C["nav_active_bdr"])
+            else:
+                btn.configure(fg_color="transparent", text_color="gray", border_width=0)
+        for sec_name, frame in self._sections.items():
+            if sec_name == name:
+                frame.pack(fill="both", expand=True)
+            else:
+                frame.pack_forget()
+
+    def _build_sections(self) -> None:
+        cfg = tray_config.load()
+        for sec_name in ("Status", "Tasks", "Feats", "Hours"):
+            frame = ctk.CTkFrame(self._content, fg_color=_C["bg"], corner_radius=0)
+            self._sections[sec_name] = frame
+        self._build_status(self._sections["Status"])
+        self._build_tasks(self._sections["Tasks"], cfg)
+        self._build_feats(self._sections["Feats"], cfg)
+        self._build_hours(self._sections["Hours"], cfg)
+
+    def _build_tasks(self, parent: ctk.CTkFrame, cfg: dict) -> None:
+        pass
+
+    def _build_feats(self, parent: ctk.CTkFrame, cfg: dict) -> None:
+        pass
+
+    def _build_hours(self, parent: ctk.CTkFrame, cfg: dict) -> None:
+        pass
 
     # ── Status tab ────────────────────────────────────────────────────────────
 
