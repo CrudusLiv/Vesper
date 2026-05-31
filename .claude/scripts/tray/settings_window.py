@@ -93,8 +93,8 @@ class SettingsWindow:
             self._content = ctk.CTkFrame(self._root, fg_color=_C["bg"], corner_radius=0)
             self._content.pack(side="left", fill="both", expand=True)
 
-            self._nav_btns: list[tuple[str, ctk.CTkButton]] = []
-            self._sections: dict[str, ctk.CTkFrame] = {}
+            self._nav_btns = []
+            self._sections = {}
 
             self._build_sidebar(sidebar)
             self._build_sections()
