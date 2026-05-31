@@ -391,26 +391,6 @@ class SettingsWindow:
         ("toast_notifications", "Toast",       "Desktop notifications"),
     ]
 
-    def _build_features(self, parent: ctk.CTkFrame) -> None:
-        cfg = tray_config.load()
-        feats = cfg.get("features", {})
-        for key, name, desc in self._FEATURE_META:
-            row = ctk.CTkFrame(parent)
-            row.pack(fill="x", padx=8, pady=4)
-            text_col = ctk.CTkFrame(row, fg_color="transparent")
-            text_col.pack(side="left", padx=12, pady=8, fill="x", expand=True)
-            ctk.CTkLabel(text_col, text=name, anchor="w",
-                         font=("Segoe UI", 12, "bold")).pack(anchor="w")
-            ctk.CTkLabel(text_col, text=desc, anchor="w",
-                         text_color="gray", font=("Segoe UI", 10)).pack(anchor="w")
-            sw = ctk.CTkSwitch(row, text="", width=46,
-                               command=lambda k=key: self._toggle_feature(k))
-            sw.pack(side="right", padx=12)
-            if feats.get(key, True):
-                sw.select()
-            else:
-                sw.deselect()
-
     def _toggle_feature(self, key: str) -> None:
         cfg = tray_config.load()
         feats = cfg.setdefault("features", {})
