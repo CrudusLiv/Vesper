@@ -4,6 +4,7 @@ import subprocess
 import sys
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 
 import customtkinter as ctk
@@ -55,7 +56,6 @@ def _fmt_time(raw: str) -> str:
     if not raw or raw == "N/A":
         return "N/A"
     try:
-        from datetime import datetime
         return datetime.strptime(raw, "%m/%d/%Y %I:%M:%S %p").strftime("%b %d %H:%M")
     except ValueError:
         return raw
@@ -196,7 +196,7 @@ class SettingsWindow:
         self._bot_btn.pack(side="right", padx=16)
         self._bot_badge = ctk.CTkLabel(row, text="● Checking…", text_color="gray",
                                        font=("Segoe UI", 10))
-        self._bot_badge.pack(side="right", padx=(0, 8))
+        self._bot_badge.pack(side="right", padx=16)
         content = ctk.CTkFrame(row, fg_color="transparent", corner_radius=0)
         content.pack(side="left", fill="both", expand=True, padx=(14, 0), pady=12)
         ctk.CTkLabel(content, text="Discord Bot", font=("Segoe UI", 12, "bold"),
@@ -267,7 +267,6 @@ class SettingsWindow:
         hb_status = task_scheduler.get_status(task_scheduler.TASK_NAMES["heartbeat"])
         next_raw = hb_status.get("next_run", "N/A")
         try:
-            from datetime import datetime
             dt = datetime.strptime(next_raw, "%m/%d/%Y %I:%M:%S %p")
             next_text = dt.strftime("%H:%M")
         except Exception:
