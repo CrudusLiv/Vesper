@@ -19,18 +19,18 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
 
 _C = {
-    "bg":             "#161618",
-    "sidebar":        "#1a1a1c",
-    "divider":        "#212123",
-    "stripe_on":      "#3b82f6",
-    "stripe_off":     "#2e2e36",
-    "badge_green_bg": "#052e16",
-    "badge_green_fg": "#4ade80",
-    "badge_blue_bg":  "#0c1d3d",
-    "badge_blue_fg":  "#93c5fd",
-    "badge_off_fg":   "#505058",
-    "nav_active_bg":  "#1e2d4a",
-    "nav_active_bdr": "#3b82f6",
+    "bg":             "#1c1c20",
+    "sidebar":        "#222227",
+    "divider":        "#26262b",
+    "stripe_on":      "#6d8fd6",
+    "stripe_off":     "#33333a",
+    "badge_green_bg": "#1a2e22",
+    "badge_green_fg": "#7fd6a0",
+    "badge_blue_bg":  "#202a3d",
+    "badge_blue_fg":  "#a9c2ec",
+    "badge_off_fg":   "#5c5c66",
+    "nav_active_bg":  "#2a3142",
+    "nav_active_bdr": "#6d8fd6",
 }
 
 _NAV = [("🤖", "Status"), ("📋", "Tasks"), ("🔧", "Feats"), ("⏰", "Hours")]
@@ -123,16 +123,16 @@ class SettingsWindow:
             btn = ctk.CTkButton(
                 sidebar,
                 text=f"{icon}\n{label}",
-                width=56, height=64,
+                width=52, height=58,
                 fg_color="transparent",
                 hover_color=_C["nav_active_bg"],
-                text_color="gray",
-                font=("Segoe UI", 8),
-                corner_radius=6,
+                text_color="#8a8a94",
+                font=("Segoe UI", 10),
+                corner_radius=14,
                 border_width=0,
                 command=lambda s=label: self._show_section(s),
             )
-            btn.pack(padx=4, pady=2)
+            btn.pack(padx=6, pady=4)
             self._nav_btns.append((label, btn))
 
     def _show_section(self, name: str) -> None:
@@ -140,10 +140,10 @@ class SettingsWindow:
             return
         for sec_name, btn in self._nav_btns:
             if sec_name == name:
-                btn.configure(fg_color=_C["nav_active_bg"], text_color="white",
-                              border_width=1, border_color=_C["nav_active_bdr"])
+                btn.configure(fg_color=_C["nav_active_bg"], text_color="#eaeaf0",
+                              border_width=0)
             else:
-                btn.configure(fg_color="transparent", text_color="gray", border_width=0)
+                btn.configure(fg_color="transparent", text_color="#8a8a94", border_width=0)
         for sec_name, frame in self._sections.items():
             if sec_name == name:
                 frame.pack(fill="x")
@@ -203,14 +203,14 @@ class SettingsWindow:
         hb_next.pack(side="left")
 
         line3 = ctk.CTkFrame(content, fg_color="transparent", corner_radius=0)
-        line3.pack(fill="x", pady=(4, 0))
-        ctk.CTkButton(line3, text="▶ Run Now", width=80, height=26,
+        line3.pack(fill="x", pady=(6, 0))
+        ctk.CTkButton(line3, text="▶ Run Now", width=84, height=28, corner_radius=14,
                       command=lambda: self._run_task_now(hb_name)).pack(side="left")
-        interval_entry = ctk.CTkEntry(line3, width=36, height=26)
+        interval_entry = ctk.CTkEntry(line3, width=40, height=28, corner_radius=10)
         interval_entry.insert(0, str(cfg.get("heartbeat_interval_minutes", 30)))
         interval_entry.pack(side="left", padx=(8, 0))
         ctk.CTkLabel(line3, text="min", font=("Segoe UI", 10)).pack(side="left", padx=(4, 0))
-        ctk.CTkButton(line3, text="Save", width=46, height=26,
+        ctk.CTkButton(line3, text="Save", width=50, height=28, corner_radius=14,
                       command=lambda e=interval_entry: self._save_interval(e)).pack(side="left", padx=(6, 0))
 
         self._task_widgets["heartbeat"] = {
@@ -290,14 +290,16 @@ class SettingsWindow:
         time_row = ctk.CTkFrame(parent, fg_color="transparent", corner_radius=0)
         time_row.pack(fill="x", padx=16, pady=(0, 12))
         ctk.CTkLabel(time_row, text="Start", font=("Segoe UI", 10)).pack(side="left")
-        self._start_entry = ctk.CTkEntry(time_row, width=64, placeholder_text="09:00")
+        self._start_entry = ctk.CTkEntry(time_row, width=64, height=30, corner_radius=10,
+                                         placeholder_text="09:00")
         self._start_entry.insert(0, cfg.get("active_hours_start", "09:00"))
         self._start_entry.pack(side="left", padx=(6, 12))
         ctk.CTkLabel(time_row, text="End", font=("Segoe UI", 10)).pack(side="left")
-        self._end_entry = ctk.CTkEntry(time_row, width=64, placeholder_text="22:00")
+        self._end_entry = ctk.CTkEntry(time_row, width=64, height=30, corner_radius=10,
+                                       placeholder_text="22:00")
         self._end_entry.insert(0, cfg.get("active_hours_end", "22:00"))
         self._end_entry.pack(side="left", padx=(6, 12))
-        ctk.CTkButton(time_row, text="Save Hours", width=80, height=28,
+        ctk.CTkButton(time_row, text="Save Hours", width=84, height=30, corner_radius=15,
                       command=self._save_hours).pack(side="left")
 
         # Divider before startup rows
@@ -354,7 +356,7 @@ class SettingsWindow:
         # the full parent height when a fill="y" child is present.
         row = tk.Frame(parent, bg=_C["bg"])
         row.pack(fill="x")
-        stripe = tk.Frame(row, width=2, bg=stripe_color)
+        stripe = tk.Frame(row, width=3, bg=stripe_color)
         stripe.pack(side="left", fill="y")
         stripe.pack_propagate(False)
         if divider:
@@ -368,15 +370,16 @@ class SettingsWindow:
     def _build_status(self, parent: ctk.CTkFrame) -> None:
         # Bot row
         row, _ = self._make_stripe_row(parent, stripe_color=_C["bg"])
-        self._bot_btn = ctk.CTkButton(row, text="Stop", width=64,
-                                      fg_color="#450a0a", hover_color="#7f1d1d",
+        self._bot_btn = ctk.CTkButton(row, text="Stop", width=68, height=30,
+                                      corner_radius=15,
+                                      fg_color="#5a1216", hover_color="#7f1d1d",
                                       command=self._toggle_bot)
         self._bot_btn.pack(side="right", padx=16)
         self._bot_badge = ctk.CTkLabel(row, text="● Checking…", text_color="gray",
                                        font=("Segoe UI", 10))
-        self._bot_badge.pack(side="right", padx=16)
+        self._bot_badge.pack(side="right", padx=10)
         content = ctk.CTkFrame(row, fg_color="transparent", corner_radius=0)
-        content.pack(side="left", fill="both", expand=True, padx=(14, 0), pady=12)
+        content.pack(side="left", fill="both", expand=True, padx=(16, 0), pady=14)
         ctk.CTkLabel(content, text="Discord Bot", font=("Segoe UI", 12, "bold"),
                      anchor="w").pack(anchor="w")
 
@@ -384,12 +387,12 @@ class SettingsWindow:
         row2, _ = self._make_stripe_row(parent, stripe_color=_C["bg"])
         self._last_tick_badge = ctk.CTkLabel(
             row2, text="…", fg_color=_C["badge_blue_bg"],
-            text_color=_C["badge_blue_fg"], corner_radius=4,
-            font=("Segoe UI", 10), padx=6, pady=2,
+            text_color=_C["badge_blue_fg"], corner_radius=11,
+            font=("Segoe UI", 10), padx=10, pady=4,
         )
         self._last_tick_badge.pack(side="right", padx=16)
         content2 = ctk.CTkFrame(row2, fg_color="transparent", corner_radius=0)
-        content2.pack(side="left", fill="both", expand=True, padx=(14, 0), pady=12)
+        content2.pack(side="left", fill="both", expand=True, padx=(16, 0), pady=14)
         ctk.CTkLabel(content2, text="Last tick", font=("Segoe UI", 11),
                      anchor="w").pack(anchor="w")
 
@@ -397,12 +400,12 @@ class SettingsWindow:
         row3, _ = self._make_stripe_row(parent, stripe_color=_C["bg"], divider=False)
         self._next_tick_badge = ctk.CTkLabel(
             row3, text="…", fg_color=_C["badge_green_bg"],
-            text_color=_C["badge_green_fg"], corner_radius=4,
-            font=("Segoe UI", 10), padx=6, pady=2,
+            text_color=_C["badge_green_fg"], corner_radius=11,
+            font=("Segoe UI", 10), padx=10, pady=4,
         )
         self._next_tick_badge.pack(side="right", padx=16)
         content3 = ctk.CTkFrame(row3, fg_color="transparent", corner_radius=0)
-        content3.pack(side="left", fill="both", expand=True, padx=(14, 0), pady=12)
+        content3.pack(side="left", fill="both", expand=True, padx=(16, 0), pady=14)
         ctk.CTkLabel(content3, text="Next tick", font=("Segoe UI", 11),
                      anchor="w").pack(anchor="w")
 
