@@ -52,3 +52,15 @@ def test_load_merges_missing_feature_keys(tmp_path):
     d = config.load()
     assert d["features"]["inbox"] is False
     assert d["features"]["gcal_sync"] is True   # default preserved for missing key
+
+
+def test_heartbeat_interval_minutes_default():
+    from tray import config
+    d = config.load()
+    assert d["heartbeat_interval_minutes"] == 30
+
+
+def test_reflect_not_in_features():
+    from tray import config
+    d = config.load()
+    assert "reflect" not in d["features"]

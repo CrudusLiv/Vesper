@@ -8,9 +8,9 @@ _DEFAULT: dict = {
     "start_with_windows": True,
     "active_hours_start": "09:00",
     "active_hours_end": "22:00",
+    "heartbeat_interval_minutes": 30,
     "features": {
         "inbox": True,
-        "reflect": True,
         "gcal_sync": True,
         "thread_chat": False,
         "toast_notifications": True,
