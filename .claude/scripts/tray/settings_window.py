@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+import tkinter as tk
 import customtkinter as ctk
 
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
@@ -333,17 +334,19 @@ class SettingsWindow:
 
     def _make_stripe_row(self, parent: ctk.CTkFrame,
                          stripe_color: str = "",
-                         divider: bool = True) -> tuple[ctk.CTkFrame, ctk.CTkFrame]:
+                         divider: bool = True) -> tuple[tk.Frame, tk.Frame]:
         """Return (row_frame, stripe_frame). Pack toggle (side='right') then content into row_frame."""
-        if not stripe_color:
+        if not stripe_color or stripe_color == "transparent":
             stripe_color = _C["stripe_off"]
-        row = ctk.CTkFrame(parent, fg_color="transparent", corner_radius=0)
+        # tk.Frame avoids CTkFrame's internal expand behavior that causes rows to absorb
+        # the full parent height when a fill="y" child is present.
+        row = tk.Frame(parent, bg=_C["bg"])
         row.pack(fill="x")
-        stripe = ctk.CTkFrame(row, width=2, fg_color=stripe_color, corner_radius=0)
+        stripe = tk.Frame(row, width=2, bg=stripe_color)
         stripe.pack(side="left", fill="y")
         stripe.pack_propagate(False)
         if divider:
-            div = ctk.CTkFrame(parent, height=1, fg_color=_C["divider"], corner_radius=0)
+            div = tk.Frame(parent, height=1, bg=_C["divider"])
             div.pack(fill="x")
             div.pack_propagate(False)
         return row, stripe
@@ -352,7 +355,7 @@ class SettingsWindow:
 
     def _build_status(self, parent: ctk.CTkFrame) -> None:
         # Bot row
-        row, _ = self._make_stripe_row(parent, stripe_color="transparent")
+        row, _ = self._make_stripe_row(parent, stripe_color=_C["bg"])
         self._bot_btn = ctk.CTkButton(row, text="Stop", width=64,
                                       fg_color="#450a0a", hover_color="#7f1d1d",
                                       command=self._toggle_bot)
@@ -366,7 +369,7 @@ class SettingsWindow:
                      anchor="w").pack(anchor="w")
 
         # Last tick row
-        row2, _ = self._make_stripe_row(parent, stripe_color="transparent")
+        row2, _ = self._make_stripe_row(parent, stripe_color=_C["bg"])
         self._last_tick_badge = ctk.CTkLabel(
             row2, text="…", fg_color=_C["badge_blue_bg"],
             text_color=_C["badge_blue_fg"], corner_radius=4,
@@ -379,7 +382,7 @@ class SettingsWindow:
                      anchor="w").pack(anchor="w")
 
         # Next tick row
-        row3, _ = self._make_stripe_row(parent, stripe_color="transparent", divider=False)
+        row3, _ = self._make_stripe_row(parent, stripe_color=_C["bg"], divider=False)
         self._next_tick_badge = ctk.CTkLabel(
             row3, text="…", fg_color=_C["badge_green_bg"],
             text_color=_C["badge_green_fg"], corner_radius=4,
@@ -471,7 +474,7 @@ class SettingsWindow:
                 w["switch"].select()
             else:
                 w["switch"].deselect()
-        w["stripe"].configure(fg_color=_C["stripe_on"] if status["enabled"] else _C["stripe_off"])
+        w["stripe"].configure(bg=_C["stripe_on"] if status["enabled"] else _C["stripe_off"])
 
     def _toggle_task(self, task_key: str) -> None:
         task_name = task_scheduler.TASK_NAMES[task_key]
