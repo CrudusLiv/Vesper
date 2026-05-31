@@ -75,6 +75,7 @@ def index_file(conn, path: Path) -> int:
             "INSERT OR REPLACE INTO files(path, mtime, hash) VALUES (?, ?, ?)",
             (rel, mtime, h),
         )
+        conn.commit()
         return 0
 
     vectors = embed([c.content for c in chunks])
@@ -92,6 +93,7 @@ def index_file(conn, path: Path) -> int:
         "INSERT OR REPLACE INTO files(path, mtime, hash) VALUES (?, ?, ?)",
         (rel, mtime, h),
     )
+    conn.commit()
     return len(chunks)
 
 
@@ -113,6 +115,7 @@ def main() -> int:
 
     deleted = cleanup_deleted(conn, rel_set)
     if deleted:
+        conn.commit()
         print(f"  removed {deleted} deleted file(s) from index")
 
     indexed_count = 0
@@ -124,7 +127,6 @@ def main() -> int:
             chunk_count += n
             print(f"  indexed {f.relative_to(VAULT)} ({n} chunks)")
 
-    conn.commit()
     total_chunks = conn.execute("SELECT COUNT(*) AS c FROM chunks").fetchone()["c"]
     total_files = conn.execute("SELECT COUNT(*) AS c FROM files").fetchone()["c"]
     conn.close()
