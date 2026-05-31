@@ -68,12 +68,12 @@ class SettingsWindow:
         self._nav_btns: list[tuple[str, ctk.CTkButton]] = []
         self._sections: dict[str, ctk.CTkFrame] = {}
         self._content: ctk.CTkFrame | None = None
-        self._bot_badge: ctk.CTkLabel | None = None
-        self._bot_btn: ctk.CTkButton | None = None
-        self._last_tick_badge: ctk.CTkLabel | None = None
-        self._next_tick_badge: ctk.CTkLabel | None = None
-        self._start_entry: ctk.CTkEntry | None = None
-        self._end_entry: ctk.CTkEntry | None = None
+        self._bot_badge: ctk.CTkLabel = None  # type: ignore[assignment]
+        self._bot_btn: ctk.CTkButton = None  # type: ignore[assignment]
+        self._last_tick_badge: ctk.CTkLabel = None  # type: ignore[assignment]
+        self._next_tick_badge: ctk.CTkLabel = None  # type: ignore[assignment]
+        self._start_entry: ctk.CTkEntry = None  # type: ignore[assignment]
+        self._end_entry: ctk.CTkEntry = None  # type: ignore[assignment]
 
     def lift(self) -> None:
         if self._root:
