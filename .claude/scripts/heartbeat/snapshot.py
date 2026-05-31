@@ -145,7 +145,9 @@ def load_state() -> dict | None:
 
 def save_state(snapshot: dict) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(
+    tmp = STATE_FILE.with_suffix(".tmp")
+    tmp.write_text(
         json.dumps(snapshot, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    tmp.replace(STATE_FILE)
