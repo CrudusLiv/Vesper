@@ -43,7 +43,10 @@ _FORCE_GIT_PATTERNS: list[str] = [
     r"\bgit\s+clean\s+-[a-z]*f",
     r"\bgit\s+checkout\s+--\s",
     r"\bgit\s+restore\s+--source",
-    r"\bgit\s+branch\s+-D\b",
+    # (?-i:-D) keeps this case-sensitive despite the global IGNORECASE in
+    # _matches: only the force-delete -D is hard to reverse. The safe -d
+    # refuses to drop unmerged branches, so it must not trip this rule.
+    r"\bgit\s+branch\s+(?-i:-D)\b",
 ]
 
 # --- Financial ---

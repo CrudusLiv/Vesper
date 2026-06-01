@@ -25,6 +25,8 @@ CASES: list[tuple[str, str, dict, str]] = [
     ("git push --force",     "Bash",  {"command": "git push --force origin main"},                                   "fail"),
     ("git push -f",          "Bash",  {"command": "git push -f origin main"},                                        "fail"),
     ("git reset --hard",     "Bash",  {"command": "git reset --hard HEAD~1"},                                        "fail"),
+    ("git branch -D force",  "Bash",  {"command": "git branch -D feature"},                                          "fail"),
+    ("git branch -d safe",   "Bash",  {"command": "git branch -d feature"},                                          "pass"),
     ("Memory delete",        "Bash",  {"command": "rm Dynamous/Memory/SOUL.md"},                                     "fail"),
     ("financial URL",        "Bash",  {"command": "curl https://stripe.com/dashboard"},                              "fail"),
     ("social tweet",         "Bash",  {"command": "python -c \"twitter.tweet(text=hi)\""},                           "fail"),
