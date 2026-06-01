@@ -1,0 +1,283 @@
+"""Unit tests for discord_bot module-level helpers (no live Discord)."""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+
+
+def _bot():
+    repo_root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(repo_root / ".claude"))
+    sys.path.insert(0, str(repo_root / ".claude" / "scripts"))
+    from chat import discord_bot
+    return discord_bot
+
+
+def test_build_help_text_lists_every_command():
+    db = _bot()
+    text = db.build_help_text()
+    assert text.startswith(db.HELP_TITLE)
+    for name in ("/schedule", "/note", "/finance", "/totals", "/list", "/delete", "/undo", "/help"):
+        assert name in text
+
+
+def test_slash_text_prefers_explicit_text():
+    db = _bot()
+    assert db._slash_text("✅", "logged RM5.00") == "logged RM5.00"
+
+
+def test_slash_text_falls_back_to_reaction():
+    db = _bot()
+    assert db._slash_text("✅", None) == "Done."
+    assert db._slash_text("❌", None) == "Failed."
+    assert db._slash_text("❓", None) == "Unrecognized."
+    assert db._slash_text(None, None) == "Done."
+
+
+class _FakeSchedule:
+    """Stand-in for the schedule_parser module."""
+    def __init__(self, existing=False, pending=None):
+        self._existing = existing
+        self._pending = pending
+        self.written = None
+        self.pending_written = None
+        self.cleared = False
+
+    def parse_timetable(self, raw):
+        if raw == "BOOM":
+            raise ValueError("bad")
+        return ([{"day": "Mon"}], f"parsed: {raw}")
+
+    def has_existing_schedule(self):
+        return self._existing
+
+    def write_schedule(self, entries):
+        self.written = entries
+
+    def write_pending(self, entries):
+        self.pending_written = entries
+
+    def read_pending(self):
+        return self._pending
+
+    def clear_pending(self):
+        self.cleared = True
+
+
+def test_run_schedule_fresh_write(monkeypatch):
+    db = _bot()
+    fake = _FakeSchedule(existing=False)
+    monkeypatch.setattr(db, "schedule_parser", fake)
+    reaction, text = db.run_schedule("Mon 9am Math", confirm=False)
+    assert reaction == "✅"
+    assert text == "parsed: Mon 9am Math"
+    assert fake.written == [{"day": "Mon"}]
+
+
+def test_run_schedule_existing_asks_confirm(monkeypatch):
+    db = _bot()
+    fake = _FakeSchedule(existing=True)
+    monkeypatch.setattr(db, "schedule_parser", fake)
+    reaction, text = db.run_schedule("Mon 9am Math", confirm=False)
+    assert reaction == "❓"
+    assert "confirm" in text.lower()
+    assert fake.pending_written == [{"day": "Mon"}]
+    assert fake.written is None  # not written yet
+
+
+def test_run_schedule_confirm_writes_pending(monkeypatch):
+    db = _bot()
+    fake = _FakeSchedule(pending=[{"day": "Tue"}])
+    monkeypatch.setattr(db, "schedule_parser", fake)
+    reaction, text = db.run_schedule("", confirm=True)
+    assert reaction == "✅"
+    assert "updated" in text.lower()
+    assert fake.written == [{"day": "Tue"}]
+    assert fake.cleared is True
+
+
+def test_run_schedule_confirm_nothing_pending(monkeypatch):
+    db = _bot()
+    fake = _FakeSchedule(pending=None)
+    monkeypatch.setattr(db, "schedule_parser", fake)
+    reaction, text = db.run_schedule("", confirm=True)
+    assert reaction == "❓"
+    assert "nothing pending" in text.lower()
+
+
+def test_run_schedule_parse_error(monkeypatch):
+    db = _bot()
+    fake = _FakeSchedule(existing=False)
+    monkeypatch.setattr(db, "schedule_parser", fake)
+    reaction, text = db.run_schedule("BOOM", confirm=False)
+    assert reaction == "❌"
+    assert "failed to parse" in text.lower()
+
+
+def test_run_note_not_a_note(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.discord_dm_capture, "classify", lambda c: "chit-chat")
+    reaction, text = db.run_note("just chatting")
+    assert reaction is None
+    assert text is None
+
+
+def test_run_note_success(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.discord_dm_capture, "classify", lambda c: "note")
+    monkeypatch.setattr(db.discord_dm_capture, "_append_note", lambda target, dt, raw: "the body")
+    reaction, text = db.run_note("note: the body")
+    assert reaction == "✅"
+    assert text is None
+
+
+def test_run_note_empty_after_strip(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.discord_dm_capture, "classify", lambda c: "note")
+    monkeypatch.setattr(db.discord_dm_capture, "_append_note", lambda target, dt, raw: "")
+    reaction, text = db.run_note("note:")
+    assert reaction == "❌"
+    assert "empty" in text.lower()
+
+
+def test_run_note_error(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.discord_dm_capture, "classify", lambda c: "note")
+
+    def _boom(target, dt, raw):
+        raise OSError("disk")
+
+    monkeypatch.setattr(db.discord_dm_capture, "_append_note", _boom)
+    reaction, text = db.run_note("note: x")
+    assert reaction == "❌"
+    assert "error" in text.lower()
+
+
+def test_run_totals(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.finance_tracker, "month_summary", lambda: "June: RM50")
+    reaction, text = db.run_totals()
+    assert reaction is None
+    assert "June: RM50" in text
+    assert text.startswith("```") and text.rstrip().endswith("```")
+
+
+def test_run_finance_logs_expense(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.finance_tracker, "CURRENCY", "RM")
+    monkeypatch.setattr(
+        db.finance_tracker, "parse",
+        lambda c: {"amount": 12.5, "category": "food", "note": "lunch"},
+    )
+    monkeypatch.setattr(
+        db.finance_tracker, "log",
+        lambda amount, category, note: {"month_total": 62.5, "category_total": 30.0},
+    )
+    reaction, text = db.run_finance("12.50 food lunch")
+    assert reaction is None
+    assert "RM12.50" in text and "food" in text and "lunch" in text
+    assert "62.50" in text and "30.00" in text
+
+
+def test_run_finance_totals_alias(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.finance_tracker, "month_summary", lambda: "June: RM50")
+    reaction, text = db.run_finance("totals")
+    assert "June: RM50" in text
+
+
+def test_run_finance_unparseable(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.finance_tracker, "parse", lambda c: None)
+    reaction, text = db.run_finance("hello there")
+    assert reaction == "❓"
+    assert text is None
+
+
+def test_run_verb_not_a_verb(monkeypatch):
+    db = _bot()
+    reaction, text = db.run_verb("random message")
+    assert reaction is None
+    assert text is None
+
+
+def test_run_verb_undo(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.vault_actions, "undo", lambda: {"message": "reverted X"})
+    reaction, text = db.run_verb("undo")
+    assert reaction == "✅"
+    assert "reverted X" in text
+
+
+def test_run_verb_delete(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(
+        db.vault_actions, "delete",
+        lambda p: {"path": p, "trash_path": "_trash/" + p},
+    )
+    reaction, text = db.run_verb("delete: notes/old.md")
+    assert reaction == "✅"
+    assert "notes/old.md" in text and "_trash/notes/old.md" in text
+
+
+def test_run_verb_list_empty(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(
+        db.vault_actions, "list_dir",
+        lambda d: {"directory": d, "entries": []},
+    )
+    reaction, text = db.run_verb("list: notes")
+    assert reaction == "✅"
+    assert "empty" in text.lower()
+
+
+def test_run_verb_list_truncates(monkeypatch):
+    db = _bot()
+    entries = [f"f{i}.md" for i in range(25)]
+    monkeypatch.setattr(
+        db.vault_actions, "list_dir",
+        lambda d: {"directory": d, "entries": entries},
+    )
+    reaction, text = db.run_verb("list: notes")
+    assert reaction == "✅"
+    assert "+5 more" in text
+
+
+def test_run_verb_known_error(monkeypatch):
+    db = _bot()
+
+    def _missing(p):
+        raise FileNotFoundError("notes/nope.md")
+
+    monkeypatch.setattr(db.vault_actions, "delete", _missing)
+    reaction, text = db.run_verb("delete: notes/nope.md")
+    assert reaction == "❌"
+    assert "FileNotFoundError" in text
+
+
+def test_run_note_force_skips_classify(monkeypatch):
+    db = _bot()
+    # classify would route this away as finance, but force must bypass it
+    monkeypatch.setattr(db.discord_dm_capture, "classify", lambda c: "finance")
+    captured = {}
+
+    def _append(target, dt, raw):
+        captured["raw"] = raw
+        return raw
+
+    monkeypatch.setattr(db.discord_dm_capture, "_append_note", _append)
+    reaction, text = db.run_note("spent RM5 on lunch", force=True)
+    assert reaction == "✅"
+    assert text is None
+    assert captured["raw"] == "spent RM5 on lunch"
+
+
+def test_run_note_force_empty(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.discord_dm_capture, "classify", lambda c: "finance")
+    monkeypatch.setattr(db.discord_dm_capture, "_append_note", lambda target, dt, raw: "")
+    reaction, text = db.run_note("", force=True)
+    assert reaction == "❌"
+    assert "empty" in text.lower()
