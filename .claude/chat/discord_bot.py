@@ -159,6 +159,44 @@ def run_note(content: str) -> tuple[str | None, str | None]:
         return "❌", f"[inbox] note save error: {type(exc).__name__}"
 
 
+def run_totals() -> tuple[str | None, str | None]:
+    """Month spending summary. Returns (reaction, text). Blocking I/O."""
+    try:
+        summary = finance_tracker.month_summary()
+        return None, f"```\n{summary}\n```"
+    except Exception as exc:
+        print(f"finance summary failed: {exc}", file=sys.stderr)
+        return None, f"[finance summary error: {type(exc).__name__}]"
+
+
+def run_finance(content: str) -> tuple[str | None, str | None]:
+    """Log an expense, or show totals on the `totals`/`finance`/`spend` aliases.
+
+    Returns (reaction, text). (None, None) -ish: when content can't be parsed
+    as an expense, returns ("❓", None) so the message path reacts with ❓.
+    Blocking I/O."""
+    if content.lower() in ("totals", "finance", "spend"):
+        return run_totals()
+    expense = finance_tracker.parse(content)
+    if not expense:
+        return "❓", None
+    try:
+        result = finance_tracker.log(
+            expense["amount"], expense["category"], expense["note"],
+        )
+        ack = (
+            f"logged {finance_tracker.CURRENCY}{expense['amount']:.2f} / "
+            f"{expense['category']}"
+            + (f" ({expense['note']})" if expense["note"] else "")
+            + f"\nmonth total {finance_tracker.CURRENCY}{result['month_total']:.2f}"
+            + f" | {expense['category']} {finance_tracker.CURRENCY}{result['category_total']:.2f}"
+        )
+        return None, ack
+    except Exception as exc:
+        print(f"run_finance failed: {exc}", file=sys.stderr)
+        return None, f"[finance log error: {type(exc).__name__}]"
+
+
 async def _save_attachments_to_inbox(message) -> list[str]:
     """Download supported attachments to inbox/. Returns saved filenames."""
     INBOX.mkdir(parents=True, exist_ok=True)

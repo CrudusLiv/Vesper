@@ -153,3 +153,44 @@ def test_run_note_error(monkeypatch):
     reaction, text = db.run_note("note: x")
     assert reaction == "❌"
     assert "error" in text.lower()
+
+
+def test_run_totals(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.finance_tracker, "month_summary", lambda: "June: RM50")
+    reaction, text = db.run_totals()
+    assert reaction is None
+    assert "June: RM50" in text
+    assert text.startswith("```") and text.rstrip().endswith("```")
+
+
+def test_run_finance_logs_expense(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.finance_tracker, "CURRENCY", "RM")
+    monkeypatch.setattr(
+        db.finance_tracker, "parse",
+        lambda c: {"amount": 12.5, "category": "food", "note": "lunch"},
+    )
+    monkeypatch.setattr(
+        db.finance_tracker, "log",
+        lambda amount, category, note: {"month_total": 62.5, "category_total": 30.0},
+    )
+    reaction, text = db.run_finance("12.50 food lunch")
+    assert reaction is None
+    assert "RM12.50" in text and "food" in text and "lunch" in text
+    assert "62.50" in text and "30.00" in text
+
+
+def test_run_finance_totals_alias(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.finance_tracker, "month_summary", lambda: "June: RM50")
+    reaction, text = db.run_finance("totals")
+    assert "June: RM50" in text
+
+
+def test_run_finance_unparseable(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.finance_tracker, "parse", lambda c: None)
+    reaction, text = db.run_finance("hello there")
+    assert reaction == "❓"
+    assert text is None
