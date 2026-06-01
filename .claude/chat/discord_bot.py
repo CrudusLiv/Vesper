@@ -197,6 +197,40 @@ def run_finance(content: str) -> tuple[str | None, str | None]:
         return None, f"[finance log error: {type(exc).__name__}]"
 
 
+def run_verb(content: str) -> tuple[str | None, str | None]:
+    """Deterministic vault verbs: `undo`, `delete: <path>`, `list: <dir>`.
+
+    Returns (reaction, text). (None, None) when content isn't a verb, so the
+    message path can fall through to the unknown-command react. Blocking I/O."""
+    lowered = content.lower()
+    try:
+        if lowered == "undo":
+            result = vault_actions.undo()
+            verb_text = result["message"]
+        elif lowered.startswith("delete:"):
+            target = content[len("delete:"):].strip()
+            result = vault_actions.delete(target)
+            verb_text = f"soft-deleted {result['path']} -> {result['trash_path']}"
+        elif lowered.startswith("list:"):
+            target = content[len("list:"):].strip()
+            result = vault_actions.list_dir(target)
+            entries = result["entries"]
+            if not entries:
+                verb_text = f"{result['directory']}/ is empty"
+            else:
+                listing = ", ".join(entries[:20])
+                more = f" (+{len(entries) - 20} more)" if len(entries) > 20 else ""
+                verb_text = f"{result['directory']}/: {listing}{more}"
+        else:
+            return None, None
+        return "✅", f"[inbox] {verb_text}"
+    except (FileNotFoundError, FileExistsError, ValueError, NotADirectoryError) as exc:
+        return "❌", f"[inbox] {type(exc).__name__}: {exc}"
+    except Exception as exc:
+        print(f"run_verb failed: {exc}", file=sys.stderr)
+        return "❌", f"[inbox] verb error: {type(exc).__name__}"
+
+
 async def _save_attachments_to_inbox(message) -> list[str]:
     """Download supported attachments to inbox/. Returns saved filenames."""
     INBOX.mkdir(parents=True, exist_ok=True)

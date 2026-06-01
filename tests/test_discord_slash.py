@@ -194,3 +194,64 @@ def test_run_finance_unparseable(monkeypatch):
     reaction, text = db.run_finance("hello there")
     assert reaction == "❓"
     assert text is None
+
+
+def test_run_verb_not_a_verb(monkeypatch):
+    db = _bot()
+    reaction, text = db.run_verb("random message")
+    assert reaction is None
+    assert text is None
+
+
+def test_run_verb_undo(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.vault_actions, "undo", lambda: {"message": "reverted X"})
+    reaction, text = db.run_verb("undo")
+    assert reaction == "✅"
+    assert "reverted X" in text
+
+
+def test_run_verb_delete(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(
+        db.vault_actions, "delete",
+        lambda p: {"path": p, "trash_path": "_trash/" + p},
+    )
+    reaction, text = db.run_verb("delete: notes/old.md")
+    assert reaction == "✅"
+    assert "notes/old.md" in text and "_trash/notes/old.md" in text
+
+
+def test_run_verb_list_empty(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(
+        db.vault_actions, "list_dir",
+        lambda d: {"directory": d, "entries": []},
+    )
+    reaction, text = db.run_verb("list: notes")
+    assert reaction == "✅"
+    assert "empty" in text.lower()
+
+
+def test_run_verb_list_truncates(monkeypatch):
+    db = _bot()
+    entries = [f"f{i}.md" for i in range(25)]
+    monkeypatch.setattr(
+        db.vault_actions, "list_dir",
+        lambda d: {"directory": d, "entries": entries},
+    )
+    reaction, text = db.run_verb("list: notes")
+    assert reaction == "✅"
+    assert "+5 more" in text
+
+
+def test_run_verb_known_error(monkeypatch):
+    db = _bot()
+
+    def _missing(p):
+        raise FileNotFoundError("notes/nope.md")
+
+    monkeypatch.setattr(db.vault_actions, "delete", _missing)
+    reaction, text = db.run_verb("delete: notes/nope.md")
+    assert reaction == "❌"
+    assert "FileNotFoundError" in text
