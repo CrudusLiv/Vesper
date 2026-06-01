@@ -4,12 +4,20 @@ bot in `discord_int.run_bot()`.
 
 SECURITY CARVE-OUT (post 2026-05-24 input pivot)
 ================================================
-This is the ONLY place in the codebase that calls `channel.send()`. The
-guardrail is two-pronged and AND-ed:
+This is the ONLY place in the codebase that calls `channel.send()` (and the
+related slash-command `interaction.response.send_message` / `followup` sends,
+plus the pinned-help `channel.send`/`message.edit`). The guardrail is
+two-pronged and AND-ed:
 
 1.  message.author.id matches DISCORD_USER_ID from .env -- only CrudusLiv.
 2.  message.channel.id matches DISCORD_INBOX_CHANNEL_ID, _FINANCE_, or
     _VESPER_ -- input is channel-scoped, never wildcard.
+
+Slash commands add a third outbound surface (interaction responses). They are
+owner-gated the same way -- every callback checks `interaction.user.id ==
+DISCORD_USER_ID` before doing anything -- and every reply is ephemeral, so
+nothing is posted to a channel for other members. The pinned help message is
+static preset text built by build_help_text(), not user/LLM content.
 
 DMs from the owner are CACHE-ONLY: they are stored in discord_cache.db but
 trigger no handler, no reply, no react. The pre-pivot DM-input branches
@@ -411,6 +419,32 @@ def main() -> int:
         reaction, msg = await asyncio.to_thread(run_verb, "undo")
         await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
 
+    async def _ensure_help_pinned() -> None:
+        help_cid = os.environ.get("DISCORD_HELP_CHANNEL_ID", "").strip() or inbox_channel_id
+        if not help_cid:
+            print("help pin skipped: no DISCORD_HELP_CHANNEL_ID or inbox channel set", file=sys.stderr)
+            return
+        try:
+            channel = client.get_channel(int(help_cid))
+        except (TypeError, ValueError):
+            print(f"help pin skipped: bad channel id {help_cid!r}", file=sys.stderr)
+            return
+        if channel is None:
+            print(f"help pin skipped: channel {help_cid} not found", file=sys.stderr)
+            return
+        text = build_help_text()
+        try:
+            pins = await channel.pins()
+            for msg in pins:
+                if msg.author.id == client.user.id and msg.content.startswith(HELP_TITLE):
+                    if msg.content != text:
+                        await msg.edit(content=text)
+                    return
+            sent = await channel.send(text)
+            await sent.pin()
+        except Exception as exc:
+            print(f"help pin failed: {exc}", file=sys.stderr)
+
     @client.event
     async def on_ready() -> None:
         self_id_holder["id"] = str(client.user.id) if client.user else None
@@ -424,6 +458,14 @@ def main() -> int:
         for name, cid in arms:
             status = f"enabled (channel={cid})" if cid else "DISABLED (env var unset)"
             print(f"  {name} arm: {status}")
+        try:
+            for guild in client.guilds:
+                tree.copy_global_to(guild=guild)
+                synced = await tree.sync(guild=guild)
+                print(f"  slash: synced {len(synced)} commands to guild {guild.id}")
+        except Exception as exc:
+            print(f"slash sync failed: {exc}", file=sys.stderr)
+        await _ensure_help_pinned()
 
     async def _handle_inbox(message) -> None:
         content = (message.content or "").strip()
