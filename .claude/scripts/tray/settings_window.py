@@ -86,6 +86,12 @@ class SettingsWindow:
         try:
             self._root = ctk.CTk()
             self._root.title("Vesper Settings")
+            ico = Path(__file__).resolve().parent / "vesper.ico"
+            if ico.is_file():
+                try:
+                    self._root.iconbitmap(str(ico))
+                except Exception:
+                    pass  # bad/unsupported .ico — keep Tk's default icon
             self._root.geometry("460x300")
             self._root.resizable(False, False)
             self._root.configure(fg_color=_C["bg"])
