@@ -149,12 +149,14 @@ def run_schedule(raw: str, *, confirm: bool) -> tuple[str | None, str | None]:
         return "❌", f"[schedule] Write error: {type(exc).__name__}"
 
 
-def run_note(content: str) -> tuple[str | None, str | None]:
+def run_note(content: str, *, force: bool = False) -> tuple[str | None, str | None]:
     """Append a note to NOTES.md. Returns (reaction, text).
 
-    Returns (None, None) when the content doesn't classify as a note, so
-    callers can fall through to the schedule/verb handlers. Blocking I/O."""
-    if discord_dm_capture.classify(content) != "note":
+    Returns (None, None) when the content doesn't classify as a note (so the
+    message path can fall through to the schedule/verb handlers) -- unless
+    force=True, used by the /note slash command where the user explicitly
+    asked to take a note and classify must not route it away. Blocking I/O."""
+    if not force and discord_dm_capture.classify(content) != "note":
         return None, None
     try:
         dt = datetime.now(tz=KL)
@@ -378,7 +380,7 @@ def main() -> int:
     async def slash_note(interaction, text: str) -> None:
         if not _is_owner(interaction):
             return await _deny(interaction)
-        reaction, msg = await asyncio.to_thread(run_note, f"note: {text}")
+        reaction, msg = await asyncio.to_thread(run_note, text, force=True)
         await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
 
     @tree.command(name="finance", description="Log an expense (e.g. 12.50 food lunch)")
@@ -434,8 +436,7 @@ def main() -> int:
             return
         text = build_help_text()
         try:
-            pins = await channel.pins()
-            for msg in pins:
+            async for msg in channel.pins():
                 if msg.author.id == client.user.id and msg.content.startswith(HELP_TITLE):
                     if msg.content != text:
                         await msg.edit(content=text)

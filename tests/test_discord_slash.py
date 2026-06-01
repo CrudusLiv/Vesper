@@ -255,3 +255,29 @@ def test_run_verb_known_error(monkeypatch):
     reaction, text = db.run_verb("delete: notes/nope.md")
     assert reaction == "❌"
     assert "FileNotFoundError" in text
+
+
+def test_run_note_force_skips_classify(monkeypatch):
+    db = _bot()
+    # classify would route this away as finance, but force must bypass it
+    monkeypatch.setattr(db.discord_dm_capture, "classify", lambda c: "finance")
+    captured = {}
+
+    def _append(target, dt, raw):
+        captured["raw"] = raw
+        return raw
+
+    monkeypatch.setattr(db.discord_dm_capture, "_append_note", _append)
+    reaction, text = db.run_note("spent RM5 on lunch", force=True)
+    assert reaction == "✅"
+    assert text is None
+    assert captured["raw"] == "spent RM5 on lunch"
+
+
+def test_run_note_force_empty(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.discord_dm_capture, "classify", lambda c: "finance")
+    monkeypatch.setattr(db.discord_dm_capture, "_append_note", lambda target, dt, raw: "")
+    reaction, text = db.run_note("", force=True)
+    assert reaction == "❌"
+    assert "empty" in text.lower()
