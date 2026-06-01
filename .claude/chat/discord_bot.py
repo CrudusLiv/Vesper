@@ -141,6 +141,24 @@ def run_schedule(raw: str, *, confirm: bool) -> tuple[str | None, str | None]:
         return "❌", f"[schedule] Write error: {type(exc).__name__}"
 
 
+def run_note(content: str) -> tuple[str | None, str | None]:
+    """Append a note to NOTES.md. Returns (reaction, text).
+
+    Returns (None, None) when the content doesn't classify as a note, so
+    callers can fall through to the schedule/verb handlers. Blocking I/O."""
+    if discord_dm_capture.classify(content) != "note":
+        return None, None
+    try:
+        dt = datetime.now(tz=KL)
+        stripped = discord_dm_capture._append_note(NOTES_FILE, dt, content)
+        if stripped:
+            return "✅", None
+        return "❌", "[inbox] note was empty after stripping `note:` prefix."
+    except Exception as exc:
+        print(f"run_note failed: {exc}", file=sys.stderr)
+        return "❌", f"[inbox] note save error: {type(exc).__name__}"
+
+
 async def _save_attachments_to_inbox(message) -> list[str]:
     """Download supported attachments to inbox/. Returns saved filenames."""
     INBOX.mkdir(parents=True, exist_ok=True)

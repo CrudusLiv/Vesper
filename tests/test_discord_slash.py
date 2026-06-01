@@ -114,3 +114,42 @@ def test_run_schedule_parse_error(monkeypatch):
     reaction, text = db.run_schedule("BOOM", confirm=False)
     assert reaction == "❌"
     assert "failed to parse" in text.lower()
+
+
+def test_run_note_not_a_note(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.discord_dm_capture, "classify", lambda c: "chit-chat")
+    reaction, text = db.run_note("just chatting")
+    assert reaction is None
+    assert text is None
+
+
+def test_run_note_success(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.discord_dm_capture, "classify", lambda c: "note")
+    monkeypatch.setattr(db.discord_dm_capture, "_append_note", lambda target, dt, raw: "the body")
+    reaction, text = db.run_note("note: the body")
+    assert reaction == "✅"
+    assert text is None
+
+
+def test_run_note_empty_after_strip(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.discord_dm_capture, "classify", lambda c: "note")
+    monkeypatch.setattr(db.discord_dm_capture, "_append_note", lambda target, dt, raw: "")
+    reaction, text = db.run_note("note:")
+    assert reaction == "❌"
+    assert "empty" in text.lower()
+
+
+def test_run_note_error(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.discord_dm_capture, "classify", lambda c: "note")
+
+    def _boom(target, dt, raw):
+        raise OSError("disk")
+
+    monkeypatch.setattr(db.discord_dm_capture, "_append_note", _boom)
+    reaction, text = db.run_note("note: x")
+    assert reaction == "❌"
+    assert "error" in text.lower()
