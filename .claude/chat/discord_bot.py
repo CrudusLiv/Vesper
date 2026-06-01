@@ -231,6 +231,22 @@ def run_verb(content: str) -> tuple[str | None, str | None]:
         return "❌", f"[inbox] verb error: {type(exc).__name__}"
 
 
+async def _emit(message, reaction: str | None, text: str | None) -> None:
+    """Apply a helper's (reaction, text) result to a channel message:
+    react if a reaction is given, send text if any. Each wrapped so a
+    Discord API hiccup on one doesn't abort the other."""
+    if reaction:
+        try:
+            await message.add_reaction(reaction)
+        except Exception as exc:
+            print(f"_emit react failed: {exc}", file=sys.stderr)
+    if text:
+        try:
+            await message.channel.send(text)
+        except Exception as exc:
+            print(f"_emit send failed: {exc}", file=sys.stderr)
+
+
 async def _save_attachments_to_inbox(message) -> list[str]:
     """Download supported attachments to inbox/. Returns saved filenames."""
     INBOX.mkdir(parents=True, exist_ok=True)
@@ -356,191 +372,36 @@ def main() -> int:
             elif discord_dm_capture.classify(content) != "note":
                 return
 
-        if discord_dm_capture.classify(content) == "note":
-            try:
-                dt = datetime.now(tz=KL)
-                stripped = await asyncio.to_thread(
-                    discord_dm_capture._append_note, NOTES_FILE, dt, content,
-                )
-                if stripped:
-                    handled = True
-                    try:
-                        await message.add_reaction("✅")
-                    except Exception as exc:
-                        print(f"_handle_inbox reaction failed: {exc}", file=sys.stderr)
-                else:
-                    handled = True
-                    try:
-                        await message.add_reaction("❌")
-                        await message.channel.send("[inbox] note was empty after stripping `note:` prefix.")
-                    except Exception as exc:
-                        print(f"_handle_inbox empty-note react failed: {exc}", file=sys.stderr)
-            except Exception as exc:
-                print(f"_handle_inbox note failed: {exc}", file=sys.stderr)
-                try:
-                    await message.add_reaction("❌")
-                    await message.channel.send(f"[inbox] note save error: {type(exc).__name__}")
-                except Exception:
-                    pass
-                return
+        # note: capture
+        if not handled:
+            reaction, text = await asyncio.to_thread(run_note, content)
+            if reaction is not None:
+                await _emit(message, reaction, text)
+                handled = True
 
-        # schedule: prefix — parse timetable or confirm pending overwrite
+        # schedule: prefix
         if not handled and content.lower().startswith("schedule:"):
-            handled = True
             raw = content[len("schedule:"):].strip()
-            try:
-                if raw.lower() == "yes":
-                    entries = await asyncio.to_thread(schedule_parser.read_pending)
-                    if entries is None:
-                        await message.channel.send(
-                            "Nothing pending. Send `schedule: [text]` first."
-                        )
-                        try:
-                            await message.add_reaction("❓")
-                        except Exception as exc:
-                            print(f"_handle_inbox schedule-react failed: {exc}", file=sys.stderr)
-                    else:
-                        await asyncio.to_thread(schedule_parser.write_schedule, entries)
-                        await asyncio.to_thread(schedule_parser.clear_pending)
-                        await message.channel.send("Done — schedule updated.")
-                        try:
-                            await message.add_reaction("✅")
-                        except Exception as exc:
-                            print(f"_handle_inbox schedule-react failed: {exc}", file=sys.stderr)
-                else:
-                    entries, summary = await asyncio.to_thread(
-                        schedule_parser.parse_timetable, raw
-                    )
-                    if await asyncio.to_thread(schedule_parser.has_existing_schedule):
-                        await asyncio.to_thread(schedule_parser.write_pending, entries)
-                        await message.channel.send(
-                            f"You already have a schedule. Here's what I parsed:\n{summary}\n"
-                            "Send `schedule: yes` to replace it."
-                        )
-                        try:
-                            await message.add_reaction("❓")
-                        except Exception as exc:
-                            print(f"_handle_inbox schedule-react failed: {exc}", file=sys.stderr)
-                    else:
-                        await asyncio.to_thread(schedule_parser.write_schedule, entries)
-                        await message.channel.send(summary)
-                        try:
-                            await message.add_reaction("✅")
-                        except Exception as exc:
-                            print(f"_handle_inbox schedule-react failed: {exc}", file=sys.stderr)
-            except ValueError:
-                try:
-                    await message.add_reaction("❌")
-                    await message.channel.send(
-                        "[schedule] Failed to parse timetable — try again or paste in a different format."
-                    )
-                except Exception as exc:
-                    print(f"_handle_inbox schedule-error-react failed: {exc}", file=sys.stderr)
-            except Exception as exc:
-                print(f"_handle_inbox schedule failed: {exc}", file=sys.stderr)
-                try:
-                    await message.add_reaction("❌")
-                    await message.channel.send(f"[schedule] Write error: {type(exc).__name__}")
-                except Exception:
-                    pass
+            reaction, text = await asyncio.to_thread(
+                run_schedule, raw, confirm=raw.lower() == "yes",
+            )
+            await _emit(message, reaction, text)
+            handled = True
 
-        # Deterministic verb dispatch: `undo`, `delete: <path>`, `list: <dir>`.
-        # No LLM. These call into vault.actions (Tasks 4-7 infrastructure).
+        # deterministic verbs: undo / delete: / list:
         if not handled:
-            lowered = content.lower()
-            verb_text: str | None = None
-            try:
-                if lowered == "undo":
-                    result = await asyncio.to_thread(vault_actions.undo)
-                    verb_text = result["message"]
-                elif lowered.startswith("delete:"):
-                    target = content[len("delete:"):].strip()
-                    result = await asyncio.to_thread(vault_actions.delete, target)
-                    verb_text = f"soft-deleted {result['path']} -> {result['trash_path']}"
-                elif lowered.startswith("list:"):
-                    target = content[len("list:"):].strip()
-                    result = await asyncio.to_thread(vault_actions.list_dir, target)
-                    entries = result["entries"]
-                    if not entries:
-                        verb_text = f"{result['directory']}/ is empty"
-                    else:
-                        listing = ", ".join(entries[:20])
-                        more = f" (+{len(entries) - 20} more)" if len(entries) > 20 else ""
-                        verb_text = f"{result['directory']}/: {listing}{more}"
-
-                if verb_text is not None:
-                    handled = True
-                    try:
-                        await message.add_reaction("✅")
-                    except Exception as exc:
-                        print(f"_handle_inbox verb-react failed: {exc}", file=sys.stderr)
-                    await message.channel.send(f"[inbox] {verb_text}")
-            except (FileNotFoundError, FileExistsError, ValueError, NotADirectoryError) as exc:
+            reaction, text = await asyncio.to_thread(run_verb, content)
+            if reaction is not None or text is not None:
+                await _emit(message, reaction, text)
                 handled = True
-                try:
-                    await message.add_reaction("❌")
-                    await message.channel.send(f"[inbox] {type(exc).__name__}: {exc}")
-                except Exception as exc2:
-                    print(f"_handle_inbox verb error-react failed: {exc2}", file=sys.stderr)
-            except Exception as exc:
-                handled = True
-                print(f"_handle_inbox verb failed: {exc}", file=sys.stderr)
-                try:
-                    await message.add_reaction("❌")
-                    await message.channel.send(f"[inbox] verb error: {type(exc).__name__}")
-                except Exception:
-                    pass
 
         if not handled:
-            try:
-                await message.add_reaction("❓")
-            except Exception as exc:
-                print(f"_handle_inbox unknown-react failed: {exc}", file=sys.stderr)
+            await _emit(message, "❓", None)
 
     async def _handle_finance(message) -> None:
         content = (message.content or "").strip()
-
-        if content.lower() in ("totals", "finance", "spend"):
-            try:
-                summary = await asyncio.to_thread(finance_tracker.month_summary)
-                await message.channel.send(f"```\n{summary}\n```")
-            except Exception as exc:
-                print(f"finance summary failed: {exc}", file=sys.stderr)
-                try:
-                    await message.channel.send(f"[finance summary error: {type(exc).__name__}]")
-                except Exception:
-                    pass
-            return
-
-        expense = finance_tracker.parse(content)
-        if expense:
-            try:
-                result = await asyncio.to_thread(
-                    finance_tracker.log,
-                    expense["amount"],
-                    expense["category"],
-                    expense["note"],
-                )
-                ack = (
-                    f"logged {finance_tracker.CURRENCY}{expense['amount']:.2f} / "
-                    f"{expense['category']}"
-                    + (f" ({expense['note']})" if expense['note'] else "")
-                    + f"\nmonth total {finance_tracker.CURRENCY}{result['month_total']:.2f}"
-                    + f" | {expense['category']} {finance_tracker.CURRENCY}{result['category_total']:.2f}"
-                )
-                await message.channel.send(ack)
-            except Exception as exc:
-                print(f"finance log failed: {exc}", file=sys.stderr)
-                try:
-                    await message.channel.send(f"[finance log error: {type(exc).__name__}]")
-                except Exception:
-                    pass
-            return
-
-        try:
-            await message.add_reaction("❓")
-        except Exception as exc:
-            print(f"_handle_finance unknown-react failed: {exc}", file=sys.stderr)
+        reaction, text = await asyncio.to_thread(run_finance, content)
+        await _emit(message, reaction, text)
 
     async def _handle_vesper(message) -> None:
         try:
