@@ -34,3 +34,83 @@ def test_slash_text_falls_back_to_reaction():
     assert db._slash_text("❌", None) == "Failed."
     assert db._slash_text("❓", None) == "Unrecognized."
     assert db._slash_text(None, None) == "Done."
+
+
+class _FakeSchedule:
+    """Stand-in for the schedule_parser module."""
+    def __init__(self, existing=False, pending=None):
+        self._existing = existing
+        self._pending = pending
+        self.written = None
+        self.pending_written = None
+        self.cleared = False
+
+    def parse_timetable(self, raw):
+        if raw == "BOOM":
+            raise ValueError("bad")
+        return ([{"day": "Mon"}], f"parsed: {raw}")
+
+    def has_existing_schedule(self):
+        return self._existing
+
+    def write_schedule(self, entries):
+        self.written = entries
+
+    def write_pending(self, entries):
+        self.pending_written = entries
+
+    def read_pending(self):
+        return self._pending
+
+    def clear_pending(self):
+        self.cleared = True
+
+
+def test_run_schedule_fresh_write(monkeypatch):
+    db = _bot()
+    fake = _FakeSchedule(existing=False)
+    monkeypatch.setattr(db, "schedule_parser", fake)
+    reaction, text = db.run_schedule("Mon 9am Math", confirm=False)
+    assert reaction == "✅"
+    assert text == "parsed: Mon 9am Math"
+    assert fake.written == [{"day": "Mon"}]
+
+
+def test_run_schedule_existing_asks_confirm(monkeypatch):
+    db = _bot()
+    fake = _FakeSchedule(existing=True)
+    monkeypatch.setattr(db, "schedule_parser", fake)
+    reaction, text = db.run_schedule("Mon 9am Math", confirm=False)
+    assert reaction == "❓"
+    assert "confirm" in text.lower()
+    assert fake.pending_written == [{"day": "Mon"}]
+    assert fake.written is None  # not written yet
+
+
+def test_run_schedule_confirm_writes_pending(monkeypatch):
+    db = _bot()
+    fake = _FakeSchedule(pending=[{"day": "Tue"}])
+    monkeypatch.setattr(db, "schedule_parser", fake)
+    reaction, text = db.run_schedule("", confirm=True)
+    assert reaction == "✅"
+    assert "updated" in text.lower()
+    assert fake.written == [{"day": "Tue"}]
+    assert fake.cleared is True
+
+
+def test_run_schedule_confirm_nothing_pending(monkeypatch):
+    db = _bot()
+    fake = _FakeSchedule(pending=None)
+    monkeypatch.setattr(db, "schedule_parser", fake)
+    reaction, text = db.run_schedule("", confirm=True)
+    assert reaction == "❓"
+    assert "nothing pending" in text.lower()
+
+
+def test_run_schedule_parse_error(monkeypatch):
+    db = _bot()
+    fake = _FakeSchedule(existing=False)
+    monkeypatch.setattr(db, "schedule_parser", fake)
+    reaction, text = db.run_schedule("BOOM", confirm=False)
+    assert reaction == "❌"
+    assert "failed to parse" in text.lower()

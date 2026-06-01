@@ -109,6 +109,38 @@ def _slash_text(reaction: str | None, text: str | None) -> str:
     return {"✅": "Done.", "❌": "Failed.", "❓": "Unrecognized."}.get(reaction or "", "Done.")
 
 
+def run_schedule(raw: str, *, confirm: bool) -> tuple[str | None, str | None]:
+    """Schedule-set flow. Returns (reaction, text).
+
+    confirm=True  -> write the stashed pending entries (the `schedule: yes` path).
+    confirm=False -> parse `raw`; if a schedule already exists, stash pending and
+                     ask the caller to confirm; otherwise write immediately.
+    Blocking I/O — async callers wrap this in asyncio.to_thread."""
+    try:
+        if confirm:
+            entries = schedule_parser.read_pending()
+            if entries is None:
+                return "❓", "Nothing pending. Send a schedule first."
+            schedule_parser.write_schedule(entries)
+            schedule_parser.clear_pending()
+            return "✅", "Done — schedule updated."
+
+        entries, summary = schedule_parser.parse_timetable(raw)
+        if schedule_parser.has_existing_schedule():
+            schedule_parser.write_pending(entries)
+            return "❓", (
+                f"You already have a schedule. Here's what I parsed:\n{summary}\n"
+                "Confirm to replace it (`schedule: yes` or `/schedule confirm:true`)."
+            )
+        schedule_parser.write_schedule(entries)
+        return "✅", summary
+    except ValueError:
+        return "❌", "[schedule] Failed to parse timetable — try again or paste in a different format."
+    except Exception as exc:
+        print(f"run_schedule failed: {exc}", file=sys.stderr)
+        return "❌", f"[schedule] Write error: {type(exc).__name__}"
+
+
 async def _save_attachments_to_inbox(message) -> list[str]:
     """Download supported attachments to inbox/. Returns saved filenames."""
     INBOX.mkdir(parents=True, exist_ok=True)
