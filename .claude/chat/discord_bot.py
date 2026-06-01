@@ -89,7 +89,8 @@ def build_help_text() -> str:
         f"{HELP_TITLE}\n"
         "\n"
         "Slash commands (work in any channel, only you can use them):\n"
-        "• `/schedule text:<timetable>` — set or replace your class timetable\n"
+        "• `/schedule` — show your current timetable\n"
+        "• `/schedule text:<timetable>` — set or replace it\n"
         "   (if one already exists, re-run with `confirm:true` to replace it)\n"
         "• `/note text:<note>` — save a quick note to NOTES.md\n"
         "• `/finance text:<e.g. 12.50 food lunch>` — log an expense\n"
@@ -147,6 +148,19 @@ def run_schedule(raw: str, *, confirm: bool) -> tuple[str | None, str | None]:
     except Exception as exc:
         print(f"run_schedule failed: {exc}", file=sys.stderr)
         return "❌", f"[schedule] Write error: {type(exc).__name__}"
+
+
+def run_schedule_view() -> tuple[str | None, str | None]:
+    """Render the current schedule for display. Returns (reaction, text):
+    (None, <schedule>) when one exists, else ("❓", <hint>). Blocking I/O."""
+    try:
+        text = schedule_parser.format_for_discord()
+    except Exception as exc:
+        print(f"run_schedule_view failed: {exc}", file=sys.stderr)
+        return "❌", f"[schedule] read error: {type(exc).__name__}"
+    if not text:
+        return "❓", "No schedule set yet. Send `/schedule text:<your timetable>` to add one."
+    return None, text
 
 
 def run_note(content: str, *, force: bool = False) -> tuple[str | None, str | None]:
@@ -359,19 +373,22 @@ def main() -> int:
             return await _deny(interaction)
         await interaction.response.send_message(build_help_text(), ephemeral=True)
 
-    @tree.command(name="schedule", description="Set or replace your class timetable")
+    @tree.command(name="schedule", description="View your timetable, or set/replace it with text")
     @discord.app_commands.describe(
-        text="The timetable text to parse",
+        text="The timetable text to parse (omit to view your current schedule)",
         confirm="Set true to replace an existing schedule",
     )
     async def slash_schedule(interaction, text: str = "", confirm: bool = False) -> None:
         if not _is_owner(interaction):
             return await _deny(interaction)
+        # Bare /schedule (no text, no confirm) -> show the current schedule.
         if not text and not confirm:
-            return await interaction.response.send_message(
-                "Provide `text:` with your timetable, or `confirm:true` to apply a pending one.",
-                ephemeral=True,
-            )
+            reaction, msg = await asyncio.to_thread(run_schedule_view)
+            chunks = _split_for_discord(_slash_text(reaction, msg))
+            await interaction.response.send_message(chunks[0], ephemeral=True)
+            for extra in chunks[1:]:
+                await interaction.followup.send(extra, ephemeral=True)
+            return
         reaction, msg = await asyncio.to_thread(run_schedule, text, confirm=confirm)
         await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
 

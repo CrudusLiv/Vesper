@@ -116,6 +116,25 @@ def test_run_schedule_parse_error(monkeypatch):
     assert "failed to parse" in text.lower()
 
 
+def test_run_schedule_view_empty(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(db.schedule_parser, "format_for_discord", lambda: None)
+    reaction, text = db.run_schedule_view()
+    assert reaction == "❓"
+    assert "no schedule" in text.lower()
+
+
+def test_run_schedule_view_shows(monkeypatch):
+    db = _bot()
+    monkeypatch.setattr(
+        db.schedule_parser, "format_for_discord",
+        lambda: "**Weekly Grid**\n```\n08:00  CS101\n```",
+    )
+    reaction, text = db.run_schedule_view()
+    assert reaction is None
+    assert "Weekly Grid" in text and "CS101" in text
+
+
 def test_run_note_not_a_note(monkeypatch):
     db = _bot()
     monkeypatch.setattr(db.discord_dm_capture, "classify", lambda c: "chit-chat")

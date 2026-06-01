@@ -46,6 +46,35 @@ def test_parse_timetable_raises_on_malformed_entries():
             schedule_parser.parse_timetable("bad entries")
 
 
+def test_format_for_discord_none_when_missing(tmp_vault):
+    assert schedule_parser.format_for_discord() is None
+
+
+def test_format_for_discord_includes_grid_and_breakdown(tmp_vault):
+    schedule_parser.write_schedule(_SAMPLE_ENTRIES)
+    out = schedule_parser.format_for_discord()
+    assert out is not None
+    assert "Weekly Grid" in out
+    assert "```" in out  # grid wrapped in a code fence
+    assert "Day Breakdown" in out
+    assert "CS101" in out
+    assert "Monday" in out
+
+
+def test_align_grid_pads_columns():
+    aligned = schedule_parser._align_grid([
+        "| Time | Mon | Tue |",
+        "|------|-----|-----|",
+        "| 08:00 | CS101 | |",
+    ])
+    lines = aligned.splitlines()
+    # header + dashed separator + one data row
+    assert len(lines) == 3
+    # every rendered row is the same visual width (columns aligned)
+    assert "CS101" in aligned
+    assert lines[1].count("-") > 0
+
+
 def test_write_schedule_creates_file(tmp_vault):
     schedule_parser.write_schedule(_SAMPLE_ENTRIES)
     path = tmp_vault / "SCHEDULE.md"

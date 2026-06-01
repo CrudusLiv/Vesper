@@ -162,6 +162,55 @@ def has_existing_schedule() -> bool:
     return bool(_DAY_SECTION_RE.search(path.read_text(encoding="utf-8")))
 
 
+def _align_grid(grid_lines: list[str]) -> str:
+    """Turn markdown table rows into a monospace-aligned block (for a Discord
+    code fence). Drops the `|---|` separator row and pads columns to width."""
+    rows: list[list[str]] = []
+    for ln in grid_lines:
+        stripped = ln.strip()
+        if not stripped.startswith("|"):
+            continue
+        if set(stripped) <= set("|-: "):  # the |---|---| separator row
+            continue
+        rows.append([c.strip() for c in stripped.strip("|").split("|")])
+    if not rows:
+        return ""
+    ncol = max(len(r) for r in rows)
+    widths = [0] * ncol
+    for r in rows:
+        for i, c in enumerate(r):
+            widths[i] = max(widths[i], len(c))
+    out: list[str] = []
+    for idx, r in enumerate(rows):
+        padded = [(r[i] if i < len(r) else "").ljust(widths[i]) for i in range(ncol)]
+        out.append("  ".join(padded).rstrip())
+        if idx == 0:
+            out.append("  ".join("-" * widths[i] for i in range(ncol)))
+    return "\n".join(out)
+
+
+def format_for_discord() -> str | None:
+    """Render the active SCHEDULE.md for a Discord message: an aligned weekly
+    grid in a code fence followed by the day breakdown. Returns None when no
+    schedule exists yet."""
+    path = _vault() / "SCHEDULE.md"
+    if not path.exists():
+        return None
+    text = path.read_text(encoding="utf-8")
+    if not _DAY_SECTION_RE.search(text):
+        return None
+    parts: list[str] = []
+    gm = re.search(r"## Weekly Grid\s*\n(.*?)(?:\n## |\Z)", text, re.DOTALL)
+    if gm:
+        grid = _align_grid(gm.group(1).splitlines())
+        if grid:
+            parts.append("**Weekly Grid**\n```\n" + grid + "\n```")
+    bm = re.search(r"## Day Breakdown\s*\n(.*)", text, re.DOTALL)
+    if bm and bm.group(1).strip():
+        parts.append("**Day Breakdown**\n" + bm.group(1).strip())
+    return "\n\n".join(parts) if parts else None
+
+
 def read_pending() -> list[dict] | None:
     """Return pending entries from schedule_pending.json, or None if missing/malformed."""
     try:
