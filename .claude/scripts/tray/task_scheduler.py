@@ -6,6 +6,11 @@ import subprocess
 
 _TIMEOUT = 5  # seconds per schtasks call
 
+# The tray runs under pythonw.exe, which has no console. Without this flag each
+# schtasks call spawns a fresh, visible cmd window (and the allocation is slow,
+# stalling the Tk event loop). CREATE_NO_WINDOW is Windows-only; 0 elsewhere.
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 TASK_NAMES: dict[str, str] = {
     "heartbeat": "secondbrain-heartbeat",
     "reflect":   "secondbrain-reflect",
@@ -20,6 +25,7 @@ def get_status(task_name: str) -> dict:
         result = subprocess.run(
             ["schtasks", "/query", "/fo", "CSV", "/v", "/tn", task_name],
             capture_output=True, text=True, timeout=_TIMEOUT,
+            creationflags=_NO_WINDOW,
         )
         if result.returncode != 0:
             return _fallback()
@@ -44,6 +50,7 @@ def set_enabled(task_name: str, enabled: bool) -> bool:
     result = subprocess.run(
         ["schtasks", "/change", "/tn", task_name, flag],
         capture_output=True, timeout=_TIMEOUT,
+        creationflags=_NO_WINDOW,
     )
     return result.returncode == 0
 
@@ -53,6 +60,7 @@ def run_now(task_name: str) -> bool:
     result = subprocess.run(
         ["schtasks", "/run", "/tn", task_name],
         capture_output=True, timeout=_TIMEOUT,
+        creationflags=_NO_WINDOW,
     )
     return result.returncode == 0
 
@@ -62,6 +70,7 @@ def set_interval(task_name: str, minutes: int) -> bool:
     result = subprocess.run(
         ["schtasks", "/change", "/tn", task_name, "/ri", str(minutes)],
         capture_output=True, timeout=_TIMEOUT,
+        creationflags=_NO_WINDOW,
     )
     return result.returncode == 0
 

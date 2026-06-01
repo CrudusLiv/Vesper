@@ -57,6 +57,30 @@ class TestGetStatus:
         assert s["status"] == "unknown"
 
 
+class TestNoConsoleWindow:
+    """The tray runs under pythonw.exe (no console); schtasks calls must not flash a cmd window."""
+
+    def test_get_status_passes_create_no_window(self):
+        with patch("subprocess.run", return_value=_mock_run(_ENABLED_CSV)) as mock:
+            task_scheduler.get_status("secondbrain-heartbeat")
+        assert mock.call_args.kwargs.get("creationflags") == task_scheduler._NO_WINDOW
+
+    def test_set_enabled_passes_create_no_window(self):
+        with patch("subprocess.run", return_value=_mock_run()) as mock:
+            task_scheduler.set_enabled("secondbrain-heartbeat", True)
+        assert mock.call_args.kwargs.get("creationflags") == task_scheduler._NO_WINDOW
+
+    def test_run_now_passes_create_no_window(self):
+        with patch("subprocess.run", return_value=_mock_run()) as mock:
+            task_scheduler.run_now("secondbrain-heartbeat")
+        assert mock.call_args.kwargs.get("creationflags") == task_scheduler._NO_WINDOW
+
+    def test_set_interval_passes_create_no_window(self):
+        with patch("subprocess.run", return_value=_mock_run()) as mock:
+            task_scheduler.set_interval("secondbrain-heartbeat", 30)
+        assert mock.call_args.kwargs.get("creationflags") == task_scheduler._NO_WINDOW
+
+
 class TestSetEnabled:
     def test_enable_passes_enable_flag(self):
         with patch("subprocess.run", return_value=_mock_run()) as mock:
