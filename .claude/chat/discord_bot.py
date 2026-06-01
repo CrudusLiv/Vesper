@@ -459,11 +459,33 @@ def main() -> int:
         for name, cid in arms:
             status = f"enabled (channel={cid})" if cid else "DISABLED (env var unset)"
             print(f"  {name} arm: {status}")
+        # Register slash commands in the "home" guild only -- the server that
+        # owns the configured input channels. Other guilds the bot happens to
+        # be in get their command list CLEARED, so the commands don't clutter
+        # (or leak from) servers that aren't this second brain. If no home
+        # guild can be resolved, fall back to syncing everywhere so the bot
+        # isn't left without commands.
+        home_guild_id = None
+        for cid in (inbox_channel_id, finance_channel_id, vesper_channel_id):
+            if not cid:
+                continue
+            try:
+                ch = client.get_channel(int(cid))
+            except (TypeError, ValueError):
+                continue
+            if ch is not None and getattr(ch, "guild", None) is not None:
+                home_guild_id = ch.guild.id
+                break
         try:
             for guild in client.guilds:
-                tree.copy_global_to(guild=guild)
-                synced = await tree.sync(guild=guild)
-                print(f"  slash: synced {len(synced)} commands to guild {guild.id}")
+                if home_guild_id is None or guild.id == home_guild_id:
+                    tree.copy_global_to(guild=guild)
+                    synced = await tree.sync(guild=guild)
+                    print(f"  slash: synced {len(synced)} commands to guild {guild.id}")
+                else:
+                    tree.clear_commands(guild=guild)
+                    await tree.sync(guild=guild)
+                    print(f"  slash: cleared commands from guild {guild.id}")
         except Exception as exc:
             print(f"slash sync failed: {exc}", file=sys.stderr)
         await _ensure_help_pinned()
