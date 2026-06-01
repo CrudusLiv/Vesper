@@ -69,6 +69,45 @@ INBOX = PROJECT_DIR / "Dynamous" / "Memory" / "inbox"
 HEARTBEAT_SCRIPT = PROJECT_DIR / ".claude" / "scripts" / "heartbeat.py"
 INBOX_EXTS = {".pdf", ".pptx"}
 
+HELP_TITLE = "**Vesper — Quick Reference**"
+
+
+def build_help_text() -> str:
+    """The preset reference text. Used by /help and the pinned message.
+
+    Opens with HELP_TITLE so the pin can be found and edited in place on
+    restart (Discord renders text literally, so no hidden marker is usable)."""
+    return (
+        f"{HELP_TITLE}\n"
+        "\n"
+        "Slash commands (work in any channel, only you can use them):\n"
+        "• `/schedule text:<timetable>` — set or replace your class timetable\n"
+        "   (if one already exists, re-run with `confirm:true` to replace it)\n"
+        "• `/note text:<note>` — save a quick note to NOTES.md\n"
+        "• `/finance text:<e.g. 12.50 food lunch>` — log an expense\n"
+        "• `/totals` — this month's spending summary\n"
+        "• `/list dir:<folder>` — list files in a vault folder\n"
+        "• `/delete path:<file>` — soft-delete a vault file (recoverable via /undo)\n"
+        "• `/undo` — undo the last vault action\n"
+        "• `/help` — show this message\n"
+        "\n"
+        "You can also:\n"
+        "• Just talk to me in #vesper\n"
+        "• Drop .pdf / .pptx lecture files in #inbox to get them summarized\n"
+        "• Use the text prefixes in their channels: `schedule:`, `note:`, "
+        "`delete:`, `list:`, `undo`, `totals`\n"
+    )
+
+
+def _slash_text(reaction: str | None, text: str | None) -> str:
+    """Map a helper's (reaction, text) result to an ephemeral slash reply.
+
+    Slash commands can't add reactions, so when a helper signals success
+    purely via a reaction (text is None) we substitute a short phrase."""
+    if text:
+        return text
+    return {"✅": "Done.", "❌": "Failed.", "❓": "Unrecognized."}.get(reaction or "", "Done.")
+
 
 async def _save_attachments_to_inbox(message) -> list[str]:
     """Download supported attachments to inbox/. Returns saved filenames."""
