@@ -333,7 +333,83 @@ def main() -> int:
     intents.guilds = True
 
     client = discord.Client(intents=intents)
+    tree = discord.app_commands.CommandTree(client)
+
+    def _is_owner(interaction) -> bool:
+        return bool(owner_id) and str(interaction.user.id) == owner_id
+
     self_id_holder: dict = {"id": None}
+
+    async def _deny(interaction) -> None:
+        await interaction.response.send_message("Not authorized.", ephemeral=True)
+
+    @tree.command(name="help", description="Show how to use the bot")
+    async def slash_help(interaction) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        await interaction.response.send_message(build_help_text(), ephemeral=True)
+
+    @tree.command(name="schedule", description="Set or replace your class timetable")
+    @discord.app_commands.describe(
+        text="The timetable text to parse",
+        confirm="Set true to replace an existing schedule",
+    )
+    async def slash_schedule(interaction, text: str = "", confirm: bool = False) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        if not text and not confirm:
+            return await interaction.response.send_message(
+                "Provide `text:` with your timetable, or `confirm:true` to apply a pending one.",
+                ephemeral=True,
+            )
+        reaction, msg = await asyncio.to_thread(run_schedule, text, confirm=confirm)
+        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+
+    @tree.command(name="note", description="Save a quick note to NOTES.md")
+    @discord.app_commands.describe(text="The note text")
+    async def slash_note(interaction, text: str) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        reaction, msg = await asyncio.to_thread(run_note, f"note: {text}")
+        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+
+    @tree.command(name="finance", description="Log an expense (e.g. 12.50 food lunch)")
+    @discord.app_commands.describe(text="Amount, category, and optional note")
+    async def slash_finance(interaction, text: str) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        reaction, msg = await asyncio.to_thread(run_finance, text)
+        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+
+    @tree.command(name="totals", description="This month's spending summary")
+    async def slash_totals(interaction) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        reaction, msg = await asyncio.to_thread(run_totals)
+        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+
+    @tree.command(name="list", description="List files in a vault folder")
+    @discord.app_commands.describe(dir="The vault folder to list")
+    async def slash_list(interaction, dir: str) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        reaction, msg = await asyncio.to_thread(run_verb, f"list: {dir}")
+        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+
+    @tree.command(name="delete", description="Soft-delete a vault file (recoverable via /undo)")
+    @discord.app_commands.describe(path="The vault file path to delete")
+    async def slash_delete(interaction, path: str) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        reaction, msg = await asyncio.to_thread(run_verb, f"delete: {path}")
+        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+
+    @tree.command(name="undo", description="Undo the last vault action")
+    async def slash_undo(interaction) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        reaction, msg = await asyncio.to_thread(run_verb, "undo")
+        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
 
     @client.event
     async def on_ready() -> None:
