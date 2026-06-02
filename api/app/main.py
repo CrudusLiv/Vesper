@@ -5,18 +5,22 @@ blocking `llm.call` (subprocess to the claude CLI, up to 120s) never blocks the
 event loop."""
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from . import bridge
 from .routes import chat, memory, status
 
-app = FastAPI(title="Vesper API")
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    # Read SOUL.md once so the first chat request isn't slowed by disk I/O.
+    bridge._soul()
+    yield
+
+
+app = FastAPI(title="Vesper API", lifespan=_lifespan)
 app.include_router(status.router, prefix="/api")
 app.include_router(memory.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
-
-
-@app.on_event("startup")
-def _warm_soul() -> None:
-    # Read SOUL.md once so the first chat request isn't slowed by disk I/O.
-    bridge._soul()
