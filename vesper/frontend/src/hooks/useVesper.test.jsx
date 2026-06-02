@@ -1,9 +1,19 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, test, vi } from 'vitest'
 import { StoreProvider, useStore } from '../state/store.jsx'
 import { useVesper } from './useVesper.js'
 import * as client from '../api/client.js'
+
+const mockSpeech = {
+  sttSupported: true,
+  ttsSupported: true,
+  startListening: vi.fn(),
+  stopListening: vi.fn(),
+  speak: vi.fn(),
+  cancelSpeech: vi.fn(),
+}
+vi.mock('./useSpeech.js', () => ({ useSpeech: () => mockSpeech }))
 
 afterEach(() => { vi.restoreAllMocks() })
 
@@ -45,4 +55,41 @@ test('a 401 from the status poll clears the stored secret and locks', async () =
   render(<StoreProvider><Harness /></StoreProvider>)
   await waitFor(() => expect(screen.getByTestId('unlocked')).toHaveTextContent('false'))
   expect(localStorage.getItem('vesper_secret')).toBeNull()
+})
+
+function VoiceHarness() {
+  const { state } = useStore()
+  const { startVoice } = useVesper()
+  return (
+    <div>
+      <button onClick={() => startVoice()}>mic</button>
+      <span data-testid="orb">{state.orb}</span>
+      <span data-testid="last">{state.chat.messages.at(-1)?.content ?? ''}</span>
+    </div>
+  )
+}
+
+test('startVoice sets orb listening, auto-sends the transcript, and speaks the reply', async () => {
+  vi.spyOn(client.api, 'status').mockResolvedValue({ integrations: {}, vault: {}, memory: 'ok' })
+  vi.spyOn(client.api, 'chat').mockResolvedValue({ reply: 'spoken reply', sources: [] })
+  let onTranscript
+  mockSpeech.startListening.mockImplementation((cb) => { onTranscript = cb })
+  render(<StoreProvider><VoiceHarness /></StoreProvider>)
+  await userEvent.click(screen.getByText('mic'))
+  expect(screen.getByTestId('orb')).toHaveTextContent('listening')
+  expect(mockSpeech.cancelSpeech).toHaveBeenCalled()
+  await act(async () => { onTranscript('hello vesper') })
+  await waitFor(() => expect(screen.getByTestId('last')).toHaveTextContent('spoken reply'))
+  expect(mockSpeech.speak).toHaveBeenCalled()
+  expect(mockSpeech.speak.mock.calls[0][0]).toBe('spoken reply')
+})
+
+test('typed sendChat does not speak', async () => {
+  vi.spyOn(client.api, 'status').mockResolvedValue({ integrations: {}, vault: {}, memory: 'ok' })
+  vi.spyOn(client.api, 'chat').mockResolvedValue({ reply: 'typed reply', sources: [] })
+  mockSpeech.speak.mockClear()
+  render(<StoreProvider><Harness /></StoreProvider>)
+  await userEvent.click(screen.getByText('send'))
+  await waitFor(() => expect(screen.getByTestId('last')).toHaveTextContent('typed reply'))
+  expect(mockSpeech.speak).not.toHaveBeenCalled()
 })
