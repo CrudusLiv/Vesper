@@ -1,16 +1,19 @@
 import { useCallback, useRef } from 'react'
 
 // Tuning + voice preference. Change these to adjust how Vesper sounds.
-const RATE = 0.95
-const PITCH = 0.9
+// Tuned for a younger, snappier tsundere read: pitch up, a touch quick. Drop
+// PITCH toward 1.0 and RATE toward 0.95 for a calmer/older delivery.
+const RATE = 1.05
+const PITCH = 1.25
 // Tried in order; first English voice matching the earliest tier wins. The old
 // Microsoft SAPI voices (Zira/David) are robotic, so they sit last — only used
-// when nothing better is installed. Google (Chrome) and Natural/Online (Edge)
-// neural voices sound far more human and are preferred.
+// when nothing better is installed. "Google US English" reads younger/brighter
+// (best for the tsundere tone); Natural/Online (Edge) are neural; other Google
+// voices beat SAPI.
 const VOICE_PREFERENCE = [
-  /google uk english female/i,            // Chrome — best local female
+  /google us english/i,                   // younger, brighter — best tsundere fit
   /natural|online/i,                      // Edge — Microsoft neural voices
-  /google.*female/i,                      // any Google female
+  /google.*female/i,                      // e.g. Google UK English Female
   /google/i,                              // any Google (still better than SAPI)
   /female|aria|jenny|hazel|susan|samantha|zira/i, // legacy SAPI fallback
 ]
