@@ -14,6 +14,7 @@ function Harness() {
     <div>
       <button onClick={() => sendChat('hi')}>send</button>
       <span data-testid="orb">{state.orb}</span>
+      <span data-testid="unlocked">{String(state.auth.unlocked)}</span>
       <span data-testid="count">{state.chat.messages.length}</span>
       <span data-testid="last">{state.chat.messages.at(-1)?.content ?? ''}</span>
     </div>
@@ -36,4 +37,12 @@ test('sendChat on LlmError pushes an error message and idles orb', async () => {
   await userEvent.click(screen.getByText('send'))
   await waitFor(() => expect(screen.getByTestId('last')).toHaveTextContent(/unavailable/i))
   expect(screen.getByTestId('orb')).toHaveTextContent('idle')
+})
+
+test('a 401 from the status poll clears the stored secret and locks', async () => {
+  localStorage.setItem('vesper_secret', 'stale')
+  vi.spyOn(client.api, 'status').mockRejectedValue(new client.AuthError())
+  render(<StoreProvider><Harness /></StoreProvider>)
+  await waitFor(() => expect(screen.getByTestId('unlocked')).toHaveTextContent('false'))
+  expect(localStorage.getItem('vesper_secret')).toBeNull()
 })
