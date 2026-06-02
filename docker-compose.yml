@@ -1,0 +1,35 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - CLAUDE_PROJECT_DIR=/workspace
+      - VAULT_PATH=/workspace/Dynamous/Memory
+      - API_SECRET=${API_SECRET}
+    volumes:
+      - ./Dynamous/Memory:/workspace/Dynamous/Memory:ro
+      - ./.claude/scripts:/workspace/.claude/scripts:ro
+      - ./.claude/data:/workspace/.claude/data
+      - ./.env:/workspace/.env:ro
+      - ./api:/workspace/api:ro
+    expose:
+      - "8000"
+    networks:
+      - vesper-net
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+    networks:
+      - vesper-net
+
+networks:
+  vesper-net:
