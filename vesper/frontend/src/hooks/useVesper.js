@@ -5,7 +5,7 @@ import { api, AuthError, clearSecret } from '../api/client.js'
 const STATUS_INTERVAL_MS = 15000
 const SPEAKING_MS = 1500
 
-export function useJarvis() {
+export function useVesper() {
   const { state, dispatch } = useStore()
 
   // A 401 means the stored secret is bad/stale: clear it from localStorage so

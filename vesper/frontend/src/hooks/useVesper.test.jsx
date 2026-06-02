@@ -2,14 +2,14 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, test, vi } from 'vitest'
 import { StoreProvider, useStore } from '../state/store.jsx'
-import { useJarvis } from './useJarvis.js'
+import { useVesper } from './useVesper.js'
 import * as client from '../api/client.js'
 
 afterEach(() => { vi.restoreAllMocks() })
 
 function Harness() {
   const { state } = useStore()
-  const { sendChat } = useJarvis()
+  const { sendChat } = useVesper()
   return (
     <div>
       <button onClick={() => sendChat('hi')}>send</button>

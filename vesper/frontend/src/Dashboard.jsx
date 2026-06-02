@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { useStore } from './state/store.jsx'
-import { useJarvis } from './hooks/useJarvis.js'
+import { useVesper } from './hooks/useVesper.js'
 import StatusBar from './components/StatusBar.jsx'
 import MemoryPanel from './components/MemoryPanel.jsx'
 import VoiceOrb from './components/VoiceOrb.jsx'
@@ -8,7 +8,7 @@ import ChatPanel from './components/ChatPanel.jsx'
 
 export default function Dashboard() {
   const { state } = useStore()
-  const { sendChat, search } = useJarvis()
+  const { sendChat, search } = useVesper()
   const debounce = useRef(null)
 
   function onSearch(q) {
