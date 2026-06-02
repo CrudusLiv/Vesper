@@ -25,3 +25,23 @@ body {
 }
 
 .mono { font-family: var(--mono); }
+
+/* VoiceOrb — Arc core */
+.orbwrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.orb { position: relative; width: 150px; height: 150px; display: flex; align-items: center; justify-content: center; }
+.orb .core {
+  width: 66px; height: 66px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #bcd8ff, #2d6cdf 55%, #11357a 100%);
+  box-shadow: 0 0 34px 8px rgba(45, 108, 223, 0.6);
+  animation: breathe 3.2s ease-in-out infinite;
+}
+.orb .ring { position: absolute; border: 2px solid rgba(91, 155, 255, 0.5); border-radius: 50%; }
+.orb .r1 { width: 106px; height: 106px; border-top-color: transparent; border-bottom-color: transparent; animation: spin 6s linear infinite; }
+.orb .r2 { width: 146px; height: 146px; border-left-color: transparent; border-right-color: transparent; animation: spin 9s linear infinite reverse; }
+.orb-thinking .r1 { animation-duration: 2s; }
+.orb-thinking .r2 { animation-duration: 3s; }
+.orb-speaking .core { animation-duration: 0.9s; }
+.orb-state { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+
+@keyframes breathe { 0%, 100% { transform: scale(1); opacity: 0.92; } 50% { transform: scale(1.1); opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
