@@ -77,6 +77,25 @@ test('speak picks a tuned female en voice and calls speechSynthesis.speak', () =
   expect(spoken[0].pitch).toBe(0.9)
 })
 
+test('speak prefers a Google neural voice over robotic Microsoft SAPI', () => {
+  const spoken = []
+  const synth = {
+    cancel: vi.fn(),
+    speak: (u) => spoken.push(u),
+    getVoices: () => [
+      { name: 'Microsoft David - English (United States)', lang: 'en-US' },
+      { name: 'Microsoft Zira - English (United States)', lang: 'en-US' },
+      { name: 'Google US English', lang: 'en-US' },
+      { name: 'Google UK English Female', lang: 'en-GB' },
+    ],
+  }
+  vi.stubGlobal('speechSynthesis', synth)
+  vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(t) { this.text = t } })
+  const { result } = renderHook(() => useSpeech())
+  act(() => result.current.speak('hi there', {}))
+  expect(spoken[0].voice.name).toBe('Google UK English Female')
+})
+
 test('cancelSpeech calls speechSynthesis.cancel', () => {
   const synth = { cancel: vi.fn(), speak: vi.fn(), getVoices: () => [] }
   vi.stubGlobal('speechSynthesis', synth)

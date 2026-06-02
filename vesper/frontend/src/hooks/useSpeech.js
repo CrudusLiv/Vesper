@@ -1,9 +1,19 @@
 import { useCallback, useRef } from 'react'
 
-// Tuning + voice heuristic. Change these to adjust how Vesper sounds.
+// Tuning + voice preference. Change these to adjust how Vesper sounds.
 const RATE = 0.95
 const PITCH = 0.9
-const FEMALE_HINT = /female|zira|aria|jenny|hazel|susan|samantha/i
+// Tried in order; first English voice matching the earliest tier wins. The old
+// Microsoft SAPI voices (Zira/David) are robotic, so they sit last — only used
+// when nothing better is installed. Google (Chrome) and Natural/Online (Edge)
+// neural voices sound far more human and are preferred.
+const VOICE_PREFERENCE = [
+  /google uk english female/i,            // Chrome — best local female
+  /natural|online/i,                      // Edge — Microsoft neural voices
+  /google.*female/i,                      // any Google female
+  /google/i,                              // any Google (still better than SAPI)
+  /female|aria|jenny|hazel|susan|samantha|zira/i, // legacy SAPI fallback
+]
 
 function recognitionCtor() {
   return globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition || null
@@ -15,7 +25,11 @@ function pickVoice() {
   const voices = synth.getVoices() || []
   if (!voices.length) return null
   const en = voices.filter((v) => /^en/i.test(v.lang))
-  return en.find((v) => FEMALE_HINT.test(v.name)) || en[0] || voices[0] || null
+  for (const re of VOICE_PREFERENCE) {
+    const match = en.find((v) => re.test(v.name))
+    if (match) return match
+  }
+  return en[0] || voices[0] || null
 }
 
 export function useSpeech() {
