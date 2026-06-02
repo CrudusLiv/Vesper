@@ -8,7 +8,7 @@ import ChatPanel from './components/ChatPanel.jsx'
 
 export default function Dashboard() {
   const { state } = useStore()
-  const { sendChat, search } = useVesper()
+  const { sendChat, search, startVoice, stopVoice, sttSupported } = useVesper()
   const debounce = useRef(null)
 
   function onSearch(q) {
@@ -27,7 +27,14 @@ export default function Dashboard() {
           <VoiceOrb state={state.orb} />
         </div>
         <div style={{ flex: '0 0 34%' }}>
-          <ChatPanel messages={state.chat.messages} pending={state.chat.pending} onSend={sendChat} />
+          <ChatPanel
+            messages={state.chat.messages}
+            pending={state.chat.pending}
+            onSend={sendChat}
+            voiceSupported={sttSupported}
+            listening={state.orb === 'listening'}
+            onMic={() => (state.orb === 'listening' ? stopVoice() : startVoice())}
+          />
         </div>
       </div>
     </div>
