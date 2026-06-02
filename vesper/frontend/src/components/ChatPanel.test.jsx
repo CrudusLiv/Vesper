@@ -30,3 +30,20 @@ test('does not send empty messages', async () => {
   await userEvent.type(screen.getByPlaceholderText(/message vesper/i), '   {enter}')
   expect(onSend).not.toHaveBeenCalled()
 })
+
+test('mic button is disabled when voice is unsupported', () => {
+  render(<ChatPanel messages={[]} pending={false} onSend={() => {}} voiceSupported={false} />)
+  expect(screen.getByRole('button', { name: /voice/i })).toBeDisabled()
+})
+
+test('mic button calls onMic when supported and clicked', async () => {
+  const onMic = vi.fn()
+  render(<ChatPanel messages={[]} pending={false} onSend={() => {}} voiceSupported onMic={onMic} />)
+  await userEvent.click(screen.getByRole('button', { name: /voice/i }))
+  expect(onMic).toHaveBeenCalled()
+})
+
+test('mic button reflects listening via aria-pressed', () => {
+  render(<ChatPanel messages={[]} pending={false} onSend={() => {}} voiceSupported listening onMic={() => {}} />)
+  expect(screen.getByRole('button', { name: /voice/i })).toHaveAttribute('aria-pressed', 'true')
+})

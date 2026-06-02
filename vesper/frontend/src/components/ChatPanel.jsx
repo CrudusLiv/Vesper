@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function ChatPanel({ messages, pending, onSend }) {
+export default function ChatPanel({ messages, pending, onSend, voiceSupported = false, listening = false, onMic = () => {} }) {
   const [text, setText] = useState('')
 
   function submit(e) {
@@ -45,9 +45,18 @@ export default function ChatPanel({ messages, pending, onSend }) {
         />
         <button
           type="button"
-          title="Voice (coming soon)"
+          onClick={onMic}
+          disabled={!voiceSupported}
           aria-label="voice"
-          style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent2)', cursor: 'not-allowed' }}
+          aria-pressed={listening}
+          title={voiceSupported ? (listening ? 'Stop listening' : 'Speak') : 'Voice not supported in this browser'}
+          style={{
+            width: 30, height: 30, borderRadius: '50%',
+            border: `1px solid ${listening ? 'var(--accent2)' : 'var(--accent)'}`,
+            background: listening ? 'var(--accent)' : 'transparent',
+            color: listening ? '#fff' : 'var(--accent2)',
+            cursor: voiceSupported ? 'pointer' : 'not-allowed',
+          }}
         >
           ◉
         </button>

@@ -10,3 +10,8 @@ test('applies the state as a class and shows the state label', () => {
   rerender(<VoiceOrb state="thinking" />)
   expect(screen.getByTestId('orb')).toHaveClass('orb-thinking')
 })
+
+test('applies orb-listening class for the listening state', () => {
+  render(<VoiceOrb state="listening" />)
+  expect(screen.getByTestId('orb')).toHaveClass('orb-listening')
+})
