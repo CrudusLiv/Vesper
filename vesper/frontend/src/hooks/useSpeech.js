@@ -11,9 +11,9 @@ const PITCH = 1.25
 // (best for the tsundere tone); Natural/Online (Edge) are neural; other Google
 // voices beat SAPI.
 const VOICE_PREFERENCE = [
-  /google us english/i,                   // younger, brighter — best tsundere fit
-  /natural|online/i,                      // Edge — Microsoft neural voices
-  /google.*female/i,                      // e.g. Google UK English Female
+  /google uk english female/i,            // smoothest local voice; holds the pitch-up cleanly
+  /natural|online/i,                      // Edge neural voices
+  /google.*female/i,                      // any Google female
   /google/i,                              // any Google (still better than SAPI)
   /female|aria|jenny|hazel|susan|samantha|zira/i, // legacy SAPI fallback
 ]

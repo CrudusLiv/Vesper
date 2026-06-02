@@ -93,7 +93,7 @@ test('speak prefers a Google neural voice over robotic Microsoft SAPI', () => {
   vi.stubGlobal('SpeechSynthesisUtterance', class { constructor(t) { this.text = t } })
   const { result } = renderHook(() => useSpeech())
   act(() => result.current.speak('hi there', {}))
-  expect(spoken[0].voice.name).toBe('Google US English')
+  expect(spoken[0].voice.name).toBe('Google UK English Female')
 })
 
 test('cancelSpeech calls speechSynthesis.cancel', () => {
