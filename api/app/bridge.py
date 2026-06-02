@@ -29,6 +29,7 @@ VAULT = Path(os.environ.get("VAULT_PATH") or (PROJECT_DIR / "Dynamous" / "Memory
 _START = time.time()
 
 MAX_TOP_K = 20
+_CHAT_MODEL = "haiku"  # claude CLI model slug passed to llm.call
 _SOUL_CACHE: str | None = None
 
 
@@ -72,6 +73,8 @@ def search(query: str, top_k: int = 5) -> dict:
         if not n:
             return {"results": [], "warning": "memory index unavailable"}
         hits = memory_search.hybrid_search(conn, query, top_k=top_k)
+    except Exception:
+        return {"results": [], "warning": "memory index unavailable"}
     finally:
         conn.close()
     results = [
@@ -109,7 +112,7 @@ def _build_prompt(message: str, history: list[dict], hits: list[dict]) -> str:
 def chat(message: str, history: list[dict]) -> dict:
     hits = search(message, top_k=5).get("results", [])
     prompt = _build_prompt(message, history, hits)
-    reply = llm.call(prompt, system_prompt=_soul() or None, model="haiku")
+    reply = llm.call(prompt, system_prompt=_soul() or None, model=_CHAT_MODEL)
     if not reply:
         raise LlmError("llm unavailable")
     sources = [{"path": h["path"], "heading": h["heading"], "score": h["score"]} for h in hits]

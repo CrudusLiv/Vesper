@@ -1,3 +1,4 @@
+import pytest
 import app.bridge as bridge
 
 
@@ -61,8 +62,5 @@ def test_chat_happy_path(monkeypatch):
 def test_chat_raises_on_empty_llm(monkeypatch):
     monkeypatch.setattr(bridge, "search", lambda message, top_k=5: {"results": []})
     monkeypatch.setattr(bridge.llm, "call", lambda *a, **k: "")
-    try:
+    with pytest.raises(bridge.LlmError):
         bridge.chat("hello", history=[])
-        assert False, "expected LlmError"
-    except bridge.LlmError:
-        pass
