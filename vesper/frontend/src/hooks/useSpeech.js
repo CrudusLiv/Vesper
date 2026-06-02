@@ -10,8 +10,11 @@ const PITCH = 1.25
 // when nothing better is installed. "Google US English" reads younger/brighter
 // (best for the tsundere tone); Natural/Online (Edge) are neural; other Google
 // voices beat SAPI.
+// Each tier is matched against "<name> <lang>" across ALL voices, so the
+// Japanese tier can match by lang and read English with a Japanese accent.
 const VOICE_PREFERENCE = [
-  /google uk english female/i,            // smoothest local voice; holds the pitch-up cleanly
+  /ja[-_]?jp|日本語|japanese/i,            // Japanese voice → accented English (anime tone)
+  /google uk english female/i,            // smoothest English; holds the pitch-up cleanly
   /natural|online/i,                      // Edge neural voices
   /google.*female/i,                      // any Google female
   /google/i,                              // any Google (still better than SAPI)
@@ -27,12 +30,11 @@ function pickVoice() {
   if (!synth || typeof synth.getVoices !== 'function') return null
   const voices = synth.getVoices() || []
   if (!voices.length) return null
-  const en = voices.filter((v) => /^en/i.test(v.lang))
   for (const re of VOICE_PREFERENCE) {
-    const match = en.find((v) => re.test(v.name))
+    const match = voices.find((v) => re.test(`${v.name} ${v.lang}`))
     if (match) return match
   }
-  return en[0] || voices[0] || null
+  return voices.find((v) => /^en/i.test(v.lang)) || voices[0] || null
 }
 
 export function useSpeech() {
@@ -76,7 +78,10 @@ export function useSpeech() {
     synth.cancel()
     const u = new Utter(text)
     const voice = pickVoice()
-    if (voice) u.voice = voice
+    if (voice) {
+      u.voice = voice
+      u.lang = voice.lang // match the voice's locale (e.g. ja-JP) so it engages correctly
+    }
     u.rate = RATE
     u.pitch = PITCH
     if (onStart) u.onstart = onStart
