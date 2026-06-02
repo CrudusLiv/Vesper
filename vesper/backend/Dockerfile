@@ -1,4 +1,4 @@
-# Build context is the repo ROOT (see docker-compose.yml).
+# Build context is vesper/backend (see vesper/docker-compose.yml).
 FROM python:3.14-slim
 
 # System libs: libgomp1 for onnxruntime (fastembed); curl/gnupg to add NodeSource.
@@ -11,13 +11,13 @@ RUN apt-get update \
 # The claude CLI (used by llm.py via subprocess).
 RUN npm install -g @anthropic-ai/claude-code
 
-WORKDIR /workspace/api
+WORKDIR /workspace/backend
 
-COPY api/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy api source for standalone builds; compose also bind-mounts ./api over this.
-COPY api/ /workspace/api/
+# Copy backend source for standalone builds; compose also bind-mounts it over this.
+COPY . /workspace/backend/
 
 ENV CLAUDE_PROJECT_DIR=/workspace \
     VAULT_PATH=/workspace/Dynamous/Memory \

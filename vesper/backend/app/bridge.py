@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2])
+PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
 _SCRIPTS = PROJECT_DIR / ".claude" / "scripts"
 for _p in (_SCRIPTS, _SCRIPTS / "integrations", _SCRIPTS / "memory"):
     _sp = str(_p)
