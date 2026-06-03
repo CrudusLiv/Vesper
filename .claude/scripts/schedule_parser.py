@@ -12,15 +12,17 @@ from heartbeat import llm
 _PARSE_PROMPT = """\
 Extract EVERY class/lecture/tutorial entry from this timetable as JSON.
 Return ONLY a JSON array, no other text:
-[{{"course": "CS101", "days": ["Mon","Wed","Fri"], "start": "08:00", "end": "09:30", "type": "lecture"}}, ...]
+[{{"course": "CS101", "days": ["Mon","Wed","Fri"], "start": "08:00", "end": "09:30", "type": "lecture", "location": "Room A1"}}, ...]
 
 Rules:
 - Extract every entry. Do NOT skip, drop, summarise, or invent entries.
 - Emit one object per (course, day, start time). Only combine multiple days into
-  one object when the SAME course runs at the SAME start AND end time on each.
+  one object when the SAME course runs at the SAME start AND end time AND the
+  SAME location on each.
 - Days must use 3-letter abbreviations: Mon Tue Wed Thu Fri Sat Sun.
 - Times must be HH:MM (24-hour); convert am/pm (e.g. 2pm -> 14:00, 2:30pm -> 14:30).
 - "type" is the parenthesised kind, lowercased (e.g. lecture, tutorial); default "class".
+- "location" is the room/venue (e.g. EMPH, BLH2.2, ALH2.6, Online); use "" if none.
 - Include every entry from the input — do not omit any. Output the JSON array only.
 
 Timetable:
@@ -61,7 +63,9 @@ def parse_timetable(text: str) -> tuple[list[dict], str]:
     try:
         for e in entries:
             days_str = "/".join(e.get("days", []))
-            parts.append(f"{e['course']} {days_str} {e['start']}–{e['end']}")
+            loc = e.get("location", "")
+            suffix = f" @ {loc}" if loc else ""
+            parts.append(f"{e['course']} {days_str} {e['start']}–{e['end']}{suffix}")
     except (KeyError, TypeError, AttributeError) as exc:
         raise ValueError(f"empty or malformed JSON from LLM: {exc}") from exc
     return entries, ", ".join(parts)
@@ -103,7 +107,9 @@ def _course_colors(entries: list[dict]) -> dict[str, str]:
 
 
 def _strip_color(cell: str) -> str:
-    """Remove palette emoji from a cell (for the monospace Discord grid)."""
+    """Reduce a grid cell to bare course code for the monospace Discord grid:
+    drop the palette emoji and any `<br>location` second line."""
+    cell = cell.split("<br>")[0]
     for emo in _PALETTE:
         cell = cell.replace(emo, "")
     return cell.strip()
@@ -148,7 +154,12 @@ def write_schedule(entries: list[dict]) -> None:
             cells = [st]
             for abbr in _weekdays_abbr:
                 match = next((e for e in entries if e["start"] == st and abbr in e.get("days", [])), None)
-                cells.append(f"{colors.get(match['course'], '')} {match['course']}".strip() if match else "")
+                if not match:
+                    cells.append("")
+                    continue
+                cell = f"{colors.get(match['course'], '')} {match['course']}".strip()
+                loc = match.get("location", "")
+                cells.append(f"{cell}<br>{loc}" if loc else cell)
             grid_rows.append("| " + " | ".join(cells) + " |")
     else:
         grid_rows.append("|      |     |     |     |     |     |")
@@ -171,7 +182,9 @@ def write_schedule(entries: list[dict]) -> None:
                     f"> - ⬜ {_fmt_time(prev_end)}–{cls['start']} — free ({_fmt_duration(gap)})"
                 )
             emo = colors.get(cls["course"], "")
-            lines.append(f"> - {emo} {cls['start']}–{cls['end']} **{cls['course']}** ({cls['type']})")
+            loc = cls.get("location", "")
+            loc_str = f" · 📍 {loc}" if loc else ""
+            lines.append(f"> - {emo} {cls['start']}–{cls['end']} **{cls['course']}** ({cls['type']}){loc_str}")
             prev_end = _parse_time(cls["end"])
         breakdown_sections.append("\n".join(lines))
 
