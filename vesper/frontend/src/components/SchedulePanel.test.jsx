@@ -22,3 +22,13 @@ test('a 409 shows the replace dialog, then confirming re-saves with confirm=true
   await userEvent.click(screen.getByRole('button', { name: /^replace$/i }))
   expect(onSave).toHaveBeenLastCalledWith('tue 10-11 cs', true)
 })
+
+test('a non-conflict error shows a parse-error status, not the replace dialog', async () => {
+  const onLoad = vi.fn().mockResolvedValue({ schedule: null })
+  const onSave = vi.fn().mockRejectedValue(new Error('boom'))
+  render(<SchedulePanel onLoad={onLoad} onSave={onSave} />)
+  await userEvent.type(screen.getByPlaceholderText(/timetable/i), 'tue 10-11 cs')
+  await userEvent.click(screen.getByRole('button', { name: /set schedule/i }))
+  expect(await screen.findByText(/could not parse/i)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /^replace$/i })).not.toBeInTheDocument()
+})

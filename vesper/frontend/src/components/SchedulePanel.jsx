@@ -12,6 +12,7 @@ export default function SchedulePanel({ onLoad, onSave }) {
   }, [onLoad])
 
   async function save(confirm) {
+    if (!text.trim()) return
     setStatus('')
     try {
       const r = await onSave(text, confirm)
