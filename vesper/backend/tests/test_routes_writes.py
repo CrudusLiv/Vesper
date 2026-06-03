@@ -35,3 +35,22 @@ def test_finance_summary_ok(monkeypatch):
     r = client.get("/api/finance/summary", headers=AUTH)
     assert r.status_code == 200
     assert "RM5.00" in r.json()["summary"]
+
+
+def test_note_requires_auth():
+    assert client.post("/api/note", json={"text": "hi"}).status_code == 401
+
+
+def test_note_ok(monkeypatch):
+    monkeypatch.setattr(bridge, "note_append", lambda text: {"ok": True, "appended_chars": len(text)})
+    r = client.post("/api/note", headers=AUTH, json={"text": "buy milk"})
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+
+
+def test_note_empty_is_422(monkeypatch):
+    def boom(text):
+        raise ValueError("empty")
+    monkeypatch.setattr(bridge, "note_append", boom)
+    r = client.post("/api/note", headers=AUTH, json={"text": "   "})
+    assert r.status_code == 422
