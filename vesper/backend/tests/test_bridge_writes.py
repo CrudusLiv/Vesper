@@ -37,3 +37,34 @@ def test_note_append_empty_raises(monkeypatch, tmp_path):
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
     with pytest.raises(ValueError):
         bridge.note_append("   ")
+
+
+def test_schedule_get_returns_rendered(monkeypatch):
+    monkeypatch.setattr(bridge.schedule_parser, "format_for_discord", lambda: "Mon 9-10 Maths")
+    assert bridge.schedule_get() == {"schedule": "Mon 9-10 Maths"}
+
+
+def test_schedule_set_writes_when_none_exists(monkeypatch):
+    monkeypatch.setattr(bridge.llm, "is_available", lambda: True)
+    monkeypatch.setattr(bridge.schedule_parser, "parse_timetable", lambda text: ([{"day": "mon"}], "1 entry"))
+    monkeypatch.setattr(bridge.schedule_parser, "has_existing_schedule", lambda: False)
+    written = {}
+    monkeypatch.setattr(bridge.schedule_parser, "write_schedule", lambda entries: written.update({"e": entries}))
+    out = bridge.schedule_set("mon 9-10 maths", confirm=False)
+    assert out == {"written": True, "summary": "1 entry"}
+    assert written["e"] == [{"day": "mon"}]
+
+
+def test_schedule_set_needs_confirm_when_exists(monkeypatch):
+    monkeypatch.setattr(bridge.llm, "is_available", lambda: True)
+    monkeypatch.setattr(bridge.schedule_parser, "parse_timetable", lambda text: ([{"day": "mon"}], "1 entry"))
+    monkeypatch.setattr(bridge.schedule_parser, "has_existing_schedule", lambda: True)
+    monkeypatch.setattr(bridge.schedule_parser, "write_schedule", lambda entries: pytest.fail("should not write"))
+    out = bridge.schedule_set("mon 9-10 maths", confirm=False)
+    assert out == {"written": False, "summary": "1 entry"}
+
+
+def test_schedule_set_raises_when_llm_down(monkeypatch):
+    monkeypatch.setattr(bridge.llm, "is_available", lambda: False)
+    with pytest.raises(bridge.LlmError):
+        bridge.schedule_set("anything", confirm=False)

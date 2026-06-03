@@ -25,6 +25,7 @@ from memory import memory_search  # noqa: E402
 from memory import db as memory_db  # noqa: E402
 from heartbeat import llm  # noqa: E402
 from finance import tracker  # noqa: E402
+import schedule_parser  # noqa: E402
 from heartbeat import discord_dm_capture  # noqa: E402
 from datetime import datetime, timedelta, timezone  # noqa: E402
 
@@ -153,3 +154,17 @@ def note_append(text: str) -> dict:
     if not stripped:
         raise ValueError("note was empty after stripping")
     return {"ok": True, "appended_chars": len(stripped)}
+
+
+def schedule_get() -> dict:
+    return {"schedule": schedule_parser.format_for_discord()}
+
+
+def schedule_set(text: str, confirm: bool = False) -> dict:
+    if not llm.is_available():
+        raise LlmError("llm unavailable")
+    entries, summary = schedule_parser.parse_timetable(text)
+    if schedule_parser.has_existing_schedule() and not confirm:
+        return {"written": False, "summary": summary}
+    schedule_parser.write_schedule(entries)
+    return {"written": True, "summary": summary}
