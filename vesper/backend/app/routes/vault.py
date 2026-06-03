@@ -33,4 +33,7 @@ def vault_delete(req: PathRequest, _: None = Depends(require_auth)):
 
 @router.post("/vault/undo")
 def vault_undo(_: None = Depends(require_auth)):
-    return bridge.vault_undo()
+    try:
+        return bridge.vault_undo()
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))

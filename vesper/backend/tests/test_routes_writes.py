@@ -134,3 +134,41 @@ def test_vault_undo_ok(monkeypatch):
     r = client.post("/api/vault/undo", headers=AUTH)
     assert r.status_code == 200
     assert "undo" in r.json()["message"]
+
+
+def test_vault_undo_conflict_is_409(monkeypatch):
+    def boom():
+        raise FileExistsError("cannot restore notes/x.md: file exists at destination")
+    monkeypatch.setattr(bridge, "vault_undo", boom)
+    r = client.post("/api/vault/undo", headers=AUTH)
+    assert r.status_code == 409
+
+
+def test_finance_mixed_case_category_totals_correct(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    r = client.post("/api/finance", headers=AUTH, json={"amount": 7.0, "category": "Food", "note": ""})
+    assert r.status_code == 200
+    body = r.json()
+    # category total must reflect the RM7 entry, not 0.0 from a case mismatch
+    assert body["category_total"] == 7.0
+    assert body["month_total"] == 7.0
+
+
+def test_finance_summary_requires_auth():
+    assert client.get("/api/finance/summary").status_code == 401
+
+
+def test_schedule_get_requires_auth():
+    assert client.get("/api/schedule").status_code == 401
+
+
+def test_schedule_set_requires_auth():
+    assert client.post("/api/schedule", json={"text": "x"}).status_code == 401
+
+
+def test_vault_delete_requires_auth():
+    assert client.post("/api/vault/delete", json={"path": "notes/x.md"}).status_code == 401
+
+
+def test_vault_undo_requires_auth():
+    assert client.post("/api/vault/undo").status_code == 401

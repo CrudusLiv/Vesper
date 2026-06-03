@@ -19,7 +19,7 @@ def finance(req: FinanceRequest, _: None = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="amount must be positive")
     if not req.category.strip():
         raise HTTPException(status_code=400, detail="category required")
-    return bridge.finance_log(req.amount, req.category.strip(), req.note)
+    return bridge.finance_log(req.amount, req.category.strip().lower(), req.note)
 
 
 @router.get("/finance/summary")
