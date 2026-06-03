@@ -26,6 +26,8 @@ from memory import db as memory_db  # noqa: E402
 from heartbeat import llm  # noqa: E402
 from finance import tracker  # noqa: E402
 import schedule_parser  # noqa: E402
+from vault import actions as vault_actions  # noqa: E402
+from vault import paths as vault_paths  # noqa: E402
 from heartbeat import discord_dm_capture  # noqa: E402
 from datetime import datetime, timedelta, timezone  # noqa: E402
 
@@ -168,3 +170,21 @@ def schedule_set(text: str, confirm: bool = False) -> dict:
         return {"written": False, "summary": summary}
     schedule_parser.write_schedule(entries)
     return {"written": True, "summary": summary}
+
+
+def vault_list(directory: str = "") -> dict:
+    res = vault_actions.list_dir(directory)
+    root = vault_paths.vault()
+    entries = [
+        {"name": name, "is_dir": (root / directory / name).is_dir()}
+        for name in res["entries"]
+    ]
+    return {"directory": res["directory"], "entries": entries}
+
+
+def vault_delete(path: str) -> dict:
+    return vault_actions.delete(path)
+
+
+def vault_undo() -> dict:
+    return vault_actions.undo()

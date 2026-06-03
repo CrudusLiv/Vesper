@@ -68,3 +68,45 @@ def test_schedule_set_raises_when_llm_down(monkeypatch):
     monkeypatch.setattr(bridge.llm, "is_available", lambda: False)
     with pytest.raises(bridge.LlmError):
         bridge.schedule_set("anything", confirm=False)
+
+
+def _seed_vault(tmp_path):
+    notes = tmp_path / "Dynamous" / "Memory" / "notes"
+    notes.mkdir(parents=True, exist_ok=True)
+    (notes / "todo.md").write_text("# todo\n", encoding="utf-8")
+    (tmp_path / "Dynamous" / "Memory" / "lectures").mkdir(parents=True, exist_ok=True)
+
+
+def test_vault_list_marks_dirs(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    _seed_vault(tmp_path)
+    out = bridge.vault_list("")
+    names = {e["name"]: e["is_dir"] for e in out["entries"]}
+    assert names["notes"] is True
+    assert names["lectures"] is True
+
+
+def test_vault_list_files_marked_not_dir(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    _seed_vault(tmp_path)
+    out = bridge.vault_list("notes")
+    assert out["entries"] == [{"name": "todo.md", "is_dir": False}]
+
+
+def test_vault_delete_then_undo_round_trip(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    _seed_vault(tmp_path)
+    target = tmp_path / "Dynamous" / "Memory" / "notes" / "todo.md"
+    deleted = bridge.vault_delete("notes/todo.md")
+    assert "trash_path" in deleted
+    assert not target.exists()
+    msg = bridge.vault_undo()
+    assert "restored" in msg["message"].lower()
+    assert target.exists()
+
+
+def test_vault_list_forbidden_prefix_raises(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    _seed_vault(tmp_path)
+    with pytest.raises(ValueError):
+        bridge.vault_list("finance")
