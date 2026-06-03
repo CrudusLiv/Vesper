@@ -97,19 +97,20 @@ def test_write_schedule_sets_updated_today(tmp_vault):
 def test_write_schedule_day_breakdown_has_sections(tmp_vault):
     schedule_parser.write_schedule(_SAMPLE_ENTRIES)
     content = (tmp_vault / "SCHEDULE.md").read_text(encoding="utf-8")
-    assert "## Day Breakdown" in content
-    assert "### Monday" in content
-    assert "### Wednesday" in content
-    assert "### Friday" in content
-    assert "### Tuesday" in content
-    assert "### Thursday" in content
+    # Day sections are collapsible [!example] callouts (collapsed by default).
+    assert "> [!example]- Monday" in content
+    assert "> [!example]- Wednesday" in content
+    assert "> [!example]- Friday" in content
+    assert "> [!example]- Tuesday" in content
+    assert "> [!example]- Thursday" in content
 
 
 def test_write_schedule_day_breakdown_has_class_lines(tmp_vault):
     schedule_parser.write_schedule(_SAMPLE_ENTRIES)
     content = (tmp_vault / "SCHEDULE.md").read_text(encoding="utf-8")
-    assert "08:00–09:30 CS101 (class)" in content
-    assert "10:00–11:30 MAT101 (class)" in content
+    # Course is bold-emphasised and colour-prefixed in the new format.
+    assert "08:00–09:30 **CS101** (class)" in content
+    assert "10:00–11:30 **MAT101** (class)" in content
 
 
 _GAPPED_ENTRIES = [
@@ -138,13 +139,46 @@ def test_write_schedule_preserves_semester_on_overwrite(tmp_vault):
 def test_write_schedule_weekly_grid_shows_course_in_correct_cell(tmp_vault):
     schedule_parser.write_schedule(_SAMPLE_ENTRIES)
     content = (tmp_vault / "SCHEDULE.md").read_text(encoding="utf-8")
-    assert "## Weekly Grid" in content
+    # Grid lives in a [!tip] callout, so rows are quote-prefixed.
+    assert "[!tip]+ Weekly Grid" in content
     for line in content.splitlines():
-        if line.startswith("| 08:00"):
+        if line.startswith("> | 08:00"):
             assert line.count("CS101") == 3
             break
     else:
         pytest.fail("08:00 row not found in Weekly Grid")
+
+
+_LOCATED_ENTRIES = [
+    {"course": "CS101", "days": ["Mon"], "start": "08:00", "end": "09:30",
+     "type": "lecture", "location": "Room A1"},
+    {"course": "CS101", "days": ["Wed"], "start": "08:00", "end": "09:30",
+     "type": "lecture", "location": "Online"},
+]
+
+
+def test_write_schedule_includes_location(tmp_vault):
+    schedule_parser.write_schedule(_LOCATED_ENTRIES)
+    content = (tmp_vault / "SCHEDULE.md").read_text(encoding="utf-8")
+    # Breakdown shows the room with a pin; grid puts it on a second line.
+    assert "📍 Room A1" in content
+    assert "CS101<br>Room A1" in content
+
+
+def test_schedule_view_structure(tmp_vault):
+    schedule_parser.write_schedule(_SAMPLE_ENTRIES)
+    view = schedule_parser.schedule_view()
+    assert view is not None
+    assert view["semester"] == "TBD"
+    assert view["grid"]  # aligned monospace grid, course-only (no emoji)
+    assert "🟦" not in view["grid"]
+    days = {d["day"]: d["lines"] for d in view["days"]}
+    assert set(days) == {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday"}
+    assert any("CS101" in ln for ln in days["Monday"])
+
+
+def test_schedule_view_none_when_missing(tmp_vault):
+    assert schedule_parser.schedule_view() is None
 
 
 def test_has_existing_schedule_false_when_file_missing(tmp_vault):

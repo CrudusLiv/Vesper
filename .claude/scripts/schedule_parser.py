@@ -239,12 +239,15 @@ def _align_grid(grid_lines: list[str]) -> str:
     return "\n".join(out)
 
 
-def format_for_discord() -> str | None:
-    """Render the active SCHEDULE.md for a Discord message: an aligned weekly
-    grid in a code fence followed by the day breakdown. Obsidian callout/quote
-    markup is stripped (Discord can't render it); colour emoji are kept in the
-    breakdown but dropped from the monospace grid. Returns None when no schedule
-    exists yet."""
+def schedule_view() -> dict | None:
+    """Structured view of the active SCHEDULE.md for rich rendering (e.g. a
+    Discord embed). Returns None when no schedule exists. Shape:
+
+        {"semester": str, "updated": str, "grid": str,
+         "days": [{"day": str, "lines": [str, ...]}, ...]}
+
+    `grid` is the monospace-aligned weekly grid (course-only, emoji stripped);
+    each day line keeps its colour emoji and room (callout/quote markup removed)."""
     path = _vault() / "SCHEDULE.md"
     if not path.exists():
         return None
@@ -256,30 +259,46 @@ def format_for_discord() -> str | None:
         s = line.strip()
         return s[1:].strip() if s.startswith(">") else s
 
-    parts: list[str] = []
+    sm = re.search(r"^semester:\s*(.+)$", text, re.MULTILINE)
+    um = re.search(r"^updated:\s*(.+)$", text, re.MULTILINE)
+    grid = _align_grid([ln for ln in text.splitlines() if _unquote(ln).startswith("|")])
 
-    # Weekly grid: the file's single markdown table, aligned (emoji stripped).
-    table_lines = [ln for ln in text.splitlines() if _unquote(ln).startswith("|")]
-    grid = _align_grid(table_lines)
-    if grid:
-        parts.append("**Weekly Grid**\n```\n" + grid + "\n```")
-
-    # Day breakdown: day headers (callout or heading) become bold; their bullet
-    # lines follow.
     _day_re = re.compile(_DAY_HEADER)
-    out: list[str] = []
-    in_day = False
+    days: list[dict] = []
+    current: dict | None = None
     for ln in text.splitlines():
         s = _unquote(ln)
         dm = _day_re.match(s)
         if dm:
-            out.append(f"**{dm.group(1)}**")
-            in_day = True
-        elif in_day and s.startswith("-"):
-            out.append(s)
-    if out:
-        parts.append("**Day Breakdown**\n" + "\n".join(out))
+            current = {"day": dm.group(1), "lines": []}
+            days.append(current)
+        elif current is not None and s.startswith("-"):
+            current["lines"].append(s.lstrip("-").strip())
 
+    return {
+        "semester": sm.group(1).strip() if sm else "",
+        "updated": um.group(1).strip() if um else "",
+        "grid": grid,
+        "days": days,
+    }
+
+
+def format_for_discord() -> str | None:
+    """Plain-text Discord rendering of the schedule (fallback for non-embed
+    callers): an aligned grid code fence followed by the day breakdown. Returns
+    None when no schedule exists yet."""
+    data = schedule_view()
+    if not data:
+        return None
+    parts: list[str] = []
+    if data["grid"]:
+        parts.append("**Weekly Grid**\n```\n" + data["grid"] + "\n```")
+    if data["days"]:
+        out: list[str] = []
+        for d in data["days"]:
+            out.append(f"**{d['day']}**")
+            out.extend(f"- {ln}" for ln in d["lines"])
+        parts.append("**Day Breakdown**\n" + "\n".join(out))
     return "\n\n".join(parts) if parts else None
 
 
