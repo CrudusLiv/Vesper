@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, expect, test, vi } from 'vitest'
-import { api, AuthError, LlmError, ApiError, getSecret, setSecret, clearSecret } from './client.js'
+import { api, AuthError, LlmError, ApiError, ConflictError, getSecret, setSecret, clearSecret } from './client.js'
 
 beforeEach(() => {
   localStorage.clear()
@@ -72,4 +72,78 @@ test('chat posts message and history as JSON', async () => {
   const [, opts] = f.mock.calls[0]
   expect(opts.method).toBe('POST')
   expect(JSON.parse(opts.body)).toEqual({ message: 'hi', history: [{ role: 'user', content: 'prev' }] })
+})
+
+test('finance posts amount/category/note as JSON', async () => {
+  setSecret('s')
+  const f = mockFetch(200, { month_total: 5, category_total: 5, currency: 'RM', date: 'x' })
+  vi.stubGlobal('fetch', f)
+  await api.finance(5, 'food', 'lunch')
+  const [url, opts] = f.mock.calls[0]
+  expect(url).toBe('/api/finance')
+  expect(opts.method).toBe('POST')
+  expect(JSON.parse(opts.body)).toEqual({ amount: 5, category: 'food', note: 'lunch' })
+})
+
+test('financeSummary GETs the summary', async () => {
+  setSecret('s'); const f = mockFetch(200, { summary: 'x' }); vi.stubGlobal('fetch', f)
+  await api.financeSummary()
+  expect(f.mock.calls[0][0]).toBe('/api/finance/summary')
+})
+
+test('note posts text', async () => {
+  setSecret('s'); const f = mockFetch(200, { ok: true }); vi.stubGlobal('fetch', f)
+  await api.note('hello')
+  const [url, opts] = f.mock.calls[0]
+  expect(url).toBe('/api/note')
+  expect(opts.method).toBe('POST')
+  expect(JSON.parse(opts.body)).toEqual({ text: 'hello' })
+})
+
+test('getSchedule GETs the schedule', async () => {
+  setSecret('s'); const f = mockFetch(200, { schedule: null }); vi.stubGlobal('fetch', f)
+  await api.getSchedule()
+  expect(f.mock.calls[0][0]).toBe('/api/schedule')
+})
+
+test('setSchedule posts text and confirm', async () => {
+  setSecret('s'); const f = mockFetch(200, { summary: 'ok' }); vi.stubGlobal('fetch', f)
+  await api.setSchedule('mon 9-10 maths', true)
+  const [url, opts] = f.mock.calls[0]
+  expect(url).toBe('/api/schedule')
+  expect(opts.method).toBe('POST')
+  expect(JSON.parse(opts.body)).toEqual({ text: 'mon 9-10 maths', confirm: true })
+})
+
+test('setSchedule 409 throws ConflictError carrying the body', async () => {
+  setSecret('s'); vi.stubGlobal('fetch', mockFetch(409, { summary: 'preview', exists: true }))
+  await expect(api.setSchedule('x', false)).rejects.toBeInstanceOf(ConflictError)
+})
+
+test('setSchedule 409 error exposes .data', async () => {
+  setSecret('s'); vi.stubGlobal('fetch', mockFetch(409, { summary: 'preview', exists: true }))
+  expect.assertions(1)
+  await api.setSchedule('x', false).catch((err) => {
+    expect(err.data).toEqual({ summary: 'preview', exists: true })
+  })
+})
+
+test('vaultList encodes the dir query', async () => {
+  setSecret('s'); const f = mockFetch(200, { directory: 'a/b', entries: [] }); vi.stubGlobal('fetch', f)
+  await api.vaultList('a/b')
+  expect(f.mock.calls[0][0]).toBe('/api/vault/list?dir=a%2Fb')
+})
+
+test('vaultDelete posts the path', async () => {
+  setSecret('s'); const f = mockFetch(200, { path: 'notes/x.md', trash_path: '_trash/x.md' }); vi.stubGlobal('fetch', f)
+  await api.vaultDelete('notes/x.md')
+  expect(f.mock.calls[0][0]).toBe('/api/vault/delete')
+  expect(JSON.parse(f.mock.calls[0][1].body)).toEqual({ path: 'notes/x.md' })
+})
+
+test('vaultUndo POSTs undo', async () => {
+  setSecret('s'); const f = mockFetch(200, { message: 'nothing to undo' }); vi.stubGlobal('fetch', f)
+  await api.vaultUndo()
+  expect(f.mock.calls[0][0]).toBe('/api/vault/undo')
+  expect(f.mock.calls[0][1].method).toBe('POST')
 })
