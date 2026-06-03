@@ -389,8 +389,12 @@ def main() -> int:
             for extra in chunks[1:]:
                 await interaction.followup.send(extra, ephemeral=True)
             return
+        # Parsing routes through an LLM subprocess (run_schedule -> parse_timetable),
+        # which far exceeds Discord's ~3s interaction-ack deadline. Defer first to ACK
+        # immediately, then deliver the result via followup.
+        await interaction.response.defer(ephemeral=True)
         reaction, msg = await asyncio.to_thread(run_schedule, text, confirm=confirm)
-        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+        await interaction.followup.send(_slash_text(reaction, msg), ephemeral=True)
 
     @tree.command(name="note", description="Save a quick note to NOTES.md")
     @discord.app_commands.describe(text="The note text")
