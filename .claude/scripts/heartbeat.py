@@ -400,7 +400,12 @@ def _too_soon() -> bool:
     Windows Task Scheduler fires missed intervals back-to-back when the machine
     wakes up late. This guard silently drops any extra run inside the window.
     tick_started_at is written at the very start of a tick so concurrent
-    second instances see it even before the tick completes."""
+    second instances see it even before the tick completes.
+
+    HEARTBEAT_FORCE=1 (set by the scheduler's sentinel pickup for a manual
+    /api/heartbeat/run) bypasses the guard so a deliberate trigger always runs."""
+    if os.environ.get("HEARTBEAT_FORCE") == "1":
+        return False
     prev = snapshot.load_state()
     if not prev:
         return False
