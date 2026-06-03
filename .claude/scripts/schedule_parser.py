@@ -10,12 +10,18 @@ from pathlib import Path
 from heartbeat import llm
 
 _PARSE_PROMPT = """\
-Extract all class/lecture entries from this timetable as JSON.
+Extract EVERY class/lecture/tutorial entry from this timetable as JSON.
 Return ONLY a JSON array, no other text:
-[{{"course": "CS101", "days": ["Mon","Wed","Fri"], "start": "08:00", "end": "09:30", "type": "class"}}, ...]
+[{{"course": "CS101", "days": ["Mon","Wed","Fri"], "start": "08:00", "end": "09:30", "type": "lecture"}}, ...]
 
-Days must use 3-letter abbreviations: Mon Tue Wed Thu Fri Sat Sun.
-Times must be HH:MM (24-hour).
+Rules:
+- Extract every entry. Do NOT skip, drop, summarise, or invent entries.
+- Emit one object per (course, day, start time). Only combine multiple days into
+  one object when the SAME course runs at the SAME start AND end time on each.
+- Days must use 3-letter abbreviations: Mon Tue Wed Thu Fri Sat Sun.
+- Times must be HH:MM (24-hour); convert am/pm (e.g. 2pm -> 14:00, 2:30pm -> 14:30).
+- "type" is the parenthesised kind, lowercased (e.g. lecture, tutorial); default "class".
+- Include every entry from the input — do not omit any. Output the JSON array only.
 
 Timetable:
 {text}"""
@@ -45,7 +51,10 @@ def _pending_path() -> Path:
 def parse_timetable(text: str) -> tuple[list[dict], str]:
     """Parse raw timetable text via LLM. Returns (entries, human_summary).
     Raises ValueError if LLM returns empty or malformed JSON."""
-    entries = llm.call_json(_PARSE_PROMPT.format(text=text), model="haiku")
+    # Sonnet, not haiku: haiku silently drops entries from dense, run-on
+    # timetable strings (observed dropping 4 of 8). Schedule parsing is rare
+    # (once a semester), so the extra latency/cost is worth the reliability.
+    entries = llm.call_json(_PARSE_PROMPT.format(text=text), model="sonnet")
     if not isinstance(entries, list) or not entries:
         raise ValueError("empty or malformed JSON from LLM")
     parts: list[str] = []

@@ -181,6 +181,17 @@ def call_json(
         text = "\n".join(lines).strip()
     try:
         return json.loads(text)
-    except json.JSONDecodeError as exc:
-        print(f"[llm.call_json] parse failed: {exc}\nResponse: {text[:500]}", file=sys.stderr)
-        return None
+    except json.JSONDecodeError:
+        pass
+    # Tolerate prose around the JSON: models sometimes add a trailing remark
+    # ("That's 8 entries.") or a lead-in despite instructions. Decode the first
+    # JSON value starting at the first bracket and ignore any trailing data.
+    start = next((i for i, c in enumerate(text) if c in "[{"), -1)
+    if start != -1:
+        try:
+            obj, _ = json.JSONDecoder().raw_decode(text, start)
+            return obj
+        except json.JSONDecodeError:
+            pass
+    print(f"[llm.call_json] parse failed\nResponse: {text[:500]}", file=sys.stderr)
+    return None
