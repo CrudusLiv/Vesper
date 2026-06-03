@@ -24,6 +24,9 @@ from integrations import registry  # noqa: E402
 from memory import memory_search  # noqa: E402
 from memory import db as memory_db  # noqa: E402
 from heartbeat import llm  # noqa: E402
+from finance import tracker  # noqa: E402
+from heartbeat import discord_dm_capture  # noqa: E402
+from datetime import datetime, timedelta, timezone  # noqa: E402
 
 VAULT = Path(os.environ.get("VAULT_PATH") or (PROJECT_DIR / "Dynamous" / "Memory"))
 _START = time.time()
@@ -31,6 +34,16 @@ _START = time.time()
 MAX_TOP_K = 20
 _CHAT_MODEL = "haiku"  # claude CLI model slug passed to llm.call
 _SOUL_CACHE: str | None = None
+
+_KL = timezone(timedelta(hours=8))
+
+
+def _project_dir() -> Path:
+    return Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
+
+
+def _vault_dir() -> Path:
+    return Path(os.environ.get("VAULT_PATH") or (_project_dir() / "Dynamous" / "Memory"))
 
 
 class LlmError(RuntimeError):
@@ -117,3 +130,26 @@ def chat(message: str, history: list[dict]) -> dict:
         raise LlmError("llm unavailable")
     sources = [{"path": h["path"], "heading": h["heading"], "score": h["score"]} for h in hits]
     return {"reply": reply, "sources": sources}
+
+
+def finance_log(amount: float, category: str, note: str = "") -> dict:
+    r = tracker.log(amount, category, note)
+    return {
+        "date": r["date"],
+        "month_total": r["month_total"],
+        "category_total": r["category_total"],
+        "currency": tracker.CURRENCY,
+    }
+
+
+def finance_summary() -> dict:
+    return {"summary": tracker.month_summary()}
+
+
+def note_append(text: str) -> dict:
+    notes_file = _vault_dir() / "notes" / "NOTES.md"
+    notes_file.parent.mkdir(parents=True, exist_ok=True)
+    stripped = discord_dm_capture._append_note(notes_file, datetime.now(_KL), text)
+    if not stripped:
+        raise ValueError("note was empty after stripping")
+    return {"ok": True, "appended_chars": len(stripped)}
