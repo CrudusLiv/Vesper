@@ -2,6 +2,7 @@
 .env
 .venv/
 *.token.json
+graphify-out
 
 # OS
 .DS_Store
@@ -38,3 +39,7 @@ __pycache__/
 !.claude/chat/handler.py
 !.claude/chat/dry_run.py
 Dynamous/Memory/.obsidian/
+
+# Debug/scratch test files
+**/*_debug*.test.jsx
+**/*_debug*.test.js
