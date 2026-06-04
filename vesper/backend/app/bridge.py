@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -29,7 +30,10 @@ import schedule_parser  # noqa: E402
 from vault import actions as vault_actions  # noqa: E402
 from vault import paths as vault_paths  # noqa: E402
 from heartbeat import discord_dm_capture  # noqa: E402
+from heartbeat import inbox  # noqa: E402
 from datetime import datetime, timedelta, timezone  # noqa: E402
+
+from . import inbox_status  # noqa: E402
 
 VAULT = Path(os.environ.get("VAULT_PATH") or (PROJECT_DIR / "Dynamous" / "Memory"))
 _START = time.time()
@@ -39,6 +43,12 @@ _CHAT_MODEL = "haiku"  # claude CLI model slug passed to llm.call
 _SOUL_CACHE: str | None = None
 
 _KL = timezone(timedelta(hours=8))
+
+INBOX_ALLOWED_EXT = {".pptx", ".pdf"}
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
+# Serialises inbox processing so two concurrent uploads can't both run
+# process_new_files() at once and race over the same inbox files.
+_INBOX_LOCK = threading.Lock()
 
 
 def _project_dir() -> Path:
@@ -188,3 +198,59 @@ def vault_delete(path: str) -> dict:
 
 def vault_undo() -> dict:
     return vault_actions.undo()
+
+
+def _inbox_dir() -> Path:
+    return _vault_dir() / "inbox"
+
+
+def inbox_save(filename: str, content: bytes) -> Path:
+    """Validate and collision-safe write an upload into Dynamous/Memory/inbox/.
+
+    Strips any path components, rejects non-.pptx/.pdf and oversize files, and
+    suffixes (`name_1`, `name_2`, ...) to avoid clobbering an existing file."""
+    name = os.path.basename((filename or "").strip())
+    if not name:
+        raise ValueError("empty filename")
+    ext = Path(name).suffix.lower()
+    if ext not in INBOX_ALLOWED_EXT:
+        raise ValueError(f"unsupported extension: {ext or '(none)'}")
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise ValueError("file too large")
+    inbox_dir = _inbox_dir()
+    inbox_dir.mkdir(parents=True, exist_ok=True)
+    stem, suffix = Path(name).stem, Path(name).suffix
+    dest = inbox_dir / name
+    i = 1
+    while dest.exists():
+        dest = inbox_dir / f"{stem}_{i}{suffix}"
+        i += 1
+    dest.write_bytes(content)
+    return dest
+
+
+def inbox_deps_available() -> bool:
+    """True on a host that can summarise in-process (python-pptx + pypdf present);
+    False on the thin Docker backend that lacks them and must use the sentinel."""
+    try:
+        import pptx  # noqa: F401
+        import pypdf  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def inbox_trigger_heartbeat() -> None:
+    """Drop the heartbeat-trigger sentinel so the worker picks up the file on its
+    next poll. Mirrors routes/heartbeat.py. Used when in-process deps are absent."""
+    sentinel = _project_dir() / ".claude" / "data" / "state" / "heartbeat-trigger"
+    sentinel.parent.mkdir(parents=True, exist_ok=True)
+    sentinel.write_text(str(time.time()), encoding="utf-8")
+
+
+def inbox_enqueue(filename: str) -> dict:
+    return inbox_status.add(filename)
+
+
+def inbox_recent(limit: int = 10) -> list[dict]:
+    return inbox_status.recent(limit)
