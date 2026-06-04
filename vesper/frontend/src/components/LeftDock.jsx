@@ -4,8 +4,9 @@ import FinancePanel from './FinancePanel.jsx'
 import NotesPanel from './NotesPanel.jsx'
 import SchedulePanel from './SchedulePanel.jsx'
 import VaultBrowser from './VaultBrowser.jsx'
+import UploadPanel from './UploadPanel.jsx'
 
-const TABS = ['Memory', 'Finance', 'Notes', 'Schedule', 'Files']
+const TABS = ['Memory', 'Finance', 'Notes', 'Schedule', 'Files', 'Uploads']
 
 export default function LeftDock({ memoryResults, onSearch, cap }) {
   const [tab, setTab] = useState('Memory')
@@ -33,6 +34,7 @@ export default function LeftDock({ memoryResults, onSearch, cap }) {
         {tab === 'Notes' && <NotesPanel onSave={cap.saveNote} />}
         {tab === 'Schedule' && <SchedulePanel onLoad={cap.getSchedule} onSave={cap.saveSchedule} />}
         {tab === 'Files' && <VaultBrowser onList={cap.listVault} onDelete={cap.deleteVaultFile} onUndo={cap.undoVault} />}
+        {tab === 'Uploads' && <UploadPanel onUpload={cap.uploadDocument} onListUploads={cap.listUploads} />}
       </div>
     </div>
   )

@@ -13,6 +13,8 @@ function makeCap() {
     listVault: vi.fn().mockResolvedValue({ directory: '', entries: [] }),
     deleteVaultFile: vi.fn(),
     undoVault: vi.fn(),
+    uploadDocument: vi.fn(),
+    listUploads: vi.fn().mockResolvedValue([]),
   }
 }
 
@@ -31,4 +33,15 @@ test('switching to Files shows the vault browser', async () => {
   render(<LeftDock memoryResults={[]} onSearch={vi.fn()} cap={makeCap()} />)
   await userEvent.click(screen.getByRole('tab', { name: 'Files' }))
   expect(await screen.findByText(/vault root/i)).toBeInTheDocument()
+})
+
+test('the Uploads tab is present', () => {
+  render(<LeftDock memoryResults={[]} onSearch={vi.fn()} cap={makeCap()} />)
+  expect(screen.getByRole('tab', { name: 'Uploads' })).toBeInTheDocument()
+})
+
+test('switching to Uploads shows the dropzone', async () => {
+  render(<LeftDock memoryResults={[]} onSearch={vi.fn()} cap={makeCap()} />)
+  await userEvent.click(screen.getByRole('tab', { name: 'Uploads' }))
+  expect(await screen.findByText(/drop a \.pptx/i)).toBeInTheDocument()
 })
