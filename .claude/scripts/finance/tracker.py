@@ -25,8 +25,12 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
-FINANCE_DIR = PROJECT_DIR / "Dynamous" / "Memory" / "finance"
+
+def _finance_dir() -> Path:
+    """Resolve the finance dir per call, reading CLAUDE_PROJECT_DIR each time so
+    tests that monkeypatch the env var redirect writes to a temp vault."""
+    project_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
+    return project_dir / "Dynamous" / "Memory" / "finance"
 
 CURRENCY = "RM"  # Edit if you're not in MY. Single source of truth.
 KL = timezone(timedelta(hours=8))
@@ -143,8 +147,9 @@ MONTH_RE = re.compile(r"^(\d{4}-\d{2})\.md$")
 
 
 def _month_file(now: datetime) -> Path:
-    FINANCE_DIR.mkdir(parents=True, exist_ok=True)
-    return FINANCE_DIR / f"{now.strftime('%Y-%m')}.md"
+    d = _finance_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    return d / f"{now.strftime('%Y-%m')}.md"
 
 
 def _init_month_file(path: Path, now: datetime) -> None:
@@ -259,10 +264,10 @@ def _neighbour_months(now: datetime) -> tuple[str | None, str | None]:
     Doesn't synthesise neighbours that don't have a file yet -- wikilinks to
     non-existent notes show as red placeholders, which is fine in Obsidian
     but a bit noisy. Only chain to real ones."""
-    if not FINANCE_DIR.exists():
+    if not _finance_dir().exists():
         return (None, None)
     months = sorted(
-        p.stem for p in FINANCE_DIR.iterdir()
+        p.stem for p in _finance_dir().iterdir()
         if p.is_file() and MONTH_RE.match(p.name)
     )
     current = now.strftime("%Y-%m")
@@ -281,7 +286,7 @@ def _refresh_neighbour_timelines(now: datetime) -> None:
     for stem in (prev_stem, next_stem):
         if not stem:
             continue
-        path = FINANCE_DIR / f"{stem}.md"
+        path = _finance_dir() / f"{stem}.md"
         if not path.exists():
             continue
         # Parse the stem back to a datetime for the helper.
@@ -299,10 +304,10 @@ def _refresh_index() -> None:
     """Maintain a hub note at finance/Finances.md listing every month with
     its total. The friendly filename ('Finances') shows up neatly in the
     Obsidian graph view instead of the generic 'index'."""
-    if not FINANCE_DIR.exists():
+    if not _finance_dir().exists():
         return
     months = sorted(
-        (p for p in FINANCE_DIR.iterdir() if p.is_file() and MONTH_RE.match(p.name)),
+        (p for p in _finance_dir().iterdir() if p.is_file() and MONTH_RE.match(p.name)),
         key=lambda p: p.name,
         reverse=True,  # most recent first
     )
@@ -338,9 +343,9 @@ def _refresh_index() -> None:
         + "\n".join(rows)
         + "\n"
     )
-    (FINANCE_DIR / "Finances.md").write_text(text, encoding="utf-8")
+    (_finance_dir() / "Finances.md").write_text(text, encoding="utf-8")
     # Remove the legacy index.md if it's still around from earlier writes.
-    legacy = FINANCE_DIR / "index.md"
+    legacy = _finance_dir() / "index.md"
     if legacy.exists():
         legacy.unlink()
 

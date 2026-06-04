@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+python-multipart
+fastembed>=0.4.0
+sqlite-vec>=0.1.6
