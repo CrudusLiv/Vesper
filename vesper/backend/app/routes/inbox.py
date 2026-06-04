@@ -15,7 +15,9 @@ from ..deps import require_auth
 
 router = APIRouter()
 
-_ALLOWED = {"pptx", "pdf"}
+# Bare extensions (no dot) derived from the bridge's allow-list so the two
+# can't drift if a new format is ever added there.
+_ALLOWED = {ext.lstrip(".") for ext in bridge.INBOX_ALLOWED_EXT}
 
 
 @router.post("/inbox/upload", status_code=202)
@@ -36,7 +38,10 @@ def inbox_upload(
     if len(content) > bridge.MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="file exceeds the 50 MB limit")
 
-    saved_path = bridge.inbox_save(name, content)
+    try:
+        saved_path = bridge.inbox_save(name, content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     record = bridge.inbox_enqueue(saved_path.name)
     if bridge.inbox_deps_available():
         background_tasks.add_task(bridge.inbox_process_upload, record["id"], saved_path)

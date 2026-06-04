@@ -77,3 +77,10 @@ def test_uploads_list_ok(monkeypatch):
 
 def test_uploads_list_requires_auth():
     assert client.get("/api/inbox/uploads").status_code == 401
+
+
+def test_upload_dotfile_extension_is_400():
+    # ".pptx" passes the route's rsplit ext check but bridge.inbox_save sees
+    # Path(".pptx").suffix == "" and raises ValueError -> must surface as 400, not 500.
+    r = client.post("/api/inbox/upload", headers=AUTH, files=_file(".pptx"))
+    assert r.status_code == 400
