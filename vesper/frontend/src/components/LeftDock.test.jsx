@@ -1,7 +1,13 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { expect, test, vi } from 'vitest'
+import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest'
 import LeftDock from './LeftDock.jsx'
+import * as feedModule from '../hooks/useFeed.js'
+
+// Default mock for useFeed so existing tests don't hit real network
+vi.mock('../hooks/useFeed.js', () => ({
+  useFeed: () => ({ items: [], unreadCount: 0, markRead: vi.fn(), loading: false, error: null }),
+}))
 
 function makeCap() {
   return {
@@ -44,4 +50,33 @@ test('switching to Uploads shows the dropzone', async () => {
   render(<LeftDock memoryResults={[]} onSearch={vi.fn()} cap={makeCap()} />)
   await userEvent.click(screen.getByRole('tab', { name: 'Uploads' }))
   expect(await screen.findByText(/drop a \.pptx/i)).toBeInTheDocument()
+})
+
+describe('Alerts tab', () => {
+  beforeEach(() => {
+    vi.spyOn(feedModule, 'useFeed').mockReturnValue({
+      items: [{ id: 'x', kind: 'error', title: 'Error in x', body: '', priority: 'urgent', read: false, created_at: '' }],
+      unreadCount: 1,
+      markRead: vi.fn(),
+      loading: false,
+      error: null,
+    })
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  test('renders the Alerts tab button', () => {
+    render(<LeftDock memoryResults={[]} onSearch={vi.fn()} cap={makeCap()} />)
+    expect(screen.getByRole('tab', { name: /Alerts/i })).toBeTruthy()
+  })
+
+  test('shows unread badge on Alerts tab when unreadCount > 0', () => {
+    render(<LeftDock memoryResults={[]} onSearch={vi.fn()} cap={makeCap()} />)
+    expect(screen.getByText('1')).toBeTruthy()
+  })
+
+  test('renders FeedPanel when Alerts tab is active', async () => {
+    render(<LeftDock memoryResults={[]} onSearch={vi.fn()} cap={makeCap()} />)
+    await userEvent.click(screen.getByRole('tab', { name: /Alerts/i }))
+    expect(screen.getByText('Error in x')).toBeTruthy()
+  })
 })
