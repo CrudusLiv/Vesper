@@ -75,4 +75,5 @@ def update(upload_id: str, **fields) -> dict | None:
 
 
 def recent(limit: int = MAX_RECORDS) -> list[dict]:
-    return _read()[:limit]
+    with _LOCK:
+        return _read()[:limit]
