@@ -31,6 +31,8 @@ export function useCapture() {
   const listVault = useCallback((dir) => guard(() => api.vaultList(dir)), [guard])
   const deleteVaultFile = useCallback((path) => guard(() => api.vaultDelete(path)), [guard])
   const undoVault = useCallback(() => guard(() => api.vaultUndo()), [guard])
+  const uploadDocument = useCallback((file) => guard(() => api.uploadInbox(file)), [guard])
+  const listUploads = useCallback(() => guard(() => api.inboxUploads()), [guard])
 
-  return { logFinance, loadFinanceSummary, saveNote, getSchedule, saveSchedule, listVault, deleteVaultFile, undoVault }
+  return { logFinance, loadFinanceSummary, saveNote, getSchedule, saveSchedule, listVault, deleteVaultFile, undoVault, uploadDocument, listUploads }
 }

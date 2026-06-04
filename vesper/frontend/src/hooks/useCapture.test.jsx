@@ -28,3 +28,25 @@ test('a ConflictError propagates (not swallowed)', async () => {
   const { result } = renderHook(() => useCapture(), { wrapper })
   await expect(result.current.saveSchedule('x', false)).rejects.toBeInstanceOf(client.ConflictError)
 })
+
+test('uploadDocument returns the api result', async () => {
+  vi.spyOn(client.api, 'uploadInbox').mockResolvedValue({ id: '1', status: 'queued' })
+  const { result } = renderHook(() => useCapture(), { wrapper })
+  const file = new File(['x'], 'a.pptx')
+  await expect(result.current.uploadDocument(file)).resolves.toEqual({ id: '1', status: 'queued' })
+  expect(client.api.uploadInbox).toHaveBeenCalledWith(file)
+})
+
+test('listUploads returns the api result', async () => {
+  vi.spyOn(client.api, 'inboxUploads').mockResolvedValue([{ id: '1', status: 'done' }])
+  const { result } = renderHook(() => useCapture(), { wrapper })
+  await expect(result.current.listUploads()).resolves.toEqual([{ id: '1', status: 'done' }])
+})
+
+test('an AuthError during upload clears the stored secret (locks)', async () => {
+  client.setSecret('k')
+  vi.spyOn(client.api, 'uploadInbox').mockRejectedValue(new client.AuthError())
+  const { result } = renderHook(() => useCapture(), { wrapper })
+  await result.current.uploadDocument(new File(['x'], 'a.pptx'))
+  expect(client.getSecret()).toBeNull()
+})
