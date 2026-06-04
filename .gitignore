@@ -39,7 +39,3 @@ __pycache__/
 !.claude/chat/handler.py
 !.claude/chat/dry_run.py
 Dynamous/Memory/.obsidian/
-
-# Debug/scratch test files
-**/*_debug*.test.jsx
-**/*_debug*.test.js
