@@ -56,7 +56,7 @@ def _maybe_feed_and_toast(kind: str, payload: dict) -> None:
         if kind in _TOAST_KINDS:
             try:
                 from heartbeat import toast as _toast
-                _toast.show(record["title"], record["body"])
+                _toast.show(record.get("title", ""), record.get("body", ""))
             except Exception as exc:
                 print(f"[dashboard] toast failed: {exc}", file=sys.stderr)
     except Exception as exc:
