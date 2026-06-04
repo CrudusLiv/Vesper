@@ -45,6 +45,13 @@ def test_inbox_save_strips_path_components(monkeypatch, tmp_path):
     assert p.name == "evil.pptx"
 
 
+def test_inbox_save_strips_backslash_path_components(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    p = bridge.inbox_save("..\\..\\evil.pptx", b"1")
+    assert p.parent == tmp_path / "Dynamous" / "Memory" / "inbox"
+    assert p.name == "evil.pptx"
+
+
 def test_inbox_enqueue_and_recent(monkeypatch, tmp_path):
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
     rec = bridge.inbox_enqueue("a.pptx")

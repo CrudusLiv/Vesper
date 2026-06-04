@@ -209,7 +209,9 @@ def inbox_save(filename: str, content: bytes) -> Path:
 
     Strips any path components, rejects non-.pptx/.pdf and oversize files, and
     suffixes (`name_1`, `name_2`, ...) to avoid clobbering an existing file."""
-    name = os.path.basename((filename or "").strip())
+    # Normalise both separators before taking the basename so path traversal is
+    # stripped on Linux too (os.path.basename ignores backslashes on POSIX).
+    name = Path((filename or "").strip().replace("\\", "/")).name
     if not name:
         raise ValueError("empty filename")
     ext = Path(name).suffix.lower()
