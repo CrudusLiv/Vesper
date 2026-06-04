@@ -1,0 +1,52 @@
+:root {
+  --bg: #0a0d12;
+  --panel: #0f141b;
+  --line: #222b36;
+  --ink: #c8d3e0;
+  --dim: #7d8da0;
+  --accent: #2d6cdf;
+  --accent2: #5b9bff;
+  --led-on: #37d67a;
+  --led-off: #e5533c;
+  --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background:
+    linear-gradient(rgba(91, 155, 255, 0.025) 1px, transparent 1px) 0 0 / 100% 3px,
+    radial-gradient(circle at 50% 30%, #11161f, #0a0d12 75%);
+  color: var(--ink);
+  font-family: var(--sans);
+  min-height: 100vh;
+}
+
+.mono { font-family: var(--mono); }
+
+/* VoiceOrb — Arc core */
+.orbwrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.orb { position: relative; width: 150px; height: 150px; display: flex; align-items: center; justify-content: center; }
+.orb .core {
+  width: 66px; height: 66px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #bcd8ff, #2d6cdf 55%, #11357a 100%);
+  box-shadow: 0 0 34px 8px rgba(45, 108, 223, 0.6);
+  animation: breathe 3.2s ease-in-out infinite;
+}
+.orb .ring { position: absolute; border: 2px solid rgba(91, 155, 255, 0.5); border-radius: 50%; }
+.orb .r1 { width: 106px; height: 106px; border-top-color: transparent; border-bottom-color: transparent; animation: spin 6s linear infinite; }
+.orb .r2 { width: 146px; height: 146px; border-left-color: transparent; border-right-color: transparent; animation: spin 9s linear infinite reverse; }
+.orb-thinking .r1 { animation-duration: 2s; }
+.orb-thinking .r2 { animation-duration: 3s; }
+.orb-speaking .core { animation-duration: 0.9s; }
+.orb-state { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+
+@keyframes breathe { 0%, 100% { transform: scale(1); opacity: 0.92; } 50% { transform: scale(1.1); opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Orb — listening (mic active): rings tighten + cooler glow */
+.orb-listening .r1 { animation-duration: 1.4s; border-color: rgba(91, 155, 255, 0.85); }
+.orb-listening .r2 { animation-duration: 2s; border-color: rgba(91, 155, 255, 0.85); }
+.orb-listening .core { box-shadow: 0 0 40px 10px rgba(91, 155, 255, 0.7); }

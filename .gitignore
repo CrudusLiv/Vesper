@@ -2,6 +2,7 @@
 .env
 .venv/
 *.token.json
+graphify-out
 
 # OS
 .DS_Store

@@ -46,3 +46,29 @@ Removes all four tasks. Logs and vault data are preserved — delete manually if
 - `heartbeat.py` self-gates via `in_active_hours()`; the 13-hour repetition window is belt-and-suspenders.
 - The Discord wrapper has two restart layers: inner `while ($true)` loop with exponential backoff on fast-fails, plus Task Scheduler `RestartCount=999` if PowerShell itself dies.
 - Tasks run as the current user with `RunLevel Limited` so Windows Toast notifications can surface on the desktop.
+
+## Running under Docker (NAS target)
+
+The host Scheduled Tasks above remain the live system. The same four jobs also
+exist as compose services in `vesper/` for the eventual NAS migration — they are
+**opt-in** behind a `workers` profile, so plain `docker compose up` brings only
+the API + web frontend and changes nothing on the host.
+
+```powershell
+# From vesper/ — bring up the full stack including the workers:
+docker compose --profile workers up -d --build
+
+# Tail the bot / scheduler:
+docker compose logs -f discord scheduler
+```
+
+| Service | Replaces host task | Notes |
+|---|---|---|
+| `discord` | `secondbrain-discord` | The bot daemon; vault mounted read-write |
+| `scheduler` | `secondbrain-heartbeat`, `-index`, `-reflect` | One loop fires all three at their cadences |
+
+`POST /api/heartbeat/run` (Bearer `API_SECRET`) queues a forced tick: the backend
+drops `.claude/data/state/heartbeat-trigger`; the scheduler runs it within ~5s.
+
+Cutover (stopping the host tasks in favour of the containers) is a deliberate
+later step done on the NAS — not part of this build.

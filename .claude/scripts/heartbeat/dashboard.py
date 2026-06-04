@@ -34,6 +34,34 @@ KL = timezone(timedelta(hours=8))
 
 VAULT_NAME = "Memory"  # Folder under Dynamous/ holding all notes.
 
+# Kinds never written to the web feed (Discord-thread-internal or always-noise).
+_FEED_SKIP: frozenset[str] = frozenset({"deadline_reply", "lecture_reply", "vesper_reply"})
+# Kinds that fire a Windows toast in addition to the feed write.
+_TOAST_KINDS: frozenset[str] = frozenset({"deadline_24h", "deadline_overdue", "error"})
+
+
+def _maybe_feed_and_toast(kind: str, payload: dict) -> None:
+    """Write to the web feed store and optionally fire a Windows toast.
+
+    Called unconditionally at the end of notify() regardless of Discord
+    success. Swallows all exceptions so a feed/toast failure never
+    interrupts the heartbeat."""
+    if kind in _FEED_SKIP:
+        return
+    if kind == "heartbeat_tick" and payload.get("status") == "ok":
+        return
+    try:
+        from heartbeat import feed as _feed
+        record = _feed.append(kind, payload)
+        if kind in _TOAST_KINDS:
+            try:
+                from heartbeat import toast as _toast
+                _toast.show(record.get("title", ""), record.get("body", ""))
+            except Exception as exc:
+                print(f"[dashboard] toast failed: {exc}", file=sys.stderr)
+    except Exception as exc:
+        print(f"[dashboard] feed append failed: {exc}", file=sys.stderr)
+
 
 def _obsidian_url(vault_path: str) -> str:
     """Build an `obsidian://` deep link for a vault-relative path.
@@ -509,33 +537,34 @@ def notify(
     On failure, attempts a follow-up post to #errors -- unless the failing
     kind is itself `error`, to avoid recursive storms."""
     url = _route_url(kind)
-    if not url:
-        return None
-    body = format_embed(kind, payload or {})
-    try:
-        return discord_webhook.post(
-            url,
-            content=body.get("content"),
-            embeds=body.get("embeds"),
-            thread_name=thread_name or body.get("thread_name"),
-            thread_id=thread_id,
-            applied_tags=body.get("applied_tags"),
-        )
-    except Exception as exc:
-        print(f"dashboard.notify({kind}) failed: {exc}", file=sys.stderr)
-        if kind != "error":
-            try:
-                error_url = _route_url("error")
-                if error_url:
-                    err_body = _format_error({
-                        "script": f"dashboard.notify({kind})",
-                        "trace": f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}",
-                    })
-                    discord_webhook.post(
-                        error_url,
-                        content=err_body.get("content"),
-                        embeds=err_body.get("embeds"),
-                    )
-            except Exception:
-                pass
-        return None
+    result = None
+    if url:
+        body = format_embed(kind, payload or {})
+        try:
+            result = discord_webhook.post(
+                url,
+                content=body.get("content"),
+                embeds=body.get("embeds"),
+                thread_name=thread_name or body.get("thread_name"),
+                thread_id=thread_id,
+                applied_tags=body.get("applied_tags"),
+            )
+        except Exception as exc:
+            print(f"dashboard.notify({kind}) failed: {exc}", file=sys.stderr)
+            if kind != "error":
+                try:
+                    error_url = _route_url("error")
+                    if error_url:
+                        err_body = _format_error({
+                            "script": f"dashboard.notify({kind})",
+                            "trace": f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}",
+                        })
+                        discord_webhook.post(
+                            error_url,
+                            content=err_body.get("content"),
+                            embeds=err_body.get("embeds"),
+                        )
+                except Exception:
+                    pass
+    _maybe_feed_and_toast(kind, payload or {})
+    return result
