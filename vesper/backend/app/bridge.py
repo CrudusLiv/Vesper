@@ -256,3 +256,40 @@ def inbox_enqueue(filename: str) -> dict:
 
 def inbox_recent(limit: int = 10) -> list[dict]:
     return inbox_status.recent(limit)
+
+
+def inbox_process_upload(upload_id: str, saved_path: Path) -> None:
+    """Background job: run the existing summariser and reflect the outcome into
+    the status store. Runs process_new_files() under a lock so concurrent uploads
+    serialise. Matches the result back to this upload by source filename."""
+    inbox_status.update(upload_id, status="processing")
+    try:
+        with _INBOX_LOCK:
+            results = inbox.process_new_files()
+    except Exception as exc:  # noqa: BLE001 -- any pipeline failure -> failed status
+        inbox_status.update(upload_id, status="failed", error=str(exc)[:300])
+        return
+    match = next((r for r in results if r.get("source") == saved_path.name), None)
+    if not match:
+        # The file may have been swept by a sibling task, or genuinely failed and
+        # left in inbox/ for the next heartbeat tick. The panel copy says
+        # "failed -- will retry automatically" for exactly this case.
+        inbox_status.update(
+            upload_id, status="failed",
+            error="no note was produced for this upload (will retry automatically)",
+        )
+        return
+    note_path = match.get("path")
+    try:
+        rel = Path(note_path).relative_to(_vault_dir()).as_posix()
+    except (ValueError, TypeError):
+        rel = str(note_path) if note_path else None
+    inbox_status.update(
+        upload_id,
+        status="done",
+        type=match.get("type"),
+        category=match.get("name"),
+        title=match.get("title"),
+        note_path=rel,
+        error=None,
+    )

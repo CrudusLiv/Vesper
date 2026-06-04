@@ -70,3 +70,46 @@ def test_inbox_trigger_heartbeat_drops_sentinel(monkeypatch, tmp_path):
 
 def test_inbox_deps_available_returns_bool():
     assert isinstance(bridge.inbox_deps_available(), bool)
+
+
+def test_inbox_process_upload_done(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    rec = bridge.inbox_enqueue("CS101_l3.pptx")
+    saved = tmp_path / "Dynamous" / "Memory" / "inbox" / "CS101_l3.pptx"
+    note = tmp_path / "Dynamous" / "Memory" / "lectures" / "CS101" / "2026-06-04_sorting.md"
+    monkeypatch.setattr(bridge.inbox, "process_new_files", lambda: [
+        {"source": "CS101_l3.pptx", "path": note, "type": "lecture", "name": "CS101", "title": "Sorting"},
+    ])
+    bridge.inbox_process_upload(rec["id"], saved)
+    out = bridge.inbox_recent()[0]
+    assert out["status"] == "done"
+    assert out["note_path"] == "lectures/CS101/2026-06-04_sorting.md"
+    assert out["type"] == "lecture"
+    assert out["category"] == "CS101"
+    assert out["title"] == "Sorting"
+
+
+def test_inbox_process_upload_no_match_is_failed(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    rec = bridge.inbox_enqueue("mine.pdf")
+    saved = tmp_path / "Dynamous" / "Memory" / "inbox" / "mine.pdf"
+    monkeypatch.setattr(bridge.inbox, "process_new_files", lambda: [])
+    bridge.inbox_process_upload(rec["id"], saved)
+    out = bridge.inbox_recent()[0]
+    assert out["status"] == "failed"
+    assert out["error"]
+
+
+def test_inbox_process_upload_exception_is_failed(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    rec = bridge.inbox_enqueue("boom.pdf")
+    saved = tmp_path / "Dynamous" / "Memory" / "inbox" / "boom.pdf"
+
+    def boom():
+        raise RuntimeError("extract blew up")
+
+    monkeypatch.setattr(bridge.inbox, "process_new_files", boom)
+    bridge.inbox_process_upload(rec["id"], saved)
+    out = bridge.inbox_recent()[0]
+    assert out["status"] == "failed"
+    assert "extract blew up" in out["error"]
