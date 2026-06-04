@@ -43,6 +43,20 @@ async function request(path, { method = 'GET', body, secret } = {}) {
   return res.json()
 }
 
+// Multipart variant of request(): no JSON Content-Type so the browser sets the
+// multipart boundary itself. Same auth + error mapping as request().
+async function requestForm(path, formData) {
+  const token = getSecret()
+  const res = await fetch(`/api${path}`, {
+    method: 'POST',
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: formData,
+  })
+  if (res.status === 401) throw new AuthError('unauthorized')
+  if (!res.ok) throw new ApiError(`HTTP ${res.status}`)
+  return res.json()
+}
+
 export const api = {
   status: (secret) => request('/status', { secret }),
   search: (q, topK = 5) =>
@@ -61,4 +75,10 @@ export const api = {
   vaultDelete: (path) =>
     request('/vault/delete', { method: 'POST', body: { path } }),
   vaultUndo: () => request('/vault/undo', { method: 'POST' }),
+  uploadInbox: (file) => {
+    const form = new FormData()
+    form.append('file', file)
+    return requestForm('/inbox/upload', form)
+  },
+  inboxUploads: () => request('/inbox/uploads'),
 }

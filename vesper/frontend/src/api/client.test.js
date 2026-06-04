@@ -147,3 +147,30 @@ test('vaultUndo POSTs undo', async () => {
   expect(f.mock.calls[0][0]).toBe('/api/vault/undo')
   expect(f.mock.calls[0][1].method).toBe('POST')
 })
+
+test('uploadInbox posts the file as multipart with the bearer header', async () => {
+  setSecret('s')
+  const f = mockFetch(202, { id: '1', filename: 'x.pptx', status: 'queued' })
+  vi.stubGlobal('fetch', f)
+  const file = new File(['data'], 'x.pptx')
+  await api.uploadInbox(file)
+  const [url, opts] = f.mock.calls[0]
+  expect(url).toBe('/api/inbox/upload')
+  expect(opts.method).toBe('POST')
+  expect(opts.body).toBeInstanceOf(FormData)
+  expect(opts.body.get('file')).toBe(file)
+  expect(opts.headers.Authorization).toBe('Bearer s')
+  // The browser must set the multipart boundary itself.
+  expect(opts.headers['Content-Type']).toBeUndefined()
+})
+
+test('uploadInbox surfaces a 415 as ApiError', async () => {
+  setSecret('s'); vi.stubGlobal('fetch', mockFetch(415, { detail: 'bad type' }))
+  await expect(api.uploadInbox(new File(['d'], 'x.txt'))).rejects.toBeInstanceOf(ApiError)
+})
+
+test('inboxUploads GETs the uploads list', async () => {
+  setSecret('s'); const f = mockFetch(200, [{ id: '1', status: 'done' }]); vi.stubGlobal('fetch', f)
+  await api.inboxUploads()
+  expect(f.mock.calls[0][0]).toBe('/api/inbox/uploads')
+})
