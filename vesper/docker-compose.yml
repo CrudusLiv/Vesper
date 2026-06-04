@@ -12,7 +12,7 @@ services:
       - CLAUDE_PROJECT_DIR=/workspace
       - VAULT_PATH=/workspace/Dynamous/Memory
     volumes:
-      - ../Dynamous/Memory:/workspace/Dynamous/Memory:ro
+      - ../Dynamous/Memory:/workspace/Dynamous/Memory
       - ../.claude/scripts:/workspace/.claude/scripts:ro
       - ../.claude/data:/workspace/.claude/data
       - ../.env:/workspace/.env:ro
@@ -36,8 +36,7 @@ services:
       - CLAUDE_PROJECT_DIR=/workspace
       - TZ=Asia/Kuala_Lumpur
     volumes:
-      # Vault is read-WRITE here (unlike backend) — the bot writes notes,
-      # inbox drops, schedule, finance, daily logs.
+      # Vault is read-WRITE here — the bot caches messages (cache-only after Phase 4).
       - ../Dynamous/Memory:/workspace/Dynamous/Memory
       - ../.claude/scripts:/workspace/.claude/scripts:ro
       - ../.claude/chat:/workspace/.claude/chat:ro
