@@ -118,6 +118,29 @@ def _slash_text(reaction: str | None, text: str | None) -> str:
     return {"✅": "Done.", "❌": "Failed.", "❓": "Unrecognized."}.get(reaction or "", "Done.")
 
 
+SCHEDULE_EMBED_COLOR = 0x8A7FB5  # muted lilac — Vesper's palette
+
+
+def _schedule_embed(data: dict) -> "discord.Embed":
+    """Build the /schedule embed from schedule_parser.schedule_view() data:
+    a coloured card with the aligned grid in a code block and one inline field
+    per weekday, semester/updated in the footer. Content is the owner's own
+    SCHEDULE.md, sent ephemerally — same trust boundary as the other replies."""
+    emb = discord.Embed(title="🗓 Weekly Timetable", color=SCHEDULE_EMBED_COLOR)
+    if data.get("grid"):
+        emb.description = "```\n" + data["grid"] + "\n```"
+    for d in data.get("days", []):
+        value = "\n".join(d["lines"]) if d["lines"] else "—"
+        emb.add_field(name=d["day"], value=value[:1024], inline=True)
+    footer_bits = [b for b in (
+        data.get("semester", ""),
+        f"updated {data['updated']}" if data.get("updated") else "",
+    ) if b]
+    if footer_bits:
+        emb.set_footer(text=" · ".join(footer_bits))
+    return emb
+
+
 def run_schedule(raw: str, *, confirm: bool) -> tuple[str | None, str | None]:
     """Schedule-set flow. Returns (reaction, text).
 
@@ -381,13 +404,23 @@ def main() -> int:
     async def slash_schedule(interaction, text: str = "", confirm: bool = False) -> None:
         if not _is_owner(interaction):
             return await _deny(interaction)
-        # Bare /schedule (no text, no confirm) -> show the current schedule.
+        # Bare /schedule (no text, no confirm) -> show the current schedule as
+        # a rich embed.
         if not text and not confirm:
-            reaction, msg = await asyncio.to_thread(run_schedule_view)
-            chunks = _split_for_discord(_slash_text(reaction, msg))
-            await interaction.response.send_message(chunks[0], ephemeral=True)
-            for extra in chunks[1:]:
-                await interaction.followup.send(extra, ephemeral=True)
+            try:
+                data = await asyncio.to_thread(schedule_parser.schedule_view)
+            except Exception as exc:
+                print(f"slash_schedule view failed: {exc}", file=sys.stderr)
+                await interaction.response.send_message(
+                    "❌ [schedule] read error.", ephemeral=True)
+                return
+            if not data:
+                await interaction.response.send_message(
+                    "No schedule set yet. Send `/schedule text:<your timetable>` to add one.",
+                    ephemeral=True)
+                return
+            await interaction.response.send_message(
+                embed=_schedule_embed(data), ephemeral=True)
             return
         # Parsing routes through an LLM subprocess (run_schedule -> parse_timetable),
         # which far exceeds Discord's ~3s interaction-ack deadline. Defer first to ACK
