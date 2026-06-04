@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from . import bridge
-from .routes import chat, finance, heartbeat, memory, note, schedule, status, vault
+from .routes import chat, finance, heartbeat, inbox, memory, note, schedule, status, vault
 
 
 @asynccontextmanager
@@ -29,3 +29,4 @@ app.include_router(note.router, prefix="/api")
 app.include_router(schedule.router, prefix="/api")
 app.include_router(heartbeat.router, prefix="/api")
 app.include_router(vault.router, prefix="/api")
+app.include_router(inbox.router, prefix="/api")
