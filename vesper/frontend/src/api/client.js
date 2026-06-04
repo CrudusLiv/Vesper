@@ -81,4 +81,6 @@ export const api = {
     return requestForm('/inbox/upload', form)
   },
   inboxUploads: () => request('/inbox/uploads'),
+  getFeed: (limit = 50) => request(`/feed?limit=${limit}`),
+  markFeedItemRead: (id) => request(`/feed/${id}/read`, { method: 'PATCH' }),
 }

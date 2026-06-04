@@ -174,3 +174,35 @@ test('inboxUploads GETs the uploads list', async () => {
   await api.inboxUploads()
   expect(f.mock.calls[0][0]).toBe('/api/inbox/uploads')
 })
+
+describe('getFeed', () => {
+  it('GETs /api/feed with auth', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true, status: 200,
+      json: async () => [{ id: 'x', kind: 'error', read: false }],
+    })
+    localStorage.setItem('vesper_secret', 'tok')
+    const result = await api.getFeed()
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/feed?limit=50',
+      expect.objectContaining({ method: 'GET' }),
+    )
+    expect(result[0].kind).toBe('error')
+  })
+})
+
+describe('markFeedItemRead', () => {
+  it('PATCHes /api/feed/{id}/read', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true, status: 200,
+      json: async () => ({ id: 'x', read: true }),
+    })
+    localStorage.setItem('vesper_secret', 'tok')
+    const result = await api.markFeedItemRead('x')
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/feed/x/read',
+      expect.objectContaining({ method: 'PATCH' }),
+    )
+    expect(result.read).toBe(true)
+  })
+})
