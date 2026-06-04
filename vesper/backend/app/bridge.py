@@ -31,6 +31,7 @@ from vault import actions as vault_actions  # noqa: E402
 from vault import paths as vault_paths  # noqa: E402
 from heartbeat import discord_dm_capture  # noqa: E402
 from heartbeat import inbox  # noqa: E402
+from heartbeat import feed as _feed_store  # noqa: E402
 from datetime import datetime, timedelta, timezone  # noqa: E402
 
 from . import inbox_status  # noqa: E402
@@ -293,3 +294,11 @@ def inbox_process_upload(upload_id: str, saved_path: Path) -> None:
         note_path=rel,
         error=None,
     )
+
+
+def feed_recent(limit: int = 50) -> list[dict]:
+    return _feed_store.recent(min(limit, 50))
+
+
+def feed_mark_read(item_id: str) -> dict | None:
+    return _feed_store.mark_read(item_id)
