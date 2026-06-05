@@ -37,6 +37,11 @@
   background: rgba(205, 214, 244, 0.05);
 }
 
+.left-dock-tab:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
 .left-dock-tab[aria-selected="true"] {
   border-left-color: var(--accent-cyan);
   background: rgba(137, 220, 235, 0.06);
@@ -55,7 +60,7 @@
 }
 
 .left-dock-badge {
-  background: #e74c3c;
+  background: var(--led-off);
   color: #fff;
   border-radius: 9px;
   padding: 1px 6px;
