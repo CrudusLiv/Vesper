@@ -7,9 +7,9 @@ if (-not $dockerProcess) {
 }
 
 # Navigate to repo and start compose
-$repoPath = "D:\GitHub\BoredBot"
+$repoPath = "D:\GitHub\Vesper\vesper"
 Write-Host "[startup] Starting docker-compose from $repoPath"
-cd $repoPath
+Set-Location $repoPath
 docker-compose up -d
 
 Write-Host "[startup] Vesper stack started (backend, frontend, scheduler)"
