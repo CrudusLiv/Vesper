@@ -55,6 +55,7 @@ Then grab your own user ID:
 git clone https://github.com/CrudusLiv/Vesper.git
 cd Vesper
 py -m pip install -r .claude/requirements.txt
+py -m pip install -r .claude/requirements.txt
 ```
 
 ## 3. Configure secrets
@@ -220,7 +221,7 @@ The vault is gitignored — copy your own in, or start fresh from templates.
 Four scheduled tasks live in `.claude/scripts/deploy/`. Open PowerShell **as Administrator**:
 
 ```powershell
-pwsh -ExecutionPolicy Bypass -File .claude\scripts\deploy\install_tasks.ps1
+pwsh -ExecutionPolicy Bypass -File .claude\scripts\deploy\start-docker.ps1
 ```
 
 Idempotent — re-running replaces any existing `secondbrain-*` task.
