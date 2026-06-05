@@ -20,10 +20,6 @@ export default function SettingsPanel() {
     }
   }, [settings])
 
-  if (!settings || !formData) {
-    return null
-  }
-
   const handleChange = (key, value) => {
     setFormData(prev => ({ ...prev, [key]: value }))
   }
@@ -55,64 +51,71 @@ export default function SettingsPanel() {
   const hasChanges = JSON.stringify(formData) !== JSON.stringify(settings)
 
   return (
-    <FloatingPanel panelId="settings-panel" title="Settings" defaultPosition={{ x: 300, y: 20 }}>
-      <div className="settings-panel">
-        <div className="settings-section">
-          <h3>Active Hours</h3>
-          <label>
-            Start
-            <input
-              type="time"
-              value={formData.active_hours_start}
-              onChange={(e) => handleChange('active_hours_start', e.target.value)}
-            />
-          </label>
-          <label>
-            End
-            <input
-              type="time"
-              value={formData.active_hours_end}
-              onChange={(e) => handleChange('active_hours_end', e.target.value)}
-            />
-          </label>
+    <FloatingPanel panelId="settings-panel" title="Settings" defaultPosition={() => ({ x: Math.max(20, window.innerWidth - 370), y: 80 })}>
+      {(!settings || !formData) ? (
+        <div className="settings-panel">
+          {loading && <div className="settings-loading">Loading…</div>}
+          {error && <div className="settings-error">{error}</div>}
         </div>
-
-        <div className="settings-section">
-          <h3>Heartbeat Interval (minutes)</h3>
-          <input
-            type="number"
-            min="5"
-            max="120"
-            value={formData.heartbeat_interval_minutes || ''}
-            onChange={(e) => handleChange('heartbeat_interval_minutes', e.target.value ? parseInt(e.target.value) : '')}
-          />
-        </div>
-
-        <div className="settings-section">
-          <h3>Features</h3>
-          {Object.entries(formData.features || {}).map(([feature, enabled]) => (
-            <label key={feature} className="feature-toggle">
+      ) : (
+        <div className="settings-panel">
+          <div className="settings-section">
+            <h3>Active Hours</h3>
+            <label>
+              Start
               <input
-                type="checkbox"
-                checked={enabled}
-                onChange={() => handleFeatureToggle(feature)}
+                type="time"
+                value={formData.active_hours_start}
+                onChange={(e) => handleChange('active_hours_start', e.target.value)}
               />
-              {feature}
             </label>
-          ))}
-        </div>
+            <label>
+              End
+              <input
+                type="time"
+                value={formData.active_hours_end}
+                onChange={(e) => handleChange('active_hours_end', e.target.value)}
+              />
+            </label>
+          </div>
 
-        <div className="settings-actions">
-          <button onClick={handleSave} disabled={!hasChanges || saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-          <button onClick={handleReset} disabled={!hasChanges}>
-            Reset
-          </button>
-        </div>
+          <div className="settings-section">
+            <h3>Heartbeat Interval (minutes)</h3>
+            <input
+              type="number"
+              min="5"
+              max="120"
+              value={formData.heartbeat_interval_minutes || ''}
+              onChange={(e) => handleChange('heartbeat_interval_minutes', e.target.value ? parseInt(e.target.value) : '')}
+            />
+          </div>
 
-        {(error || saveError) && <div className="settings-error">{error || saveError}</div>}
-      </div>
+          <div className="settings-section">
+            <h3>Features</h3>
+            {Object.entries(formData.features || {}).map(([feature, enabled]) => (
+              <label key={feature} className="feature-toggle">
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={() => handleFeatureToggle(feature)}
+                />
+                {feature}
+              </label>
+            ))}
+          </div>
+
+          <div className="settings-actions">
+            <button onClick={handleSave} disabled={!hasChanges || saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+            <button onClick={handleReset} disabled={!hasChanges}>
+              Reset
+            </button>
+          </div>
+
+          {(error || saveError) && <div className="settings-error">{error || saveError}</div>}
+        </div>
+      )}
     </FloatingPanel>
   )
 }

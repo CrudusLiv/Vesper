@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useStore } from './state/store.jsx'
 import { useVesper } from './hooks/useVesper.js'
 import { useCapture } from './hooks/useCapture.js'
@@ -13,6 +13,7 @@ export default function Dashboard() {
   const { sendChat, search, startVoice, stopVoice, sttSupported } = useVesper()
   const cap = useCapture()
   const debounce = useRef(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   function onSearch(q) {
     clearTimeout(debounce.current)
@@ -22,7 +23,7 @@ export default function Dashboard() {
   return (
     <div className="dashboard">
       <StatusBar status={state.status} />
-      <SettingsPanel />
+      {settingsOpen && <SettingsPanel />}
 
       <div className="dashboard-center">
         <ParticleOrb state={state.orb} />
@@ -38,6 +39,14 @@ export default function Dashboard() {
         listening={state.orb === 'listening'}
         onMic={() => (state.orb === 'listening' ? stopVoice() : startVoice())}
       />
+
+      <button
+        className="gear-btn"
+        onClick={() => setSettingsOpen(o => !o)}
+        aria-label="Toggle settings"
+      >
+        ⚙
+      </button>
     </div>
   )
 }

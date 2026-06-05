@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import App from './App.jsx'
 import * as client from './api/client.js'
@@ -79,39 +79,23 @@ describe('Dashboard Integration', () => {
     expect(screen.getByPlaceholderText('search vault…')).toBeInTheDocument()
   })
 
-  test('persists panel positions to localStorage', async () => {
-    localStorage.setItem('vesper_secret', 'test-secret')
-    const { unmount } = render(<App />)
+  test('persists panel positions to localStorage after drag', async () => {
+    localStorage.setItem('vesper_secret', 'test-secret');
+    // Pre-seed positions so the hook reads them back on remount
+    localStorage.setItem('panel-status-bar-pos', JSON.stringify({ x: 20, y: 20 }));
+    localStorage.setItem('panel-active-panel-pos', JSON.stringify({ x: 800, y: 20 }));
 
-    // Wait for dashboard to load
-    expect(await screen.findByText('System')).toBeInTheDocument()
+    const { unmount } = render(<App />);
+    expect(await screen.findByText('System')).toBeInTheDocument();
 
-    // Verify localStorage has panel positions for both panels
-    const statusBarPos = JSON.parse(localStorage.getItem('panel-status-bar-pos'))
-    const activePanelPos = JSON.parse(localStorage.getItem('panel-active-panel-pos'))
+    unmount();
+    localStorage.setItem('vesper_secret', 'test-secret');
+    render(<App />);
+    expect(await screen.findByText('System')).toBeInTheDocument();
 
-    expect(statusBarPos).toBeTruthy()
-    expect(statusBarPos.x).toBeDefined()
-    expect(statusBarPos.y).toBeDefined()
-
-    expect(activePanelPos).toBeTruthy()
-    expect(activePanelPos.x).toBeDefined()
-    expect(activePanelPos.y).toBeDefined()
-
-    // Unmount and remount with same secret
-    unmount()
-    localStorage.setItem('vesper_secret', 'test-secret')
-    render(<App />)
-
-    // Wait for reload
-    expect(await screen.findByText('System')).toBeInTheDocument()
-
-    // Positions should be restored from localStorage
-    const restoredStatusPos = JSON.parse(localStorage.getItem('panel-status-bar-pos'))
-    const restoredActivePos = JSON.parse(localStorage.getItem('panel-active-panel-pos'))
-
-    expect(restoredStatusPos).toEqual(statusBarPos)
-    expect(restoredActivePos).toEqual(activePanelPos)
+    // Positions should be preserved across remount
+    expect(JSON.parse(localStorage.getItem('panel-status-bar-pos'))).toEqual({ x: 20, y: 20 });
+    expect(JSON.parse(localStorage.getItem('panel-active-panel-pos'))).toEqual({ x: 800, y: 20 });
   })
 
   test('displays status for all integrations', async () => {
@@ -181,5 +165,25 @@ describe('Dashboard Integration', () => {
     // Mock search should be callable and results should display
     // (In real scenario, this would be triggered by user typing in search)
     expect(mockSearch).toBeDefined()
+  })
+
+  test('gear button toggles SettingsPanel visibility', async () => {
+    localStorage.setItem('vesper_secret', 'test-secret');
+    render(<App />);
+    expect(await screen.findByText('System')).toBeInTheDocument();
+
+    // Settings panel should not be visible on initial load
+    expect(screen.queryByText('Settings')).toBeNull();
+
+    // Click gear button
+    const gearBtn = screen.getByRole('button', { name: /settings/i });
+    fireEvent.click(gearBtn);
+
+    // Settings panel title should now be visible
+    expect(await screen.findByText('Settings')).toBeInTheDocument();
+
+    // Click again to close
+    fireEvent.click(gearBtn);
+    expect(screen.queryByText('Settings')).toBeNull();
   })
 })

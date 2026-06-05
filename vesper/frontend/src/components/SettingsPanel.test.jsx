@@ -49,7 +49,7 @@ describe('SettingsPanel', () => {
     expect(mockLoad).toHaveBeenCalled()
   })
 
-  test('returns null before settings load', () => {
+  test('shows loading state before settings load', () => {
     useSettings.mockReturnValue({
       settings: null,
       load: vi.fn(),
@@ -58,8 +58,9 @@ describe('SettingsPanel', () => {
       error: null,
     })
 
-    const { container } = render(<SettingsPanel />)
-    expect(container.firstChild).toBeNull()
+    render(<SettingsPanel />)
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('09:00')).toBeNull()
   })
 
   test('updates form when settings change', () => {
