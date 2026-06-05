@@ -14,8 +14,8 @@ Agent operates in **Advisor mode**: it drafts replies and writes into the vault,
 - **Deadline tracking** — project documents dropped into `inbox/` are classified, dated milestones get promoted into `DEADLINES.md`, mirrored to Google Calendar, and routed into forum threads at 72h / 24h / overdue thresholds.
 - **Lecture summarisation** — drop a `.pptx` or `.pdf` into `Dynamous/Memory/inbox/`, get a structured Obsidian note under `lectures/<course>/` and a new forum thread in `#lectures`.
 - **Hybrid-RAG note search** — 70% vector + 30% BM25 over the whole vault. Embeddings are local (FastEmbed / ONNX, no API calls).
-- **Vesper Tray** — a Windows system tray app (`pystray` + `CustomTkinter`) that runs the whole stack from a tray icon (custom Vesper artwork with a green/red status dot). Its settings window has a four-section sidebar: **Status** (bot start/stop, last/next heartbeat tick), **Tasks** (enable/disable the `secondbrain-*` scheduled tasks, change the heartbeat interval, "Run Now"), **Feats** (per-feature toggles), and **Hours** (active-window times, auto-start, start-with-Windows). Feature toggles and active hours persist to `.claude/data/tray_settings.json` and are read by the heartbeat on every tick; task and interval changes are applied live against Task Scheduler via `schtasks`.
-- **Heartbeat reasoning** — every 30 min during active hours, Python builds a snapshot diff and an LLM decides what (if anything) is worth notifying you about. All tasks route through Claude Haiku; task-level model overrides are configurable via `.claude/data/llm-config.json`. Feature slices (inbox, GCal sync, thread chat, toast notifications) can be toggled live from the tray settings.
+- **Web UI Settings** — floating panel on Dashboard for active hours, feature toggles, heartbeat interval configuration.
+- **Heartbeat reasoning** — every 30 min during active hours, Python builds a snapshot diff and an LLM decides what (if anything) is worth notifying you about. All tasks route through Claude Haiku; task-level model overrides are configurable via `.claude/data/llm-config.json`. Feature slices (inbox, GCal sync, thread chat, toast notifications) can be toggled via the web UI Settings panel.
 - **Discord embed redesign** — all webhook posts and bot DMs now use a unified Vesper embed style: consistent colour palette, structured fields, and Obsidian deep-link buttons where applicable.
 - **Daily reflection** — at 08:00 KL, promotes durable items from yesterday's `daily/` log into `MEMORY.md`; rolls `HABITS.md`.
 - **Vault guardrails** — a path validator with hard-coded forbidden prefixes, an append-only JSONL transaction log, and a `suggest_for_missing` typo-recovery layer protect the vault from accidental writes.
@@ -72,49 +72,61 @@ DISCORD_USER_ID=<your numeric user ID>
 
 Leave every other key empty. Webhook URLs, Google creds, GitHub tokens — all optional. Their corresponding features silently skip when env vars are missing.
 
-## 4. Install the two tasks you need
+## 4. Start Docker
 
-Open PowerShell **as Administrator** (`Register-ScheduledTask` requires elevation, even for user-scoped tasks):
+Everything runs in Docker containers. Two options:
 
+**Option A: Auto-start on logon (recommended)**
+
+Run once:
 ```powershell
-pwsh -ExecutionPolicy Bypass -File .claude\scripts\deploy\install_tasks.ps1
+$shortcut = New-Object -ComObject WScript.Shell
+$startupFolder = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
+$linkPath = "$startupFolder\Vesper-Docker.lnk"
+$link = $shortcut.CreateShortCut($linkPath)
+$link.TargetPath = "powershell.exe"
+$link.Arguments = '-NoProfile -ExecutionPolicy Bypass -File "D:\GitHub\Vesper\.claude\scripts\deploy\start-docker.ps1"'
+$link.WindowStyle = 7
+$link.Save()
 ```
 
-The installer registers four `secondbrain-*` tasks. For pings-only, you need:
+On next logon, Docker automatically starts.
 
-- `secondbrain-discord` — runs the bot at logon. It writes every visible message into `.claude/data/discord_cache.db`.
-- `secondbrain-heartbeat` — every 30 min between 09:00–22:00 KL, scans the cache for new `<@your_id>` mentions and fires the Toast + DM.
-
-Disable the two you don't need:
+**Option B: Manual start**
 
 ```powershell
-Disable-ScheduledTask -TaskName 'secondbrain-reflect'   # needs a vault
-Disable-ScheduledTask -TaskName 'secondbrain-index'     # needs vault files to embed
+cd D:\GitHub\Vesper
+docker-compose up -d
 ```
 
-The Discord task fires at logon — to start it now without rebooting:
-
+Verify running:
 ```powershell
-Start-ScheduledTask -TaskName 'secondbrain-discord'
+docker-compose ps
 ```
+
+Expected: `backend`, `web`, `scheduler` all showing "Up"
 
 ## 5. Verify
 
 ```powershell
-# Both should be Running / Ready
-Get-ScheduledTask -TaskName 'secondbrain-discord','secondbrain-heartbeat' |
-    Format-Table TaskName, State, LastRunTime, NextRunTime
+# Check Docker containers
+docker-compose ps
 
-# Tail the bot log to confirm it connected
-Get-Content .claude\data\logs\discord-*.log -Wait -Tail 20
+# View logs
+docker-compose logs --tail 20
 
-# Manual heartbeat tick (don't wait for the next 30-min mark)
-py .claude\scripts\heartbeat.py
+# Follow scheduler logs (Ctrl+C to exit)
+docker-compose logs -f scheduler
 ```
 
-Have someone @mention you in a server the bot is in. Within 30 minutes (or immediately if you run the heartbeat manually) you should get a Toast and a DM.
+Expected: Backend, web, and scheduler containers all "Up". Open http://localhost in your browser.
 
-**Troubleshooting:** no Toast on Windows means `winotify` failed silently; check the heartbeat's stderr. No DM means `DISCORD_USER_ID` is wrong or the bot can't open a DM with you (Discord requires you share a server).
+Have someone @mention you in a server the bot is in. Within 30 minutes you should get a Toast and a DM.
+
+**Troubleshooting:**
+- No containers running? `docker-compose up -d`
+- Check logs: `docker-compose logs backend` (or `scheduler`, `web`)
+- No DM? Verify `DISCORD_USER_ID` is correct in `.env`
 
 ## 6. Configure Settings (optional)
 
