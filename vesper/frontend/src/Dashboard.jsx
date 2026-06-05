@@ -3,6 +3,7 @@ import { useStore } from './state/store.jsx'
 import { useVesper } from './hooks/useVesper.js'
 import { useCapture } from './hooks/useCapture.js'
 import StatusBar from './components/StatusBar.jsx'
+import SettingsPanel from './components/SettingsPanel.jsx'
 import { ActivePanel } from './components/ActivePanel.jsx'
 import { ParticleOrb } from './components/ParticleOrb.jsx'
 import './Dashboard.css'
@@ -21,6 +22,7 @@ export default function Dashboard() {
   return (
     <div className="dashboard">
       <StatusBar status={state.status} />
+      <SettingsPanel />
 
       <div className="dashboard-center">
         <ParticleOrb state={state.orb} />
