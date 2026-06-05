@@ -8,10 +8,10 @@ export function FloatingPanel({ panelId, title, children, defaultPosition = { x:
     <div
       className="floating-panel frosted-glass"
       data-collapsed={isCollapsed}
+      data-dragging={isDragging}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
-        cursor: isDragging ? 'grabbing' : 'default',
       }}
     >
       <div className="panel-header" onMouseDown={startDrag}>

@@ -20,7 +20,7 @@
   gap: 8px;
 }
 
-.panel-header:active {
+.floating-panel[data-dragging="true"] .panel-header {
   cursor: grabbing;
 }
 
@@ -53,6 +53,12 @@
 
 .panel-chevron:hover {
   color: var(--ink);
+}
+
+.panel-chevron:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .panel-content {
