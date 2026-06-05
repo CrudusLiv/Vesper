@@ -83,4 +83,6 @@ export const api = {
   inboxUploads: () => request('/inbox/uploads'),
   getFeed: (limit = 50) => request(`/feed?limit=${limit}`),
   markFeedItemRead: (id) => request(`/feed/${id}/read`, { method: 'PATCH' }),
+  getSettings: () => request('/settings'),
+  saveSettings: (updates) => request('/settings', { method: 'POST', body: updates }),
 }
