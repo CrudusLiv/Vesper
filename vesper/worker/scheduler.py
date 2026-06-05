@@ -10,6 +10,7 @@ The job's own in_active_hours()/_too_soon() guards stay authoritative for
 scheduled runs — the scheduler just fires; the job decides whether to act."""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -72,15 +73,27 @@ def check_sentinel() -> bool:
     return True
 
 
-def setup_schedule() -> None:
-    schedule.every(30).minutes.do(run_job, _heartbeat_script())
+def _load_heartbeat_interval() -> int:
+    """Load heartbeat interval from tray_settings.json, default to 30."""
+    proj = _proj()
+    settings_file = proj / ".claude" / "data" / "tray_settings.json"
+    try:
+        data = json.loads(settings_file.read_text(encoding="utf-8"))
+        return int(data.get("heartbeat_interval_minutes", 30))
+    except (FileNotFoundError, json.JSONDecodeError, ValueError):
+        return 30
+
+
+def setup_schedule(interval_minutes: int = 30) -> None:
+    schedule.every(interval_minutes).minutes.do(run_job, _heartbeat_script())
     schedule.every(10).minutes.do(run_job, _index_script())
     schedule.every().day.at("08:00").do(run_job, _reflect_script())
 
 
 def main() -> int:
-    setup_schedule()
-    print("[scheduler] started; heartbeat/30m, index/10m, reflect@08:00", flush=True)
+    interval = _load_heartbeat_interval()
+    setup_schedule(interval)
+    print(f"[scheduler] started; heartbeat/{interval}m, index/10m, reflect@08:00", flush=True)
     while True:
         schedule.run_pending()
         check_sentinel()
