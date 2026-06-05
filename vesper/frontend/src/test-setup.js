@@ -30,6 +30,11 @@ HTMLCanvasElement.prototype.getContext = () => ({
   stroke: () => {},
   arc: () => {},
   fill: () => {},
+  save: () => {},
+  restore: () => {},
+  setTransform: () => {},
+  setLineDash: () => {},
+  createRadialGradient: () => ({ addColorStop: () => {} }),
   shadowColor: '',
   shadowBlur: 0,
 })
