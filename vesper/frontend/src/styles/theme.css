@@ -14,6 +14,8 @@
   /* Legacy (for compatibility) */
   --accent: #89dceb;
   --accent2: #b4befe;
+  --line: rgba(180, 190, 254, 0.15);
+  --led-off: #e5533c;
 
   --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
   --sans: ui-sans-serif, system-ui, sans-serif;

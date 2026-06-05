@@ -6,6 +6,7 @@ import StatusBar from './components/StatusBar.jsx'
 import SettingsPanel from './components/SettingsPanel.jsx'
 import { ActivePanel } from './components/ActivePanel.jsx'
 import { ParticleOrb } from './components/ParticleOrb.jsx'
+import LeftDock from './components/LeftDock.jsx'
 import './Dashboard.css'
 
 export default function Dashboard() {
@@ -26,12 +27,20 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
-      <StatusBar status={state.status} />
-      {settingsOpen && <SettingsPanel />}
+      <div className="dashboard-sidebar">
+        <LeftDock
+          memoryResults={state.memory.results}
+          onSearch={onSearch}
+          cap={cap}
+        />
+      </div>
 
       <div className="dashboard-center">
         <ParticleOrb state={state.orb} />
       </div>
+
+      <StatusBar status={state.status} />
+      {settingsOpen && <SettingsPanel />}
 
       <ActivePanel
         memoryResults={state.memory.results}

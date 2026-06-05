@@ -9,7 +9,7 @@ export default function StatusBar({ status }) {
   const integrations = status.integrations;
 
   return (
-    <FloatingPanel panelId="status-bar" title="System" defaultPosition={{ x: 20, y: 20 }}>
+    <FloatingPanel panelId="status-bar" title="System" defaultPosition={{ x: 230, y: 20 }}>
       <div className="status-grid">
         {Object.entries(integrations).map(([name, info]) => (
           <div key={name} className="status-item">

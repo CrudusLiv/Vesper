@@ -18,15 +18,19 @@ export function ParticleOrb({ state = 'idle' }) {
     const centerY = ORBS_SIZE / 2;
     const radius = ORBS_SIZE / 2 - 20;
 
-    particlesRef.current = Array.from({ length: PARTICLE_COUNT }, () => ({
-      x: centerX + (Math.random() - 0.5) * radius * 2,
-      y: centerY + (Math.random() - 0.5) * radius * 2,
-      vx: (Math.random() - 0.5) * 2,
-      vy: (Math.random() - 0.5) * 2,
-      size: Math.random() * 3 + 1,
-      color: `hsl(190, 100%, ${Math.random() * 30 + 50}%)`,
-      trail: [],
-    }));
+    particlesRef.current = Array.from({ length: PARTICLE_COUNT }, () => {
+      const lightness = Math.round(Math.random() * 30 + 50);
+      return {
+        x: centerX + (Math.random() - 0.5) * radius * 2,
+        y: centerY + (Math.random() - 0.5) * radius * 2,
+        vx: (Math.random() - 0.5) * 2,
+        vy: (Math.random() - 0.5) * 2,
+        size: Math.random() * 3 + 1,
+        color: `hsl(190, 100%, ${lightness}%)`,
+        trailColor: `rgba(190, 100, ${lightness}, 0.3)`,
+        trail: [],
+      };
+    });
   }, []);
 
   // Animation loop
@@ -93,7 +97,7 @@ export function ParticleOrb({ state = 'idle' }) {
         p.trail.push({ x: p.x, y: p.y });
         if (p.trail.length > 15) p.trail.shift();
 
-        ctx.strokeStyle = `rgba(${p.color.match(/\d+/g).slice(0, 3).join(',')}, 0.3)`;
+        ctx.strokeStyle = p.trailColor;
         ctx.lineWidth = 0.5;
         ctx.beginPath();
         p.trail.forEach((point, i) => {
@@ -104,8 +108,6 @@ export function ParticleOrb({ state = 'idle' }) {
 
         // Draw particle
         ctx.fillStyle = p.color;
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = 8;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
