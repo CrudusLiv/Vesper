@@ -86,3 +86,8 @@ test('Memory tab has the left-dock-tab class', () => {
   const memoryTab = screen.getByRole('tab', { name: 'Memory' })
   expect(memoryTab).toHaveClass('left-dock-tab')
 })
+
+test('renders resizer handle', () => {
+  render(<LeftDock memoryResults={[]} onSearch={vi.fn()} cap={makeCap()} onResizeStart={vi.fn()} />)
+  expect(document.querySelector('.left-dock-resizer')).toBeInTheDocument()
+})
