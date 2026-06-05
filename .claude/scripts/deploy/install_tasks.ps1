@@ -19,10 +19,7 @@ surface on the desktop.
 #>
 [CmdletBinding()]
 param(
-    [string]$User = $env:USERNAME,
-    # Pass -VisibleHeartbeat to run heartbeat.py directly (shows a console window).
-    # Default: invisible via run_heartbeat.vbs (wscript.exe, no popup).
-    [switch]$VisibleHeartbeat
+    [string]$User = $env:USERNAME
 )
 
 $ErrorActionPreference = 'Stop'
@@ -97,8 +94,8 @@ Write-Host "  py:      $PyPath"
 Write-Host ""
 
 # ----- secondbrain-heartbeat: every 30 min, 09:00-22:00 KL -----
-# heartbeat.py also self-gates via in_active_hours(); restricting the trigger
-# window is belt-and-suspenders so the task list stays clean.
+# Interval now configurable via web UI Settings panel. Task Scheduler enforces
+# the time window; heartbeat.py also self-gates via in_active_hours().
 #
 # PS 5.1 quirk: on a fresh -Daily trigger, .Repetition is $null, so writing
 # .Repetition.Interval throws "property cannot be found on this object". The
@@ -110,19 +107,10 @@ $hbRepeatSrc = New-ScheduledTaskTrigger -Once -At '09:00' `
 $hbTrigger = New-ScheduledTaskTrigger -Daily -At '09:00'
 $hbTrigger.Repetition = $hbRepeatSrc.Repetition
 $HbLaunch = Join-Path $PSScriptRoot 'run_heartbeat.vbs'
-if ($VisibleHeartbeat) {
-    $hbAction = New-ScheduledTaskAction `
-        -Execute $PyPath `
-        -Argument "`"$ScriptsDir\heartbeat.py`"" `
-        -WorkingDirectory $ProjectDir
-    Write-Host "  heartbeat: visible (py heartbeat.py)"
-} else {
-    $hbAction = New-ScheduledTaskAction `
-        -Execute 'wscript.exe' `
-        -Argument "`"$HbLaunch`"" `
-        -WorkingDirectory $ProjectDir
-    Write-Host "  heartbeat: invisible (run_heartbeat.vbs)"
-}
+$hbAction = New-ScheduledTaskAction `
+    -Execute 'wscript.exe' `
+    -Argument "`"$HbLaunch`"" `
+    -WorkingDirectory $ProjectDir
 Register-Task `
     -Name 'secondbrain-heartbeat' `
     -Trigger $hbTrigger `
