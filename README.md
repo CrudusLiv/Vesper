@@ -55,7 +55,6 @@ Then grab your own user ID:
 git clone https://github.com/CrudusLiv/Vesper.git
 cd Vesper
 py -m pip install -r .claude/requirements.txt
-py -m pip install -r .claude/requirements.txt
 ```
 
 ## 3. Configure secrets
