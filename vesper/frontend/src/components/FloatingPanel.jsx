@@ -2,45 +2,33 @@ import { useDragPanel } from '../hooks/useDragPanel.js';
 import './FloatingPanel.css';
 
 export function FloatingPanel({ panelId, title, children, defaultPosition = { x: 20, y: 20 } }) {
-  const { position, isDragging, startDrag, onDrag, stopDrag } = useDragPanel(panelId, defaultPosition);
-
-  // Attach event listeners when dragging
-  const handleMouseDown = (e) => {
-    startDrag(e);
-  };
-
-  const handleMouseMove = (e) => {
-    if (isDragging) {
-      onDrag(e);
-    }
-  };
-
-  const handleMouseUp = () => {
-    stopDrag();
-  };
+  const { position, isDragging, isCollapsed, startDrag, toggleCollapse } = useDragPanel(panelId, defaultPosition);
 
   return (
-    <>
-      <div
-        className="floating-panel frosted-glass"
-        style={{
-          transform: `translate(${position.x}px, ${position.y}px)`,
-          cursor: isDragging ? 'grabbing' : 'grab',
-        }}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      >
-        <div
-          className="panel-header"
-          onMouseDown={handleMouseDown}
+    <div
+      className="floating-panel frosted-glass"
+      data-collapsed={isCollapsed}
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        cursor: isDragging ? 'grabbing' : 'default',
+      }}
+    >
+      <div className="panel-header" onMouseDown={startDrag}>
+        <h3 className="panel-title">{title}</h3>
+        <button
+          className="panel-chevron"
+          onClick={(e) => { e.stopPropagation(); toggleCollapse(); }}
+          aria-label={isCollapsed ? 'Expand panel' : 'Collapse panel'}
         >
-          <h3 className="panel-title">{title}</h3>
-        </div>
+          {isCollapsed ? '›' : '⌄'}
+        </button>
+      </div>
+      {!isCollapsed && (
         <div className="panel-content">
           {children}
         </div>
-      </div>
-    </>
+      )}
+    </div>
   );
 }

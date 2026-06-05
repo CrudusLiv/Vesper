@@ -1,40 +1,68 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { FloatingPanel } from './FloatingPanel.jsx';
 
 describe('FloatingPanel', () => {
-  it('should render with title and children', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('renders title and children', () => {
     render(
-      <FloatingPanel panelId="test" title="Test Panel">
-        <div>Test Content</div>
+      <FloatingPanel panelId="fp1" title="My Panel">
+        <div>Child Content</div>
       </FloatingPanel>
     );
-    expect(screen.getByText('Test Panel')).toBeTruthy();
-    expect(screen.getByText('Test Content')).toBeTruthy();
+    expect(screen.getByText('My Panel')).toBeTruthy();
+    expect(screen.getByText('Child Content')).toBeTruthy();
   });
 
-  it('should apply frosted glass styling', () => {
+  it('has frosted-glass class', () => {
     const { container } = render(
-      <FloatingPanel panelId="test" title="Test">
+      <FloatingPanel panelId="fp2" title="Test">Content</FloatingPanel>
+    );
+    expect(container.querySelector('.floating-panel').className).toContain('frosted-glass');
+  });
+
+  it('uses fixed positioning with left/top style', () => {
+    const { container } = render(
+      <FloatingPanel panelId="fp3" title="Test" defaultPosition={{ x: 42, y: 77 }}>
         Content
       </FloatingPanel>
     );
     const panel = container.querySelector('.floating-panel');
-    expect(panel.className).toContain('frosted-glass');
+    expect(panel.style.left).toBe('42px');
+    expect(panel.style.top).toBe('77px');
   });
 
-  it('should be draggable by header', () => {
-    const { container } = render(
-      <FloatingPanel panelId="test" title="Test" defaultPosition={{ x: 0, y: 0 }}>
-        Content
+  it('renders a chevron button in the header', () => {
+    render(
+      <FloatingPanel panelId="fp4" title="Test">Content</FloatingPanel>
+    );
+    expect(screen.getByRole('button', { name: /collapse/i })).toBeTruthy();
+  });
+
+  it('collapses and hides content when chevron is clicked', () => {
+    render(
+      <FloatingPanel panelId="fp5" title="Test">
+        <div>Hidden When Collapsed</div>
       </FloatingPanel>
     );
-    const header = screen.getByText('Test').closest('.panel-header');
+    expect(screen.getByText('Hidden When Collapsed')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /collapse/i }));
+    expect(screen.queryByText('Hidden When Collapsed')).toBeNull();
+  });
 
-    fireEvent.mouseDown(header);
-    fireEvent.mouseMove(window, { clientX: 100, clientY: 100 });
-    fireEvent.mouseUp(window);
-
-    const panel = container.querySelector('.floating-panel');
-    expect(panel.style.transform).toContain('translate');
+  it('expands again when chevron is clicked a second time', () => {
+    render(
+      <FloatingPanel panelId="fp6" title="Test">
+        <div>Toggle Content</div>
+      </FloatingPanel>
+    );
+    const btn = screen.getByRole('button', { name: /collapse/i });
+    fireEvent.click(btn);
+    expect(screen.queryByText('Toggle Content')).toBeNull();
+    fireEvent.click(btn);
+    expect(screen.getByText('Toggle Content')).toBeTruthy();
   });
 });
