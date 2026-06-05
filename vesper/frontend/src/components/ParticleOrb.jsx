@@ -43,8 +43,7 @@ export function ParticleOrb({ state = 'idle' }) {
 
     const animate = () => {
       // Clear canvas
-      ctx.fillStyle = 'rgba(30, 30, 46, 0.1)';
-      ctx.fillRect(0, 0, ORBS_SIZE, ORBS_SIZE);
+      ctx.clearRect(0, 0, ORBS_SIZE, ORBS_SIZE);
 
       // Update and draw particles
       particlesRef.current.forEach((p, i) => {

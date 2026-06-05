@@ -21,6 +21,7 @@ Object.defineProperty(globalThis, 'localStorage', {
 HTMLCanvasElement.prototype.getContext = () => ({
   fillStyle: '',
   fillRect: () => {},
+  clearRect: () => {},
   strokeStyle: '',
   lineWidth: 0,
   beginPath: () => {},
