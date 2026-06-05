@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 export function useDragPanel(panelId, defaultPosition = { x: 20, y: 20 }) {
   const resolveDefault = () =>
@@ -7,7 +7,13 @@ export function useDragPanel(panelId, defaultPosition = { x: 20, y: 20 }) {
   const [position, setPosition] = useState(() => {
     const saved = localStorage.getItem(`panel-${panelId}-pos`);
     if (saved) {
-      try { return JSON.parse(saved); } catch { /* ignore bad data */ }
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          x: Math.max(0, parsed.x ?? 20),
+          y: Math.max(0, parsed.y ?? 20),
+        };
+      } catch { /* ignore bad data */ }
     }
     return resolveDefault();
   });
@@ -22,6 +28,24 @@ export function useDragPanel(panelId, defaultPosition = { x: 20, y: 20 }) {
   positionRef.current = position;
 
   const dragOffsetRef = useRef({ x: 0, y: 0 });
+
+  // Refs to hold the active drag listeners so they can be cleaned up on unmount
+  const activeMoveRef = useRef(null);
+  const activeUpRef = useRef(null);
+
+  // Cleanup drag listeners if the component unmounts mid-drag
+  useEffect(() => {
+    return () => {
+      if (activeMoveRef.current) {
+        document.removeEventListener('mousemove', activeMoveRef.current);
+        activeMoveRef.current = null;
+      }
+      if (activeUpRef.current) {
+        document.removeEventListener('mouseup', activeUpRef.current);
+        activeUpRef.current = null;
+      }
+    };
+  }, []);
 
   const toggleCollapse = useCallback(() => {
     setIsCollapsed(prev => {
@@ -41,8 +65,8 @@ export function useDragPanel(panelId, defaultPosition = { x: 20, y: 20 }) {
 
     const onMove = (moveEvent) => {
       const newPos = {
-        x: moveEvent.clientX - dragOffsetRef.current.x,
-        y: moveEvent.clientY - dragOffsetRef.current.y,
+        x: Math.max(0, moveEvent.clientX - dragOffsetRef.current.x),
+        y: Math.max(0, moveEvent.clientY - dragOffsetRef.current.y),
       };
       positionRef.current = newPos;
       setPosition(newPos);
@@ -53,7 +77,12 @@ export function useDragPanel(panelId, defaultPosition = { x: 20, y: 20 }) {
       localStorage.setItem(`panel-${panelId}-pos`, JSON.stringify(positionRef.current));
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      activeMoveRef.current = null;
+      activeUpRef.current = null;
     };
+
+    activeMoveRef.current = onMove;
+    activeUpRef.current = onUp;
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
