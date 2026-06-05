@@ -44,12 +44,6 @@ class Integration:
 
 INTEGRATIONS: list[Integration] = [
     Integration(
-        name="discord",
-        description="Discord bot (read-only) -- caches DMs + server messages",
-        requires_env=["DISCORD_BOT_TOKEN"],
-        notes="Long-running bot writes to .claude/data/discord_cache.db. CLI queries the cache.",
-    ),
-    Integration(
         name="github",
         description="GitHub repos, PRs, commit diffs",
         requires_env=["GITHUB_TOKEN"],

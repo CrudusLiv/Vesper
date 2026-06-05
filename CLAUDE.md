@@ -26,14 +26,14 @@ Credentials and secrets go in `.env` at the project root — never committed. Th
 py .claude/scripts/query.py status
 
 # Pull data
-py .claude/scripts/query.py gmail unread
-py .claude/scripts/query.py discord recent --hours 24
 py .claude/scripts/query.py github pr-list <owner/repo>
 py .claude/scripts/query.py gcal upcoming --days 14
 py .claude/scripts/query.py vault inbox
 ```
 
 Add `--json` to most subcommands for machine-readable output.
+
+**Discord integration** has been moved to a standalone app: [DiscordNotif](https://github.com/CrudusLiv/DiscordNotif). This app runs as a Windows Service and detects Discord mentions independently of Vesper.
 
 ## Memory search
 

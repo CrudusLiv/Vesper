@@ -4,10 +4,6 @@
 Usage:
     py query.py status                       Show wiring status of every integration
 
-    py query.py discord recent [--hours 24]
-    py query.py discord dms     [--hours 24]
-    py query.py discord bot                  Run the long-lived Discord cache bot
-
     py query.py github recent-pushes [--days 7]
     py query.py github pr-list [<repo>]
     py query.py github diff <repo> <sha>
@@ -17,6 +13,8 @@ Usage:
     py query.py vault inbox
 
 Add --json to most subcommands for machine-readable output.
+
+NOTE: Discord integration moved to standalone app (DiscordNotif).
 """
 from __future__ import annotations
 
@@ -28,7 +26,6 @@ sys.path.insert(0, str(Path(__file__).parent / "integrations"))
 
 from integrations import _env  # noqa: F401, E402  -- loads .env
 from integrations import (  # noqa: E402
-    discord_int,
     gcal_int,
     github_int,
     registry,
@@ -36,7 +33,6 @@ from integrations import (  # noqa: E402
 )
 
 DISPATCH = {
-    "discord": discord_int.handle_query,
     "github": github_int.handle_query,
     "gcal": gcal_int.handle_query,
     "vault": vault_fs.handle_query,

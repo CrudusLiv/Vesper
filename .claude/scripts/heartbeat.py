@@ -29,7 +29,7 @@ sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts" / "integrations"))
 import _env  # noqa: F401, E402 -- side effect: loads .env into os.environ so notify can read DISCORD_BOT_TOKEN
 
-from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, discord_ping, discord_dm_capture, gcal_sync, vault_state_writer, dashboard, dashboard_state, thread_chat  # noqa: E402
+from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, gcal_sync, vault_state_writer, dashboard, dashboard_state, thread_chat  # noqa: E402
 # Deadlines are now sourced from inbox classification (project documents
 # mentioning dated milestones), not Gmail/Calendar.
 from security import sanitize  # noqa: E402
@@ -492,59 +492,8 @@ def _main_impl() -> int:
     except Exception as exc:
         print(f"_route_pr_events failed: {exc}", file=sys.stderr)
 
-    # Section 2: Discord ping toast scan.
-    user_id = os.environ.get("DISCORD_USER_ID")
-    if user_id:
-        db_path = PROJECT_DIR / ".claude" / "data" / "discord_cache.db"
-        state_path = PROJECT_DIR / ".claude" / "data" / "discord_last_tick.json"
-        try:
-            for ping in discord_ping.scan_pings(db_path, user_id=user_id, state_path=state_path):
-                toast_title, toast_body = discord_ping.format_toast(ping, user_id=user_id)
-                dm_title, dm_body, _ = discord_ping.format_dm(ping, user_id=user_id)
-                if _features.get("toast_notifications", True):
-                    try:
-                        toast.show(toast_title, toast_body)
-                    except Exception as exc:
-                        print(f"discord_ping toast failed: {exc}", file=sys.stderr)
-                try:
-                    notify.send(dm_title, dm_body, priority="high")
-                except Exception as exc:
-                    print(f"discord_ping DM failed: {exc}", file=sys.stderr)
-        except Exception as exc:
-            print(f"discord_ping scan failed: {exc}", file=sys.stderr)
-
-        # Section 3: classify and route self-DMs to the capture bot.
-        try:
-            bot_channel = (PROJECT_DIR / ".claude" / "data" / "discord_dm_channel.txt").read_text(encoding="utf-8").strip() or None
-        except OSError:
-            bot_channel = None
-        try:
-            counts = discord_dm_capture.scan_and_route(
-                db_path,
-                user_id=user_id,
-                state_path=state_path,
-                bot_dm_channel_id=bot_channel,
-            )
-            total = counts["note"] + counts["finance"]
-            if total:
-                print(f"DM capture: {counts['note']} notes, {counts['finance']} finance, {counts['chit-chat']} discarded")
-        except Exception as exc:
-            print(f"discord_dm_capture failed: {exc}", file=sys.stderr)
-
-        # Slice 7: reply in agent-owned forum threads (deadlines + lectures).
-        # Shares state_path with the two scanners above; an LLM/post failure
-        # still marks the source row seen so the loop can't get stuck.
-        if _features.get("thread_chat", True):
-            try:
-                posted = thread_chat.scan_and_reply(
-                    db_path,
-                    user_id=user_id,
-                    state_path=state_path,
-                )
-                if posted:
-                    print(f"thread_chat: posted {posted} in-thread reply/replies")
-            except Exception as exc:
-                print(f"thread_chat failed: {exc}", file=sys.stderr)
+    # Discord ping detection moved to standalone DiscordNotif app (Phase 5).
+    # See: https://github.com/CrudusLiv/DiscordNotif
 
     # Section 6: push new DEADLINES.md rows and gcal: tags to Google Calendar.
     if _features.get("gcal_sync", True):
