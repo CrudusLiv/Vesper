@@ -1,13 +1,20 @@
 :root {
-  --bg: #0a0d12;
-  --panel: #0f141b;
-  --line: #222b36;
-  --ink: #c8d3e0;
-  --dim: #7d8da0;
-  --accent: #2d6cdf;
-  --accent2: #5b9bff;
-  --led-on: #37d67a;
-  --led-off: #e5533c;
+  /* Catppuccin Mocha */
+  --bg: #1e1e2e;
+  --panel: #313244;
+  --ink: #cdd6f4;
+  --dim: #a6adc8;
+
+  /* Cool accents */
+  --accent-cyan: #89dceb;
+  --accent-lavender: #b4befe;
+  --accent-gold: #f5c563;
+  --accent-purple: #cba6f7;
+
+  /* Legacy (for compatibility) */
+  --accent: #89dceb;
+  --accent2: #b4befe;
+
   --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
   --sans: ui-sans-serif, system-ui, sans-serif;
 }
@@ -16,15 +23,30 @@
 
 body {
   margin: 0;
-  background:
-    linear-gradient(rgba(91, 155, 255, 0.025) 1px, transparent 1px) 0 0 / 100% 3px,
-    radial-gradient(circle at 50% 30%, #11161f, #0a0d12 75%);
+  background: linear-gradient(rgba(137, 220, 235, 0.02) 1px, transparent 1px) 0 0 / 100% 3px,
+              radial-gradient(circle at 50% 30%, #24273a, #1e1e2e 75%);
   color: var(--ink);
   font-family: var(--sans);
   min-height: 100vh;
 }
 
 .mono { font-family: var(--mono); }
+
+/* Frosted glass effect for panels */
+.frosted-glass {
+  background: rgba(49, 50, 68, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--accent-lavender);
+  box-shadow: 0 0 20px rgba(180, 190, 254, 0.1);
+  border-radius: 8px;
+}
+
+/* Orb sphere outline glow */
+.orb-outline {
+  stroke: var(--accent-lavender);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 8px rgba(180, 190, 254, 0.3));
+}
 
 /* VoiceOrb — Arc core */
 .orbwrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
