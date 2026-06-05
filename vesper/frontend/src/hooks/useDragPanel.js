@@ -1,52 +1,63 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
 export function useDragPanel(panelId, defaultPosition = { x: 20, y: 20 }) {
-  const [position, setPosition] = useState(defaultPosition);
-  const [isDragging, setIsDragging] = useState(false);
-  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const resolveDefault = () =>
+    typeof defaultPosition === 'function' ? defaultPosition() : defaultPosition;
 
-  // Load position from localStorage on mount
-  useEffect(() => {
+  const [position, setPosition] = useState(() => {
     const saved = localStorage.getItem(`panel-${panelId}-pos`);
     if (saved) {
-      try {
-        setPosition(JSON.parse(saved));
-      } catch (e) {
-        console.error(`Failed to load panel position for ${panelId}:`, e);
-      }
+      try { return JSON.parse(saved); } catch { /* ignore bad data */ }
     }
+    return resolveDefault();
+  });
+
+  const [isDragging, setIsDragging] = useState(false);
+
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    return localStorage.getItem(`panel-${panelId}-collapsed`) === 'true';
+  });
+
+  const positionRef = useRef(position);
+  positionRef.current = position;
+
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+
+  const toggleCollapse = useCallback(() => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem(`panel-${panelId}-collapsed`, String(next));
+      return next;
+    });
   }, [panelId]);
 
-  const startDrag = (e) => {
+  const startDrag = useCallback((e) => {
+    e.preventDefault();
     dragOffsetRef.current = {
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
+      x: e.clientX - positionRef.current.x,
+      y: e.clientY - positionRef.current.y,
     };
     setIsDragging(true);
-  };
 
-  const onDrag = (e) => {
-    const newPos = {
-      x: e.clientX - dragOffsetRef.current.x,
-      y: e.clientY - dragOffsetRef.current.y,
+    const onMove = (moveEvent) => {
+      const newPos = {
+        x: moveEvent.clientX - dragOffsetRef.current.x,
+        y: moveEvent.clientY - dragOffsetRef.current.y,
+      };
+      positionRef.current = newPos;
+      setPosition(newPos);
     };
-    setPosition(newPos);
-  };
 
-  const stopDrag = () => {
-    setIsDragging(false);
-  };
+    const onUp = () => {
+      setIsDragging(false);
+      localStorage.setItem(`panel-${panelId}-pos`, JSON.stringify(positionRef.current));
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
 
-  // Save position to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem(`panel-${panelId}-pos`, JSON.stringify(position));
-  }, [position, panelId]);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [panelId]);
 
-  return {
-    position,
-    isDragging,
-    startDrag,
-    onDrag,
-    stopDrag,
-  };
+  return { position, isDragging, isCollapsed, startDrag, toggleCollapse };
 }
