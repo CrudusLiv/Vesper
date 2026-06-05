@@ -1,24 +1,30 @@
+import { FloatingPanel } from './FloatingPanel.jsx';
+import './StatusBar.css';
+
 export default function StatusBar({ status }) {
-  const integrations = status?.integrations ?? {}
+  if (!status || Object.keys(status.integrations).length === 0) {
+    return null;
+  }
+
+  const integrations = status.integrations;
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '8px 14px', borderBottom: '1px solid var(--line)', background: 'rgba(15,20,27,0.7)' }}>
-      <span style={{ fontWeight: 700, letterSpacing: '0.18em', color: 'var(--accent2)', fontSize: 13 }}>VESPER</span>
-      <div className="mono" style={{ display: 'flex', gap: 14, marginLeft: 'auto', fontSize: 11 }}>
+    <FloatingPanel panelId="status-bar" title="System" defaultPosition={{ x: 20, y: 20 }}>
+      <div className="status-grid">
         {Object.entries(integrations).map(([name, info]) => (
-          <span key={name} style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            <span
-              data-testid={`led-${name}`}
-              data-state={info.ready ? 'on' : 'off'}
-              style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: info.ready ? 'var(--led-on)' : 'var(--led-off)',
-                boxShadow: `0 0 8px ${info.ready ? 'var(--led-on)' : 'var(--led-off)'}`,
-              }}
-            />
-            {name}
-          </span>
+          <div key={name} className="status-item">
+            <div className="status-icon" data-ready={info.ready}>
+              ●
+            </div>
+            <div className="status-label">{name}</div>
+            {info.missing && info.missing.length > 0 && (
+              <div className="status-missing" title={info.missing.join(', ')}>
+                {info.missing.length} missing
+              </div>
+            )}
+          </div>
         ))}
       </div>
-    </div>
-  )
+    </FloatingPanel>
+  );
 }

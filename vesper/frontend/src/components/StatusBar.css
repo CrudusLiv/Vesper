@@ -1,0 +1,36 @@
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  font-size: 11px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 4px;
+  background: rgba(49, 50, 68, 0.5);
+}
+
+.status-icon {
+  font-size: 10px;
+  color: var(--accent-cyan);
+}
+
+.status-icon[data-ready="false"] {
+  color: #e5533c;
+}
+
+.status-label {
+  color: var(--dim);
+  text-transform: lowercase;
+  flex: 1;
+}
+
+.status-missing {
+  font-size: 9px;
+  color: var(--accent-gold);
+  white-space: nowrap;
+}
