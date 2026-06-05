@@ -80,3 +80,9 @@ describe('Alerts tab', () => {
     expect(screen.getByText('Error in x')).toBeTruthy()
   })
 })
+
+test('Memory tab has the left-dock-tab class', () => {
+  render(<LeftDock memoryResults={[]} onSearch={vi.fn()} cap={makeCap()} />)
+  const memoryTab = screen.getByRole('tab', { name: 'Memory' })
+  expect(memoryTab).toHaveClass('left-dock-tab')
+})

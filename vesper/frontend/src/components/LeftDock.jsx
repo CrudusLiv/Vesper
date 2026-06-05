@@ -7,36 +7,41 @@ import SchedulePanel from './SchedulePanel.jsx'
 import VaultBrowser from './VaultBrowser.jsx'
 import UploadPanel from './UploadPanel.jsx'
 import FeedPanel from './FeedPanel.jsx'
+import './LeftDock.css'
 
-const TABS = ['Memory', 'Finance', 'Notes', 'Schedule', 'Files', 'Uploads', 'Alerts']
+const TABS = [
+  { id: 'Memory',   icon: '🧠' },
+  { id: 'Finance',  icon: '💰' },
+  { id: 'Notes',    icon: '📝' },
+  { id: 'Schedule', icon: '📅' },
+  { id: 'Files',    icon: '📁' },
+  { id: 'Uploads',  icon: '⬆' },
+  { id: 'Alerts',   icon: '🔔' },
+]
 
 export default function LeftDock({ memoryResults, onSearch, cap }) {
   const [tab, setTab] = useState('Memory')
   const { items: feedItems, unreadCount, markRead } = useFeed()
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', borderRight: '1px solid var(--line)', background: 'rgba(13,17,23,0.5)' }}>
-      <div role="tablist" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: 6, borderBottom: '1px solid var(--line)' }}>
-        {TABS.map((t) => (
+    <div className="left-dock">
+      <nav className="left-dock-nav" role="tablist">
+        {TABS.map(({ id, icon }) => (
           <button
-            key={t}
+            key={id}
             role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            style={{ fontSize: 10, padding: '3px 7px', borderRadius: 5, cursor: 'pointer',
-              border: `1px solid ${tab === t ? 'var(--accent)' : 'var(--line)'}`,
-              background: tab === t ? 'var(--accent)' : 'transparent',
-              color: tab === t ? '#fff' : 'var(--dim)' }}
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className="left-dock-tab"
           >
-            {t}
-            {t === 'Alerts' && unreadCount > 0 && (
-              <span style={{ background: '#e74c3c', color: '#fff', borderRadius: 9, padding: '0 4px', fontSize: 9, marginLeft: 3 }}>
-                {unreadCount}
-              </span>
+            <span className="left-dock-tab-icon" aria-hidden="true">{icon}</span>
+            <span className="left-dock-tab-label">{id}</span>
+            {id === 'Alerts' && unreadCount > 0 && (
+              <span className="left-dock-badge">{unreadCount}</span>
             )}
           </button>
         ))}
-      </div>
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+      </nav>
+      <div className="left-dock-content">
         {tab === 'Memory'   && <MemoryPanel results={memoryResults} onSearch={onSearch} />}
         {tab === 'Finance'  && <FinancePanel onLog={cap.logFinance} onLoadSummary={cap.loadFinanceSummary} />}
         {tab === 'Notes'    && <NotesPanel onSave={cap.saveNote} />}
