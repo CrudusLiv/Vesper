@@ -19,6 +19,7 @@ services:
       - ./backend:/workspace/backend:ro
     expose:
       - "8000"
+    restart: unless-stopped
     networks:
       - vesper-net
 
@@ -75,6 +76,7 @@ services:
       - "80:80"
     depends_on:
       - backend
+    restart: unless-stopped
     networks:
       - vesper-net
 
