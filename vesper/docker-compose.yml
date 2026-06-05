@@ -3,7 +3,7 @@ services:
     build:
       context: ./backend
     env_file:
-      # Injects API_SECRET (and the rest of the BoredBot vars) into the
+      # Injects API_SECRET (and the rest of the Vesper vars) into the
       # container. NOTE: do not re-declare API_SECRET under `environment:` with
       # ${API_SECRET} — compose resolves that from a .env beside THIS file
       # (vesper/), not ../.env, so it would resolve blank and override this.

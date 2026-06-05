@@ -87,9 +87,9 @@ def test_cli_habit(tmp_vault, monkeypatch):
 
 def test_cli_commit_assignment(tmp_vault, monkeypatch):
     monkeypatch.setattr(sys, "argv",
-        ["daily.py", "commit", "assignment", "CrudusLiv/BoredBot", "fix auth bug"])
+        ["daily.py", "commit", "assignment", "CrudusLiv/Vesper", "fix auth bug"])
     daily_mod._cli()
-    assert "Commit [assignment]: CrudusLiv/BoredBot — fix auth bug" in \
+    assert "Commit [assignment]: CrudusLiv/Vesper — fix auth bug" in \
         _daily_file(tmp_vault).read_text(encoding="utf-8")
 
 

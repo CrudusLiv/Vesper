@@ -1,4 +1,4 @@
-# BoredBot
+# Vesper
 
 A second brain built on Claude Code. Hooks, scripts, skills, and scheduled tasks that turn Claude Code into a study partner: deadline tracking, lecture summarisation, hybrid-RAG note search, a Discord dashboard that mirrors the vault, and Windows-Toast pings the moment you get @mentioned.
 
@@ -52,8 +52,8 @@ Then grab your own user ID:
 ## 2. Install Python deps
 
 ```powershell
-git clone https://github.com/CrudusLiv/BoredBot.git
-cd BoredBot
+git clone https://github.com/CrudusLiv/Vesper.git
+cd Vesper
 py -m pip install -r .claude/requirements.txt
 ```
 
@@ -291,7 +291,7 @@ A disabled task survives reboots, Windows updates, and re-logons — it won't ru
 
 ```powershell
 Get-Process -Name pwsh, wscript, python, py -ErrorAction SilentlyContinue |
-    Where-Object { $_.Path -like '*BoredBot*' -or $_.CommandLine -like '*discord_bot*' } |
+    Where-Object { $_.Path -like '*Vesper*' -or $_.CommandLine -like '*discord_bot*' } |
     Stop-Process -Force
 ```
 

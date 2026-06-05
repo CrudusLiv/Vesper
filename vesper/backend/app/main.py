@@ -1,4 +1,4 @@
-"""Vesper backend — FastAPI layer wrapping the existing BoredBot scripts.
+"""Vesper backend — FastAPI layer wrapping the existing Vesper scripts.
 
 Routes are SYNC on purpose: FastAPI runs sync routes in a worker thread, so the
 blocking `llm.call` (subprocess to the claude CLI, up to 120s) never blocks the

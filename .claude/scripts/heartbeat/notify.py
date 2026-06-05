@@ -130,7 +130,7 @@ def _ensure_dm_channel(token: str, user_id: str) -> str:
             # User-Agents with a 1010 fingerprint error. The docs require a
             # User-Agent in this format:
             # https://discord.com/developers/docs/reference#user-agent
-            "User-Agent": "DiscordBot (https://github.com/CrudusLiv/BoredBot, 1.0)",
+            "User-Agent": "DiscordBot (https://github.com/CrudusLiv/Vesper, 1.0)",
         },
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
@@ -168,7 +168,7 @@ def _post_message(
             # User-Agents with a 1010 fingerprint error. The docs require a
             # User-Agent in this format:
             # https://discord.com/developers/docs/reference#user-agent
-            "User-Agent": "DiscordBot (https://github.com/CrudusLiv/BoredBot, 1.0)",
+            "User-Agent": "DiscordBot (https://github.com/CrudusLiv/Vesper, 1.0)",
         },
     )
     with urllib.request.urlopen(req, timeout=10) as resp:

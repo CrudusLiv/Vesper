@@ -1,4 +1,4 @@
-"""The single seam between FastAPI and the existing BoredBot scripts.
+"""The single seam between FastAPI and the existing Vesper scripts.
 
 Routes import THIS module, never `.claude/scripts` directly. Here we insert the
 scripts dirs onto sys.path and re-export thin wrappers. Paths resolve from
@@ -19,7 +19,7 @@ for _p in (_SCRIPTS, _SCRIPTS / "integrations", _SCRIPTS / "memory"):
     if _sp not in sys.path:
         sys.path.insert(0, _sp)
 
-# Existing BoredBot modules. _env loads .env on import.
+# Existing Vesper modules. _env loads .env on import.
 import _env  # noqa: F401,E402  -- side effect: loads .env into os.environ
 from integrations import registry  # noqa: E402
 from memory import memory_search  # noqa: E402

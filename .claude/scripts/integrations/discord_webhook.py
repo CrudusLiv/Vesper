@@ -14,7 +14,7 @@ import json
 import urllib.request
 from typing import Any
 
-USER_AGENT = "DiscordBot (https://github.com/CrudusLiv/BoredBot, 1.0)"
+USER_AGENT = "DiscordBot (https://github.com/CrudusLiv/Vesper, 1.0)"
 TIMEOUT = 10
 
 

@@ -93,13 +93,13 @@ def test_log_commits_personal(tmp_vault, monkeypatch):
 def test_log_commits_assignment(tmp_vault, monkeypatch):
     written: list[str] = []
     monkeypatch.setattr(daily_mod, "append_line", lambda line: written.append(line))
-    monkeypatch.setenv("GITHUB_ASSIGNMENT_REPOS", "CrudusLiv/BoredBot")
+    monkeypatch.setenv("GITHUB_ASSIGNMENT_REPOS", "CrudusLiv/Vesper")
 
     heartbeat._log_commits({"new_pushes": [
-        {"repo": "CrudusLiv/BoredBot", "message": "fix auth bug"},
+        {"repo": "CrudusLiv/Vesper", "message": "fix auth bug"},
     ]})
 
-    assert written == ["Commit [assignment]: CrudusLiv/BoredBot — fix auth bug"]
+    assert written == ["Commit [assignment]: CrudusLiv/Vesper — fix auth bug"]
 
 
 def test_log_commits_empty_no_write(monkeypatch):
