@@ -16,3 +16,22 @@ Object.defineProperty(globalThis, 'localStorage', {
   writable: true,
   configurable: true,
 })
+
+// Mock HTMLCanvasElement.getContext for ParticleOrb component tests
+HTMLCanvasElement.prototype.getContext = () => ({
+  fillStyle: '',
+  fillRect: () => {},
+  strokeStyle: '',
+  lineWidth: 0,
+  beginPath: () => {},
+  moveTo: () => {},
+  lineTo: () => {},
+  stroke: () => {},
+  arc: () => {},
+  fill: () => {},
+  shadowColor: '',
+  shadowBlur: 0,
+})
+
+// Mock requestAnimationFrame for ParticleOrb animation loop
+globalThis.requestAnimationFrame = (cb) => setTimeout(cb, 16)
