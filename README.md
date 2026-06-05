@@ -98,45 +98,7 @@ The Discord task fires at logon — to start it now without rebooting:
 Start-ScheduledTask -TaskName 'secondbrain-discord'
 ```
 
-## 5. Run from the tray (recommended)
-
-The tray app is the preferred way to run the bot on your own machine. It replaces the `secondbrain-discord` Task Scheduler task with a system tray icon that gives you live start/stop control, on-demand heartbeat runs, scheduled-task management, and per-feature toggles — all without editing files.
-
-**One-time setup** (after step 4's `install_tasks.ps1` has been run at least once):
-
-```powershell
-# Disable the old Task Scheduler discord task and wire up the tray app at logon
-.claude\scripts\deploy\migrate_to_tray.ps1
-```
-
-**Launch manually:**
-
-```powershell
-py .claude\scripts\tray_app.py
-```
-
-The tray icon shows the custom Vesper artwork (or a drawn circle if no image is present) with a status dot — green when the bot is running, red when stopped. Right-click for the menu; click **Open Settings** for the four-section settings window:
-
-| Section | What it controls |
-|---|---|
-| **Status** 🤖 | Discord bot Start/Stop with a live state badge; last heartbeat tick (minutes ago) and next scheduled tick. Polls every 3 s. |
-| **Tasks** 📋 | The three `secondbrain-*` Task Scheduler tasks. Heartbeat gets an expanded row — live status, last/next run, a **▶ Run Now** button, and an editable interval (minutes) that rewrites the task's repetition via `schtasks /ri`. Reflect and Index are enable/disable toggles. |
-| **Feats** 🔧 | Per-feature toggles — inbox processing, GCal sync, thread chat, toast notifications. Written to `tray_settings.json`; the heartbeat honours them on the next tick. |
-| **Hours** ⏰ | Active-window start/end times, **Auto-start Bot**, and **Start with Windows** (writes/removes the `VesperTray` entry under `HKCU\…\Run`). |
-
-Dropping a `vesper.png` / `vesper.ico` (or any `.png` / `.ico`) into `.claude/scripts/tray/` overrides the tray icon automatically — the status dot is overlaid on top.
-
-**Uninstall options:**
-
-```powershell
-# Undo migration — re-enable Task Scheduler discord task, remove tray from startup
-.claude\scripts\deploy\uninstall_tray.ps1
-
-# Nuclear — stop everything, disable all four tasks, remove startup entry
-.claude\scripts\deploy\uninstall_full.ps1
-```
-
-## 6. Verify
+## 5. Verify
 
 ```powershell
 # Both should be Running / Ready
@@ -153,6 +115,18 @@ py .claude\scripts\heartbeat.py
 Have someone @mention you in a server the bot is in. Within 30 minutes (or immediately if you run the heartbeat manually) you should get a Toast and a DM.
 
 **Troubleshooting:** no Toast on Windows means `winotify` failed silently; check the heartbeat's stderr. No DM means `DISCORD_USER_ID` is wrong or the bot can't open a DM with you (Discord requires you share a server).
+
+## 6. Configure Settings (optional)
+
+The web UI includes a **Settings** panel (floating window on the Dashboard) where you can adjust:
+
+- **Active Hours**: Set when the heartbeat runs (default 09:00–22:00 KL)
+- **Heartbeat Interval**: Change the schedule frequency (default 30 min, min 5, max 120)
+- **Features**: Enable/disable per-feature processing (inbox, reflection, calendar sync, etc.)
+
+Settings are persisted to `.claude/data/tray_settings.json` and take effect on the next heartbeat tick.
+
+To configure manually without the web UI, edit `.claude/data/tray_settings.json` directly (JSON format).
 
 ---
 
@@ -234,11 +208,7 @@ The vault is gitignored — copy your own in, or start fresh from templates.
 Four scheduled tasks live in `.claude/scripts/deploy/`. Open PowerShell **as Administrator**:
 
 ```powershell
-# Default — heartbeat runs invisibly (no console window)
 pwsh -ExecutionPolicy Bypass -File .claude\scripts\deploy\install_tasks.ps1
-
-# Optional — show a console window for the heartbeat (useful for debugging)
-pwsh -ExecutionPolicy Bypass -File .claude\scripts\deploy\install_tasks.ps1 -VisibleHeartbeat
 ```
 
 Idempotent — re-running replaces any existing `secondbrain-*` task.
@@ -249,13 +219,6 @@ Idempotent — re-running replaces any existing `secondbrain-*` task.
 | `secondbrain-reflect` | Daily 08:00 KL | `memory_reflect.py` — promote yesterday's daily log into `MEMORY.md`, roll `HABITS.md` |
 | `secondbrain-index` | Every 10 min | `run_index.vbs` → `memory/memory_index.py` — re-embed changed vault files |
 | `secondbrain-discord` | At logon, restart on failure | `start_discord_bot.vbs` → `start_discord_bot.ps1` — message cache + channel router |
-
-**Choosing heartbeat launch style:**
-
-| Mode | How it runs | When to use |
-|---|---|---|
-| Default (invisible) | `wscript.exe run_heartbeat.vbs` — no popup | Normal daily use — output is written to `state/refresh-log.md` in the vault |
-| `-VisibleHeartbeat` | `py heartbeat.py` directly — shows a console window | Debugging; lets you read stdout/stderr live |
 
 The `secondbrain-discord` task triggers at logon. After installing, either reboot or start it manually:
 
@@ -272,52 +235,11 @@ Get-ScheduledTaskInfo -TaskName 'secondbrain-heartbeat'
 Get-Content .claude\data\logs\discord-*.log -Wait -Tail 20
 ```
 
-## Pausing the bot (disable without uninstalling)
-
-Disable the scheduled tasks. They stay registered but won't fire until re-enabled.
-
-Open PowerShell **as Administrator**:
-
-```powershell
-# Disable all four
-Get-ScheduledTask -TaskName 'secondbrain-*' | Disable-ScheduledTask
-
-# Or individually
-Disable-ScheduledTask -TaskName 'secondbrain-heartbeat'
-Disable-ScheduledTask -TaskName 'secondbrain-discord'
-```
-
-A disabled task survives reboots, Windows updates, and re-logons — it won't run again until you explicitly enable it. The Discord bot, since it runs at logon, also needs the already-running process killed if you disable it mid-session:
-
-```powershell
-Get-Process -Name pwsh, wscript, python, py -ErrorAction SilentlyContinue |
-    Where-Object { $_.Path -like '*Vesper*' -or $_.CommandLine -like '*discord_bot*' } |
-    Stop-Process -Force
-```
-
-Confirm everything is paused:
-
-```powershell
-Get-ScheduledTask -TaskName 'secondbrain-*' | Format-Table TaskName, State
-# State should read 'Disabled' for all four.
-```
-
-### Re-enabling later
-
-```powershell
-Get-ScheduledTask -TaskName 'secondbrain-*' | Enable-ScheduledTask
-```
-
-The Discord task will fire again at your next logon (or run `Start-ScheduledTask -TaskName 'secondbrain-discord'` to start it immediately). The heartbeat and index pick up on their next scheduled tick.
-
 ### Fully uninstalling
 
 ```powershell
 # Remove all four scheduled tasks
 pwsh -ExecutionPolicy Bypass -File .claude\scripts\deploy\uninstall_tasks.ps1
-
-# If you were using the tray app, also stop everything and remove the startup entry
-.claude\scripts\deploy\uninstall_full.ps1
 ```
 
 Logs and vault data are preserved — delete `.claude\data\logs\` and `Dynamous\Memory\` manually if you want those gone too.
@@ -330,9 +252,7 @@ Logs and vault data are preserved — delete `.claude\data\logs\` and `Dynamous\
 | `.claude/scripts/` | `query.py` CLI dispatcher, `heartbeat.py`, `memory_reflect.py`, integrations, memory (RAG), deploy scripts |
 | `.claude/scripts/heartbeat/` | Tick sub-modules — `dashboard.py` (Vesper embed router), `discord_ping.py` (@mention + reply scanner), `deadlines.py`, `inbox.py`, `imminent.py`, `gcal_sync.py`, `toast.py`, `notify.py`, `llm.py` (Claude routing), `thread_chat.py`, `backfill_lectures.py` (one-shot vault → `#lectures` poster), etc. |
 | `.claude/scripts/vault/` | Vault guardrails — `paths.py` (path validator), `transactions.py` (append-only JSONL log), `actions.py` (append/create helpers) |
-| `.claude/scripts/deploy/` | `install_tasks.ps1`, `uninstall_tasks.ps1`, `migrate_to_tray.ps1`, `uninstall_tray.ps1`, `uninstall_full.ps1`, `start_discord_bot.ps1`, `run_heartbeat.vbs`, `run_index.vbs` |
-| `.claude/scripts/tray/` | Tray app package — `config.py`, `process_mgr.py`, `task_scheduler.py` (schtasks wrapper), `icon.py` (custom-image + status-dot loader), `settings_window.py` (four-section sidebar UI) |
-| `.claude/scripts/tray_app.py` | Tray app entry point — run directly or via `migrate_to_tray.ps1` for logon startup |
+| `.claude/scripts/deploy/` | `install_tasks.ps1`, `uninstall_tasks.ps1`, `start_discord_bot.ps1`, `run_heartbeat.vbs`, `run_index.vbs` |
 | `.claude/chat/` | Discord bot — message cache + `#inbox` / `#finance` / `#vesper` channel router |
 | `.claude/skills/` | Skills the agent invokes — `deadline-tracker`, `lecture-summarizer`, `note-search`, `vault-structure` |
 | `.claude/settings.json` | Wires hooks into Claude Code |
