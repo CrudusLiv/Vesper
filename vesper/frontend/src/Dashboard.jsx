@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useStore } from './state/store.jsx'
 import { useVesper } from './hooks/useVesper.js'
 import { useCapture } from './hooks/useCapture.js'
@@ -14,6 +14,10 @@ export default function Dashboard() {
   const cap = useCapture()
   const debounce = useRef(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+
+  useEffect(() => {
+    return () => clearTimeout(debounce.current)
+  }, [])
 
   function onSearch(q) {
     clearTimeout(debounce.current)
