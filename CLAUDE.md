@@ -98,6 +98,12 @@ Three lifecycle hooks wired in `.claude/settings.json`:
 
 Place `google_credentials.json` at `.claude/data/google_credentials.json`. The token is cached after the first OAuth flow. Both integrations share the same token.
 
+### Settings Management
+
+User settings (active hours, feature toggles, heartbeat interval) are stored in `.claude/data/tray_settings.json` and configured via the **Settings** floating panel on the web Dashboard. The scheduler reads the interval at startup; feature toggles are honored by each heartbeat task.
+
+API: GET/POST `/api/settings` (requires auth).
+
 ## Vault write rules
 
 - **Never delete** files under `Dynamous/Memory/` — except inside `inbox/_processed/`, where the lecture-summarizer deletes source files after a verified summary write
