@@ -3,9 +3,9 @@ import { useStore } from './state/store.jsx'
 import { useVesper } from './hooks/useVesper.js'
 import { useCapture } from './hooks/useCapture.js'
 import StatusBar from './components/StatusBar.jsx'
-import LeftDock from './components/LeftDock.jsx'
-import VoiceOrb from './components/VoiceOrb.jsx'
-import ChatPanel from './components/ChatPanel.jsx'
+import { ActivePanel } from './components/ActivePanel.jsx'
+import { ParticleOrb } from './components/ParticleOrb.jsx'
+import './Dashboard.css'
 
 export default function Dashboard() {
   const { state } = useStore()
@@ -19,26 +19,23 @@ export default function Dashboard() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div className="dashboard">
       <StatusBar status={state.status} />
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        <div style={{ flex: '0 0 23%' }}>
-          <LeftDock memoryResults={state.memory.results} onSearch={onSearch} cap={cap} />
-        </div>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <VoiceOrb state={state.orb} />
-        </div>
-        <div style={{ flex: '0 0 34%' }}>
-          <ChatPanel
-            messages={state.chat.messages}
-            pending={state.chat.pending}
-            onSend={sendChat}
-            voiceSupported={sttSupported}
-            listening={state.orb === 'listening'}
-            onMic={() => (state.orb === 'listening' ? stopVoice() : startVoice())}
-          />
-        </div>
+
+      <div className="dashboard-center">
+        <ParticleOrb state={state.orb} />
       </div>
+
+      <ActivePanel
+        memoryResults={state.memory.results}
+        onSearch={onSearch}
+        messages={state.chat.messages}
+        pending={state.chat.pending}
+        onSend={sendChat}
+        voiceSupported={sttSupported}
+        listening={state.orb === 'listening'}
+        onMic={() => (state.orb === 'listening' ? stopVoice() : startVoice())}
+      />
     </div>
   )
 }
