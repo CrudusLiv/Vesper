@@ -6,6 +6,7 @@ from .schema import (
     Schedule,
     parse_vault_file,
 )
+from .writer import VaultWriter
 
 __all__ = [
     "VaultFileMetadata",
@@ -13,4 +14,5 @@ __all__ = [
     "Finance",
     "Schedule",
     "parse_vault_file",
+    "VaultWriter",
 ]
