@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Optional, Literal, Union, Tuple, Any
 from datetime import datetime, date
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ConfigDict, ValidationError
 import yaml
 
 
@@ -31,7 +31,7 @@ class VaultFileMetadata(BaseModel):
 
     @field_validator("modified", mode="before")
     @classmethod
-    def convert_modified_to_string(cls, v: Any) -> str:
+    def convert_modified_to_string(cls, v: Any) -> Optional[str]:
         """Convert date objects to ISO format strings."""
         if v is None:
             return None
@@ -93,7 +93,8 @@ class Schedule(VaultFileMetadata):
         if len(parts) != 2:
             raise ValueError(f"Time must be in HH:MM format, got '{v}'")
         try:
-            hour, minute = int(parts[0]), int(parts[1])
+            hour = int(parts[0])
+            minute = int(parts[1])
             if not (0 <= hour < 24 and 0 <= minute < 60):
                 raise ValueError(
                     f"Invalid time values: hour={hour}, minute={minute}"
@@ -181,7 +182,7 @@ def parse_vault_file(
             metadata = Schedule(**metadata_dict)
         else:
             raise ValueError(f"Unknown file type: {file_type}")
-    except Exception as e:
+    except ValidationError as e:
         # Re-raise Pydantic validation errors as ValueError
         raise ValueError(f"Metadata validation error: {e}")
 

@@ -381,6 +381,6 @@ triple dashes inside.
         content = "Just plain markdown content"
         metadata, body = parse_vault_file(content)
         assert metadata.type == "note"
-        # created should be provided or defaultable
-        assert metadata.created is not None or metadata.created is None  # flexible
+        # created should be provided and be a non-empty string
+        assert isinstance(metadata.created, str) and len(metadata.created) > 0
         assert body == content
