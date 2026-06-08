@@ -104,7 +104,7 @@ class TestVaultToolIntegration:
 
         assert result["success"] is True
         assert result["error"] is None
-        assert "metadata" in result["result"]
+        assert "created" in result["result"]
 
         # Verify file was created
         note_file = Path(temp_vault) / "notes" / "test.md"
@@ -125,7 +125,7 @@ class TestVaultToolIntegration:
 
         assert result["success"] is True
         assert result["result"]["type"] == "note"
-        assert "important" in result["result"]["metadata"]["tags"]
+        assert "important" in result["result"]["tags"]
 
         # Verify file contains tags
         note_file = Path(temp_vault) / "notes" / "tagged.md"
@@ -315,6 +315,32 @@ class TestVaultToolExecutorUnitTests:
         result = executor.search(query="test", search_type="all")
         assert result["success"] is True
         assert "matches" in result["result"]
+
+
+class TestVaultPathCalculation:
+    """Tests for vault path fallback calculations."""
+
+    def test_fallback_vault_path_no_env_var(self, monkeypatch):
+        """Test that default VAULT_PATH calculation works correctly without env var."""
+        from app.agent.tools.vault import VaultToolExecutor
+        import os
+
+        # Ensure VAULT_PATH is not set in environment
+        if "VAULT_PATH" in os.environ:
+            monkeypatch.delenv("VAULT_PATH")
+
+        # Create executor without explicit vault_path - should use fallback
+        executor = VaultToolExecutor()
+
+        # Verify the fallback path is correct
+        # Path should be: <project_root>/Dynamous/Memory
+        expected_end = "Dynamous" + os.sep + "Memory"
+        assert executor.vault_path.endswith(expected_end), \
+            f"Expected vault path to end with {expected_end}, got {executor.vault_path}"
+
+        # Verify it's not the incorrect vesper/ directory
+        assert "vesper" + os.sep + "Dynamous" not in executor.vault_path, \
+            f"Vault path incorrectly includes vesper directory: {executor.vault_path}"
 
 
 class TestToolExecutorIntegration:

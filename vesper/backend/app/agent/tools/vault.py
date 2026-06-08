@@ -26,7 +26,7 @@ class VaultToolExecutor:
             self.vault_path = os.environ.get("VAULT_PATH")
             if not self.vault_path:
                 # Default to standard location
-                project_dir = Path(__file__).resolve().parents[4]
+                project_dir = Path(__file__).resolve().parents[5]
                 self.vault_path = str(project_dir / "Dynamous" / "Memory")
 
         self.writer = VaultWriter(self.vault_path)
@@ -81,10 +81,8 @@ class VaultToolExecutor:
                 "result": {
                     "type": "note",
                     "path": path,
-                    "metadata": {
-                        "created": note_metadata.created,
-                        "tags": note_metadata.tags or [],
-                    }
+                    "created": note_metadata.created,
+                    "tags": note_metadata.tags or [],
                 },
                 "error": None
             }
@@ -129,8 +127,8 @@ class VaultToolExecutor:
                     "type": "finance",
                     "amount": finance_metadata.amount,
                     "category": finance_metadata.category,
-                    "date": finance_metadata.created,
-                    "description": finance_metadata.description,
+                    "created": finance_metadata.created,
+                    "description": finance_metadata.description or "",
                 },
                 "error": None
             }
@@ -183,12 +181,12 @@ class VaultToolExecutor:
                 "result": {
                     "type": "schedule",
                     "title": schedule_metadata.title,
-                    "date": schedule_metadata.created,
+                    "created": schedule_metadata.created,
                     "start_time": schedule_metadata.start_time,
                     "end_time": schedule_metadata.end_time,
-                    "priority": getattr(schedule_metadata, "priority", None),
-                    "location": getattr(schedule_metadata, "location", None),
-                    "description": getattr(schedule_metadata, "description", None),
+                    "priority": getattr(schedule_metadata, "priority", None) or "",
+                    "location": getattr(schedule_metadata, "location", None) or "",
+                    "description": getattr(schedule_metadata, "description", None) or "",
                 },
                 "error": None
             }
