@@ -11,6 +11,7 @@ services:
     environment:
       - CLAUDE_PROJECT_DIR=/workspace
       - VAULT_PATH=/workspace/Dynamous/Memory
+      - OLLAMA_URL=http://ollama:11434
     volumes:
       - ../Dynamous/Memory:/workspace/Dynamous/Memory
       - ../.claude/scripts:/workspace/.claude/scripts:ro
