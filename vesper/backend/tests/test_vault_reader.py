@@ -501,6 +501,22 @@ class TestSearch:
         results = vault_reader.search("nonexistent")
         assert results == []
 
+    def test_search_finds_nested_files(self, vault_writer, vault_reader, temp_vault):
+        """Should find files in nested subdirectories."""
+        # Create nested directory structure and add files
+        vault_writer.add_note(path="notes/archived/nested.md", content="nested searchable")
+        vault_writer.add_note(path="notes/deep/subdir/deeply_nested.md", content="deeply searchable")
+        vault_writer.add_finance(amount=50.00, category="nested", date="2026-06-08")
+        vault_writer.add_schedule(title="nested", date="2026-06-08", start_time="10:00", end_time="11:00")
+
+        # Search for nested note
+        results = vault_reader.search("nested")
+        assert len(results) >= 2  # At least note and finance matches
+
+        # Verify we can find deeply nested notes
+        results = vault_reader.search("deeply")
+        assert len(results) > 0
+
     def test_search_results_sorted_by_date(self, vault_writer, vault_reader):
         """Search results should be sorted by date (most recent first)."""
         # Add notes with different dates

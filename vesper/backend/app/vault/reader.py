@@ -369,7 +369,8 @@ class VaultReader:
         try:
             # Search notes
             if search_type in ("all", "note"):
-                for md_file in Path(self.vault_path).rglob("notes/*.md"):
+                notes_dir = Path(self.vault_path) / "notes"
+                for md_file in notes_dir.rglob("*.md"):
                     try:
                         content = md_file.read_text(encoding="utf-8")
                         metadata, body = parse_vault_file(content)
@@ -388,7 +389,8 @@ class VaultReader:
 
             # Search finances
             if search_type in ("all", "finance"):
-                for md_file in Path(self.vault_path).rglob("finance/*.md"):
+                finance_dir = Path(self.vault_path) / "finance"
+                for md_file in finance_dir.rglob("*.md"):
                     try:
                         content = md_file.read_text(encoding="utf-8")
                         metadata, body = parse_vault_file(content)
@@ -410,7 +412,8 @@ class VaultReader:
 
             # Search schedules
             if search_type in ("all", "schedule"):
-                for md_file in Path(self.vault_path).rglob("schedule/*.md"):
+                schedule_dir = Path(self.vault_path) / "schedule"
+                for md_file in schedule_dir.rglob("*.md"):
                     try:
                         content = md_file.read_text(encoding="utf-8")
                         metadata, body = parse_vault_file(content)
