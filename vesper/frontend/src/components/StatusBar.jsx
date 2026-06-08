@@ -1,7 +1,7 @@
 import { FloatingPanel } from './FloatingPanel.jsx';
 import './StatusBar.css';
 
-export default function StatusBar({ status }) {
+export default function StatusBar({ status, onMinimize }) {
   if (!status || Object.keys(status.integrations).length === 0) {
     return null;
   }
@@ -9,7 +9,7 @@ export default function StatusBar({ status }) {
   const integrations = status.integrations;
 
   return (
-    <FloatingPanel panelId="status-bar" title="System" defaultPosition={{ x: 230, y: 20 }}>
+    <FloatingPanel panelId="status-bar" title="System" icon="⬡" defaultPosition={{ x: 230, y: 20 }} onMinimize={onMinimize}>
       <div className="status-grid">
         {Object.entries(integrations).map(([name, info]) => (
           <div key={name} className="status-item">

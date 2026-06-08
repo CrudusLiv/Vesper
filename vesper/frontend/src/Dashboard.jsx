@@ -68,6 +68,8 @@ export default function Dashboard() {
   }
 
   const activePanelMinimized = minimizedPanels.some(p => p.id === 'active-panel')
+  const settingsPanelMinimized = minimizedPanels.some(p => p.id === 'settings-panel')
+  const statusBarMinimized = minimizedPanels.some(p => p.id === 'status-bar')
 
   return (
     <div className="dashboard" data-resizing={isResizing || undefined}>
@@ -86,8 +88,8 @@ export default function Dashboard() {
         <ParticleOrb state={state.orb} />
       </div>
 
-      <StatusBar status={state.status} />
-      {settingsOpen && <SettingsPanel />}
+      {!statusBarMinimized && <StatusBar status={state.status} onMinimize={handleMinimize} />}
+      {settingsOpen && !settingsPanelMinimized && <SettingsPanel onMinimize={handleMinimize} />}
 
       {!activePanelMinimized && (
         <ActivePanel
@@ -105,7 +107,13 @@ export default function Dashboard() {
 
       <button
         className="gear-btn"
-        onClick={() => setSettingsOpen(o => !o)}
+        onClick={() => {
+          if (settingsPanelMinimized) {
+            handleRestore('settings-panel')
+          } else {
+            setSettingsOpen(o => !o)
+          }
+        }}
         aria-label="Toggle settings"
       >
         ⚙

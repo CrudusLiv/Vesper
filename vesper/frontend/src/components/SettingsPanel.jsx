@@ -3,7 +3,7 @@ import { FloatingPanel } from './FloatingPanel.jsx'
 import { useSettings } from '../hooks/useSettings.js'
 import './SettingsPanel.css'
 
-export default function SettingsPanel() {
+export default function SettingsPanel({ onMinimize }) {
   const { settings, loading, error, load, save } = useSettings()
   const [formData, setFormData] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -51,7 +51,7 @@ export default function SettingsPanel() {
   const hasChanges = JSON.stringify(formData) !== JSON.stringify(settings)
 
   return (
-    <FloatingPanel panelId="settings-panel" title="Settings" defaultPosition={() => ({ x: Math.max(20, window.innerWidth - 370), y: 80 })}>
+    <FloatingPanel panelId="settings-panel" title="Settings" icon="⚙" defaultPosition={() => ({ x: Math.max(20, window.innerWidth - 370), y: 80 })} onMinimize={onMinimize}>
       {(!settings || !formData) ? (
         <div className="settings-panel">
           {loading && <div className="settings-loading">Loading…</div>}
