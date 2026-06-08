@@ -19,6 +19,7 @@ export function FloatingPanel({ panelId, title, icon = '◻', children, defaultP
         {onMinimize && (
           <button
             className="panel-minimize"
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onMinimize({ id: panelId, title, icon }); }}
             aria-label="Minimize to dock"
             title="Minimize to dock"
@@ -28,6 +29,7 @@ export function FloatingPanel({ panelId, title, icon = '◻', children, defaultP
         )}
         <button
           className="panel-chevron"
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); toggleCollapse(); }}
           aria-label={isCollapsed ? 'Expand panel' : 'Collapse panel'}
         >

@@ -41,7 +41,7 @@ export default function ChatPanel({ messages, pending, onSend, voiceSupported = 
           placeholder="message Vesper…"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          style={{ flex: 1, background: '#0b0f15', border: '1px solid var(--line)', borderRadius: 6, padding: '6px 8px', fontSize: 12, color: 'var(--ink)' }}
+          style={{ flex: 1, background: '#0b0f15', border: '1px solid var(--line)', borderRadius: 6, padding: '6px 8px', fontSize: 14, color: 'var(--ink)' }}
         />
         <button
           type="button"

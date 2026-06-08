@@ -53,7 +53,7 @@ export function useVesper() {
     if (!query.trim()) { dispatch({ type: 'MEMORY_RESULTS', results: [] }); return }
     dispatch({ type: 'MEMORY_LOADING' })
     try {
-      const { results } = await api.search(query, 5)
+      const { results } = await api.search(query, 8)
       dispatch({ type: 'MEMORY_RESULTS', results })
     } catch (err) {
       if (err instanceof AuthError) lock()
