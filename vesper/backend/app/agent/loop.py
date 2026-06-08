@@ -2,6 +2,7 @@ import logging
 from .models import AgentRequest, AgentResponse
 from .registry import ToolRegistry
 from .executor import ToolExecutor
+from ..config import config
 
 logger = logging.getLogger(__name__)
 
@@ -9,8 +10,9 @@ logger = logging.getLogger(__name__)
 class AgentLoop:
     """Main agent loop that processes user input and executes tools"""
 
-    def __init__(self, ollama_url: str = "http://localhost:11434"):
-        self.ollama_url = ollama_url
+    def __init__(self, ollama_url: str = None):
+        self.ollama_url = ollama_url or config.OLLAMA_URL
+        self.model = config.OLLAMA_MODEL
         self.registry = ToolRegistry()
         self.executor = ToolExecutor()
 
