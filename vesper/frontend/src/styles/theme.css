@@ -36,10 +36,10 @@ body {
 
 /* Frosted glass effect for panels */
 .frosted-glass {
-  background: rgba(49, 50, 68, 0.85);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--accent-lavender);
-  box-shadow: 0 0 20px rgba(180, 190, 254, 0.1);
+  background: rgba(8, 12, 22, 0.88);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(137, 220, 235, 0.18);
+  box-shadow: 0 0 20px rgba(137, 220, 235, 0.08);
   border-radius: 8px;
 }
 

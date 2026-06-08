@@ -1,7 +1,7 @@
 import { useDragPanel } from '../hooks/useDragPanel.js';
 import './FloatingPanel.css';
 
-export function FloatingPanel({ panelId, title, children, defaultPosition = { x: 20, y: 20 } }) {
+export function FloatingPanel({ panelId, title, icon = '◻', children, defaultPosition = { x: 20, y: 20 }, onMinimize }) {
   const { position, isDragging, isCollapsed, startDrag, toggleCollapse } = useDragPanel(panelId, defaultPosition);
 
   return (
@@ -16,6 +16,16 @@ export function FloatingPanel({ panelId, title, children, defaultPosition = { x:
     >
       <div className="panel-header" onMouseDown={startDrag}>
         <h3 className="panel-title">{title}</h3>
+        {onMinimize && (
+          <button
+            className="panel-minimize"
+            onClick={(e) => { e.stopPropagation(); onMinimize({ id: panelId, title, icon }); }}
+            aria-label="Minimize to dock"
+            title="Minimize to dock"
+          >
+            ◂
+          </button>
+        )}
         <button
           className="panel-chevron"
           onClick={(e) => { e.stopPropagation(); toggleCollapse(); }}

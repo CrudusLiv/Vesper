@@ -25,6 +25,7 @@ export default function Dashboard() {
     return saved ? parseInt(saved, 10) : SIDEBAR_DEFAULT
   })
   const [isResizing, setIsResizing] = useState(false)
+  const [minimizedPanels, setMinimizedPanels] = useState([])
 
   useEffect(() => {
     return () => clearTimeout(debounce.current)
@@ -55,6 +56,19 @@ export default function Dashboard() {
     debounce.current = setTimeout(() => search(q), 300)
   }
 
+  function handleMinimize(panel) {
+    setMinimizedPanels(prev => {
+      if (prev.some(p => p.id === panel.id)) return prev
+      return [...prev, panel]
+    })
+  }
+
+  function handleRestore(panelId) {
+    setMinimizedPanels(prev => prev.filter(p => p.id !== panelId))
+  }
+
+  const activePanelMinimized = minimizedPanels.some(p => p.id === 'active-panel')
+
   return (
     <div className="dashboard" data-resizing={isResizing || undefined}>
       <div className="dashboard-sidebar" style={{ width: sidebarWidth + 'px' }}>
@@ -63,6 +77,8 @@ export default function Dashboard() {
           onSearch={onSearch}
           cap={cap}
           onResizeStart={() => setIsResizing(true)}
+          minimizedPanels={minimizedPanels}
+          onRestorePanel={handleRestore}
         />
       </div>
 
@@ -73,16 +89,19 @@ export default function Dashboard() {
       <StatusBar status={state.status} />
       {settingsOpen && <SettingsPanel />}
 
-      <ActivePanel
-        memoryResults={state.memory.results}
-        onSearch={onSearch}
-        messages={state.chat.messages}
-        pending={state.chat.pending}
-        onSend={sendChat}
-        voiceSupported={sttSupported}
-        listening={state.orb === 'listening'}
-        onMic={() => (state.orb === 'listening' ? stopVoice() : startVoice())}
-      />
+      {!activePanelMinimized && (
+        <ActivePanel
+          memoryResults={state.memory.results}
+          onSearch={onSearch}
+          messages={state.chat.messages}
+          pending={state.chat.pending}
+          onSend={sendChat}
+          voiceSupported={sttSupported}
+          listening={state.orb === 'listening'}
+          onMic={() => (state.orb === 'listening' ? stopVoice() : startVoice())}
+          onMinimize={handleMinimize}
+        />
+      )}
 
       <button
         className="gear-btn"

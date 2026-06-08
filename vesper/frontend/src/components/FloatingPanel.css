@@ -38,6 +38,7 @@
   flex: 1;
 }
 
+.panel-minimize,
 .panel-chevron {
   background: none;
   border: none;
@@ -51,10 +52,12 @@
   flex-shrink: 0;
 }
 
+.panel-minimize:hover,
 .panel-chevron:hover {
   color: var(--ink);
 }
 
+.panel-minimize:focus-visible,
 .panel-chevron:focus-visible {
   outline: 2px solid var(--accent-cyan);
   outline-offset: 2px;

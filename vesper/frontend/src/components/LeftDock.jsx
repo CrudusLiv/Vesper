@@ -19,7 +19,7 @@ const TABS = [
   { id: 'Alerts',   icon: '🔔' },
 ]
 
-export default function LeftDock({ memoryResults, onSearch, cap, onResizeStart }) {
+export default function LeftDock({ memoryResults, onSearch, cap, onResizeStart, minimizedPanels = [], onRestorePanel }) {
   const [tab, setTab] = useState('Memory')
   const { items: feedItems, unreadCount, markRead } = useFeed()
   return (
@@ -50,6 +50,22 @@ export default function LeftDock({ memoryResults, onSearch, cap, onResizeStart }
         {tab === 'Uploads'  && <UploadPanel onUpload={cap.uploadDocument} onListUploads={cap.listUploads} />}
         {tab === 'Alerts'   && <FeedPanel items={feedItems} markRead={markRead} />}
       </div>
+      {minimizedPanels.length > 0 && (
+        <div className="left-dock-minimized">
+          <span className="left-dock-minimized-label">Panels</span>
+          {minimizedPanels.map(panel => (
+            <button
+              key={panel.id}
+              className="left-dock-minimized-btn"
+              onClick={() => onRestorePanel(panel.id)}
+              title={`Restore ${panel.title}`}
+            >
+              <span className="left-dock-minimized-icon">{panel.icon}</span>
+              <span>{panel.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="left-dock-resizer" onMouseDown={onResizeStart} />
     </div>
   )

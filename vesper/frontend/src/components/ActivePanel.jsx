@@ -13,11 +13,18 @@ export function ActivePanel({
   voiceSupported,
   listening,
   onMic,
+  onMinimize,
 }) {
   const [activeTab, setActiveTab] = useState('search');
 
   return (
-    <FloatingPanel panelId="active-panel" title="Info" defaultPosition={() => ({ x: Math.max(20, window.innerWidth - 420), y: 20 })}>
+    <FloatingPanel
+      panelId="active-panel"
+      title="Info"
+      icon="💬"
+      defaultPosition={() => ({ x: Math.max(20, window.innerWidth - 420), y: 20 })}
+      onMinimize={onMinimize}
+    >
       <div className="active-panel-wrapper">
         <div className="tab-bar">
           <button

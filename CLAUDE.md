@@ -4,10 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A working second brain built on Claude Code. Two things live here:
+Vesper is a personal second brain running as a web application. Two layers live here:
 
-1. **The starter kit** — `.claude/skills/create-second-brain-prd/` contains the skill that generates a personalized PRD for someone building their own second brain.
-2. **CrudusLiv's live second brain** — `Dynamous/Memory/` is the actual vault; `.claude/scripts/`, `.claude/hooks/`, and `.claude/settings.json` are the running system.
+1. **Web app** — `vesper/` contains the React frontend, FastAPI backend, nginx reverse proxy, and Docker Compose wiring. This is the primary UI.
+2. **Claude Code agent system** — `.claude/scripts/`, `.claude/hooks/`, and `.claude/settings.json` are the running agent layer (heartbeat, memory, integrations, Discord bot).
+
+The personal vault (notes, schedules, finances) lives locally at `Dynamous/Memory/` — gitignored. Each machine keeps its own vault.
 
 ## Python environment
 
@@ -19,7 +21,18 @@ py -m pip install -r .claude/requirements.txt
 
 Credentials and secrets go in `.env` at the project root — never committed. The `_env.py` loader reads it on import; existing shell env vars take precedence.
 
-## Running integrations
+## Running the web app
+
+```powershell
+cd vesper
+docker compose up -d          # backend + web (always)
+docker compose --profile workers up -d  # add heartbeat scheduler
+docker compose ps             # verify
+```
+
+Open http://localhost in the browser.
+
+## Running integrations (CLI)
 
 ```powershell
 # Check which integrations are wired up
@@ -32,8 +45,6 @@ py .claude/scripts/query.py vault inbox
 ```
 
 Add `--json` to most subcommands for machine-readable output.
-
-**Discord integration** has been moved to a standalone app: [DiscordNotif](https://github.com/CrudusLiv/DiscordNotif). This app runs as a Windows Service and detects Discord mentions independently of Vesper.
 
 ## Memory search
 
@@ -51,6 +62,18 @@ py .claude/scripts/memory/memory_index.py
 The DB lives at `.claude/data/memory.db` (gitignored). Embeddings use `fast-all-MiniLM-L6-v2` via FastEmbed (ONNX, local, cached in `.claude/data/fastembed-cache/`).
 
 ## Architecture
+
+### Web app (`vesper/`)
+
+| Path | Purpose |
+|------|---------|
+| `vesper/frontend/` | React dashboard (Vite, served by nginx) |
+| `vesper/backend/` | FastAPI layer wrapping the Vesper scripts |
+| `vesper/worker/` | Docker worker base image (heartbeat + Discord bot) |
+| `vesper/nginx/` | nginx reverse proxy config |
+| `vesper/docker-compose.yml` | Service wiring |
+
+Backend API prefix: `/api`. Routes: `chat`, `feed`, `finance`, `heartbeat`, `inbox`, `memory`, `note`, `schedule`, `settings`, `status`, `vault`.
 
 ### Memory layer (`Dynamous/Memory/`)
 
@@ -89,7 +112,7 @@ Three lifecycle hooks wired in `.claude/settings.json`:
 ### Adding an integration
 
 1. Copy `integrations/integration_template.py` → `integrations/<name>_int.py`
-2. Implement `handle_query(argv)` 
+2. Implement `handle_query(argv)`
 3. Add an `Integration(...)` entry to `integrations/registry.py`
 4. Add the key to `DISPATCH` in `query.py`
 5. Add required env vars to `.env`
@@ -113,4 +136,11 @@ API: GET/POST `/api/settings` (requires auth).
 
 ## Skills
 
-Skills live in `.claude/skills/<name>/SKILL.md`. The `create-second-brain-prd` skill is the primary deliverable of this repo — it reads a filled-out requirements template and generates a phased PRD at `.agent/plans/second-brain-prd.md` (gitignored).
+Skills live in `.claude/skills/<name>/SKILL.md`:
+
+| Skill | Purpose |
+|-------|---------|
+| `deadline-tracker` | Parse and track deadlines from documents |
+| `lecture-summarizer` | Convert `.pptx`/`.pdf` lectures into structured Obsidian notes |
+| `note-search` | Hybrid semantic + keyword search over the vault |
+| `vault-structure` | Vault layout, Obsidian conventions, read/write rules |
