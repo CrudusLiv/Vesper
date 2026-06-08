@@ -1,0 +1,214 @@
+import pytest
+from app.agent.registry import ToolRegistry
+from app.agent.models import Tool
+
+
+def test_registry_creation():
+    """Test that registry creates with default tools"""
+    registry = ToolRegistry()
+    assert len(registry.tools) > 0  # Should have some default tools
+
+
+def test_registry_has_six_default_tools():
+    """Test that registry has exactly 6 default tools"""
+    registry = ToolRegistry()
+    assert len(registry.tools) == 6
+
+
+def test_registry_default_tools_exist():
+    """Test that all 6 core tools are registered"""
+    registry = ToolRegistry()
+    expected_tools = {
+        "vault_add_note",
+        "vault_add_finance",
+        "vault_add_schedule",
+        "vault_search",
+        "summarize_document",
+        "categorize_item",
+    }
+    assert set(registry.tools.keys()) == expected_tools
+
+
+def test_registry_get_tool():
+    """Test getting a tool by name"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("vault_add_note")
+    assert tool is not None
+    assert tool.name == "vault_add_note"
+
+
+def test_registry_get_nonexistent_tool():
+    """Test getting a tool that doesn't exist"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("nonexistent_tool")
+    assert tool is None
+
+
+def test_registry_list_tools():
+    """Test listing all tools"""
+    registry = ToolRegistry()
+    tools = registry.list_tools()
+    assert len(tools) == 6
+    assert all(isinstance(tool, Tool) for tool in tools)
+
+
+def test_registry_to_ollama_schema():
+    """Test exporting to Ollama schema"""
+    registry = ToolRegistry()
+    schema = registry.to_ollama_schema()
+    assert isinstance(schema, list)
+    assert len(schema) == 6
+    assert all(item["type"] == "function" for item in schema)
+
+
+def test_registry_ollama_schema_has_function_key():
+    """Test that Ollama schema includes function key"""
+    registry = ToolRegistry()
+    schema = registry.to_ollama_schema()
+    assert all("function" in item for item in schema)
+
+
+def test_registry_ollama_schema_has_required_fields():
+    """Test that each function in Ollama schema has required fields"""
+    registry = ToolRegistry()
+    schema = registry.to_ollama_schema()
+    for item in schema:
+        func = item["function"]
+        assert "name" in func
+        assert "description" in func
+        assert "parameters" in func
+
+
+def test_vault_add_note_parameters():
+    """Test vault_add_note has correct parameters"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("vault_add_note")
+    param_names = {p.name for p in tool.parameters}
+    assert "path" in param_names
+    assert "content" in param_names
+    assert "overwrite" in param_names
+
+
+def test_vault_add_finance_parameters():
+    """Test vault_add_finance has correct parameters"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("vault_add_finance")
+    param_names = {p.name for p in tool.parameters}
+    assert "amount" in param_names
+    assert "category" in param_names
+    assert "date" in param_names
+    assert "description" in param_names
+
+
+def test_vault_add_schedule_parameters():
+    """Test vault_add_schedule has correct parameters"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("vault_add_schedule")
+    param_names = {p.name for p in tool.parameters}
+    assert "title" in param_names
+    assert "date" in param_names
+    assert "start_time" in param_names
+    assert "end_time" in param_names
+    assert "priority" in param_names
+    assert "location" in param_names
+    assert "description" in param_names
+
+
+def test_vault_add_schedule_priority_enum():
+    """Test vault_add_schedule priority has enum values"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("vault_add_schedule")
+    priority_param = next(p for p in tool.parameters if p.name == "priority")
+    assert priority_param.enum == ["low", "medium", "high"]
+
+
+def test_vault_search_parameters():
+    """Test vault_search has correct parameters"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("vault_search")
+    param_names = {p.name for p in tool.parameters}
+    assert "query" in param_names
+    assert "search_type" in param_names
+    assert "limit" in param_names
+
+
+def test_vault_search_enum():
+    """Test vault_search search_type has enum values"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("vault_search")
+    search_type_param = next(p for p in tool.parameters if p.name == "search_type")
+    assert set(search_type_param.enum) == {"all", "notes", "finances", "schedule"}
+
+
+def test_summarize_document_parameters():
+    """Test summarize_document has correct parameters"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("summarize_document")
+    param_names = {p.name for p in tool.parameters}
+    assert "file_path" in param_names
+    assert "file_type" in param_names
+
+
+def test_summarize_document_file_type_enum():
+    """Test summarize_document file_type has enum values"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("summarize_document")
+    file_type_param = next(p for p in tool.parameters if p.name == "file_type")
+    assert set(file_type_param.enum) == {"pptx", "pdf", "txt", "md"}
+
+
+def test_categorize_item_parameters():
+    """Test categorize_item has correct parameters"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("categorize_item")
+    param_names = {p.name for p in tool.parameters}
+    assert "item_type" in param_names
+    assert "content" in param_names
+
+
+def test_categorize_item_enum():
+    """Test categorize_item item_type has enum values"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("categorize_item")
+    item_type_param = next(p for p in tool.parameters if p.name == "item_type")
+    assert set(item_type_param.enum) == {"finance", "note", "schedule"}
+
+
+def test_register_custom_tool():
+    """Test registering a custom tool"""
+    from app.agent.models import ToolParameter
+
+    registry = ToolRegistry()
+    custom_tool = Tool(
+        name="custom_tool",
+        description="A custom tool",
+        parameters=[
+            ToolParameter(name="param1", type="string", description="Test param")
+        ]
+    )
+    registry.register(custom_tool)
+    assert len(registry.tools) == 7
+    assert registry.get_tool("custom_tool") == custom_tool
+
+
+def test_registry_tool_descriptions_not_empty():
+    """Test that all tools have descriptions"""
+    registry = ToolRegistry()
+    for tool in registry.list_tools():
+        assert tool.description is not None
+        assert len(tool.description) > 0
+
+
+def test_registry_parameter_required_flags():
+    """Test that parameter required flags are set correctly"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("vault_add_note")
+
+    # Required parameters
+    required_params = {p.name for p in tool.parameters if p.required}
+    assert "path" in required_params
+    assert "content" in required_params
+
+    # Optional parameters
+    optional_params = {p.name for p in tool.parameters if not p.required}
+    assert "overwrite" in optional_params
