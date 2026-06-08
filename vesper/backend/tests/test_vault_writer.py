@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 from app.vault.writer import VaultWriter
-from app.vault.schema import Note, Finance, Schedule
+from app.vault.schema import Note, Finance, Schedule, parse_vault_file
 
 
 @pytest.fixture
@@ -296,6 +296,48 @@ class TestAddFinance:
         assert result1.created == "2026-06-08"
         assert result2.created == "2026-06-08"
 
+    def test_multiple_finance_entries_round_trip(self, vault_writer, temp_vault):
+        """Should properly format multiple finance entries for parsing."""
+        # Add first finance entry
+        vault_writer.add_finance(
+            amount=30.00,
+            category="groceries",
+            date="2026-06-08",
+            description="Weekly groceries"
+        )
+
+        # Add second finance entry to same file
+        vault_writer.add_finance(
+            amount=15.00,
+            category="transport",
+            date="2026-06-08",
+            description="Bus fare"
+        )
+
+        # Read and parse the file
+        file_path = temp_vault / "finance" / "2026-06-08.md"
+        assert file_path.exists()
+
+        raw_content = file_path.read_text(encoding="utf-8")
+
+        # The first entry should parse correctly
+        metadata, body = parse_vault_file(raw_content)
+        assert isinstance(metadata, Finance)
+        assert metadata.type == "finance"
+        assert metadata.amount == 30.00
+        assert metadata.category == "groceries"
+
+        # Verify both entries exist in raw content with proper YAML formatting
+        # Should have two separate frontmatter blocks with newline separator
+        assert raw_content.count("---") >= 4  # At least 2 frontmatters (opening and closing each)
+        assert "type: finance" in raw_content
+        assert "groceries" in raw_content
+        assert "transport" in raw_content
+
+        # Verify no malformed YAML (no direct concatenation like "---type:")
+        assert "---type:" not in raw_content
+        assert "---\ntype:" in raw_content
+
 
 class TestAddSchedule:
     """Test adding schedule entries to the vault."""
@@ -399,6 +441,50 @@ class TestAddSchedule:
         # Both entries should be persisted
         assert result1.title == "Meeting 1"
         assert result2.title == "Meeting 2"
+
+    def test_multiple_schedule_entries_round_trip(self, vault_writer, temp_vault):
+        """Should properly format multiple schedule entries for parsing."""
+        # Add first schedule entry
+        vault_writer.add_schedule(
+            title="Morning standup",
+            date="2026-06-08",
+            start_time="09:00",
+            end_time="09:30",
+            description="Daily sync"
+        )
+
+        # Add second schedule entry to same file
+        vault_writer.add_schedule(
+            title="Afternoon meeting",
+            date="2026-06-08",
+            start_time="14:00",
+            end_time="15:00",
+            description="Project review"
+        )
+
+        # Read and parse the file
+        file_path = temp_vault / "schedule" / "2026-06-08.md"
+        assert file_path.exists()
+
+        raw_content = file_path.read_text(encoding="utf-8")
+
+        # The first entry should parse correctly
+        metadata, body = parse_vault_file(raw_content)
+        assert isinstance(metadata, Schedule)
+        assert metadata.type == "schedule"
+        assert metadata.start_time == "09:00"
+        assert metadata.end_time == "09:30"
+
+        # Verify both entries exist in raw content with proper YAML formatting
+        # Should have two separate frontmatter blocks with newline separator
+        assert raw_content.count("---") >= 4  # At least 2 frontmatters (opening and closing each)
+        assert "type: schedule" in raw_content
+        assert "09:00" in raw_content
+        assert "14:00" in raw_content
+
+        # Verify no malformed YAML (no direct concatenation like "---type:")
+        assert "---type:" not in raw_content
+        assert "---\ntype:" in raw_content
 
 
 class TestUpdateFile:

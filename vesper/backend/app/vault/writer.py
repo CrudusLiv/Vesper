@@ -52,8 +52,10 @@ class VaultWriter:
             resolved = (Path(self.vault_path) / path).resolve()
             vault_root = Path(self.vault_path).resolve()
 
-            # Ensure resolved path is within vault
-            if not str(resolved).startswith(str(vault_root)):
+            # Ensure resolved path is within vault using proper path comparison
+            try:
+                resolved.relative_to(vault_root)
+            except ValueError:
                 raise ValueError(f"Path traversal detected: {relative_path}")
         except (ValueError, RuntimeError) as e:
             raise ValueError(f"Invalid path: {relative_path}") from e
@@ -345,7 +347,8 @@ class VaultWriter:
                 existing_content = full_path.read_text(encoding="utf-8")
                 # For finance and schedule, append a new section
                 frontmatter = metadata.to_yaml_frontmatter()
-                new_entry = f"{frontmatter}\n{content}\n\n"
+                # Add leading newline to ensure proper separation between entries
+                new_entry = f"\n{frontmatter}\n{content}\n\n"
                 full_content = existing_content + new_entry
                 full_path.write_text(full_content, encoding="utf-8")
                 return
