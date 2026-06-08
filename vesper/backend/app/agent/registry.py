@@ -195,6 +195,40 @@ class ToolRegistry:
             )
         )
 
+        self.register(
+            Tool(
+                name="gcal_sync",
+                description="Sync events with Google Calendar",
+                parameters=[
+                    ToolParameter(
+                        name="action",
+                        type="string",
+                        enum=["push", "pull"],
+                        description="Sync action: 'push' to send to GCal, 'pull' to fetch from GCal",
+                        required=True,
+                    ),
+                    ToolParameter(
+                        name="data",
+                        type="object",
+                        description="Event data for push action (title, date, start_time, end_time, location, description)",
+                        required=False,
+                    ),
+                    ToolParameter(
+                        name="limit",
+                        type="number",
+                        description="Max events to pull (default 10)",
+                        required=False,
+                    ),
+                    ToolParameter(
+                        name="days",
+                        type="number",
+                        description="Number of days to look ahead for pull (default 14)",
+                        required=False,
+                    ),
+                ],
+            )
+        )
+
     def register(self, tool: Tool):
         """Register a tool"""
         self.tools[tool.name] = tool

@@ -9,14 +9,14 @@ def test_registry_creation():
     assert len(registry.tools) > 0  # Should have some default tools
 
 
-def test_registry_has_six_default_tools():
-    """Test that registry has exactly 6 default tools"""
+def test_registry_has_seven_default_tools():
+    """Test that registry has exactly 7 default tools"""
     registry = ToolRegistry()
-    assert len(registry.tools) == 6
+    assert len(registry.tools) == 7
 
 
 def test_registry_default_tools_exist():
-    """Test that all 6 core tools are registered"""
+    """Test that all 7 core tools are registered"""
     registry = ToolRegistry()
     expected_tools = {
         "vault_add_note",
@@ -25,6 +25,7 @@ def test_registry_default_tools_exist():
         "vault_search",
         "summarize_document",
         "categorize_item",
+        "gcal_sync",
     }
     assert set(registry.tools.keys()) == expected_tools
 
@@ -48,7 +49,7 @@ def test_registry_list_tools():
     """Test listing all tools"""
     registry = ToolRegistry()
     tools = registry.list_tools()
-    assert len(tools) == 6
+    assert len(tools) == 7
     assert all(isinstance(tool, Tool) for tool in tools)
 
 
@@ -57,7 +58,7 @@ def test_registry_to_ollama_schema():
     registry = ToolRegistry()
     schema = registry.to_ollama_schema()
     assert isinstance(schema, list)
-    assert len(schema) == 6
+    assert len(schema) == 7
     assert all(item["type"] == "function" for item in schema)
 
 
@@ -174,6 +175,28 @@ def test_categorize_item_enum():
     assert set(item_type_param.enum) == {"finance", "note", "schedule"}
 
 
+def test_gcal_sync_parameters():
+    """Test gcal_sync has correct parameters"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("gcal_sync")
+    assert tool is not None
+    param_names = {p.name for p in tool.parameters}
+    assert "action" in param_names
+    assert "data" in param_names
+    assert "limit" in param_names
+    assert "days" in param_names
+
+
+def test_gcal_sync_action_enum():
+    """Test gcal_sync action has enum values"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("gcal_sync")
+    assert tool is not None
+    action_param = next(p for p in tool.parameters if p.name == "action")
+    assert action_param.enum is not None
+    assert set(action_param.enum) == {"push", "pull"}
+
+
 def test_register_custom_tool():
     """Test registering a custom tool"""
     from app.agent.models import ToolParameter
@@ -187,7 +210,7 @@ def test_register_custom_tool():
         ]
     )
     registry.register(custom_tool)
-    assert len(registry.tools) == 7
+    assert len(registry.tools) == 8
     assert registry.get_tool("custom_tool") == custom_tool
 
 
