@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from . import bridge
-from .routes import chat, feed, finance, heartbeat, inbox, memory, note, schedule, settings, status, vault
+from .routes import chat, feed, finance, heartbeat, inbox, memory, note, schedule, settings, status, vault, voice
 
 
 @asynccontextmanager
@@ -24,6 +24,7 @@ app = FastAPI(title="Vesper API", lifespan=_lifespan)
 app.include_router(status.router, prefix="/api")
 app.include_router(memory.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(voice.router, prefix="/api/chat")
 app.include_router(finance.router, prefix="/api")
 app.include_router(note.router, prefix="/api")
 app.include_router(schedule.router, prefix="/api")
