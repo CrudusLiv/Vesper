@@ -20,7 +20,7 @@ const TABS = [
 ]
 
 export default function LeftDock({ memoryResults, onSearch, cap, onResizeStart, minimizedPanels = [], onRestorePanel }) {
-  const [tab, setTab] = useState('Memory')
+  const [tab, setTab] = useState(() => localStorage.getItem('left-dock-tab') || 'Memory')
   const { items: feedItems, unreadCount, markRead } = useFeed()
   return (
     <div className="left-dock">
@@ -30,7 +30,7 @@ export default function LeftDock({ memoryResults, onSearch, cap, onResizeStart, 
             key={id}
             role="tab"
             aria-selected={tab === id}
-            onClick={() => setTab(id)}
+            onClick={() => { setTab(id); localStorage.setItem('left-dock-tab', id) }}
             className="left-dock-tab"
           >
             <span className="left-dock-tab-icon" aria-hidden="true">{icon}</span>

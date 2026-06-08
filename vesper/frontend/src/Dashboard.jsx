@@ -13,23 +13,35 @@ const SIDEBAR_MIN = 160
 const SIDEBAR_MAX = 400
 const SIDEBAR_DEFAULT = 220
 const STORAGE_KEY = 'left-dock-width'
+const MINIMIZED_KEY = 'minimized-panels'
+const SETTINGS_OPEN_KEY = 'settings-open'
 
 export default function Dashboard() {
   const { state } = useStore()
   const { sendChat, search, startVoice, stopVoice, sttSupported } = useVesper()
   const cap = useCapture()
   const debounce = useRef(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(() => localStorage.getItem(SETTINGS_OPEN_KEY) === 'true')
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
     return saved ? parseInt(saved, 10) : SIDEBAR_DEFAULT
   })
   const [isResizing, setIsResizing] = useState(false)
-  const [minimizedPanels, setMinimizedPanels] = useState([])
+  const [minimizedPanels, setMinimizedPanels] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(MINIMIZED_KEY) || '[]') } catch { return [] }
+  })
 
   useEffect(() => {
     return () => clearTimeout(debounce.current)
   }, [])
+
+  useEffect(() => {
+    localStorage.setItem(MINIMIZED_KEY, JSON.stringify(minimizedPanels))
+  }, [minimizedPanels])
+
+  useEffect(() => {
+    localStorage.setItem(SETTINGS_OPEN_KEY, String(settingsOpen))
+  }, [settingsOpen])
 
   useEffect(() => {
     if (!isResizing) return
