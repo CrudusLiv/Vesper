@@ -358,7 +358,7 @@ class VaultReader:
             search_type: Type to filter by ("note", "finance", "schedule", "all")
 
         Returns:
-            List of tuples (file_path, metadata) where query matches
+            List of tuples (file_path, metadata) where query matches, sorted by date (newest first)
         """
         if not query or not query.strip():
             return []
@@ -431,4 +431,6 @@ class VaultReader:
         except (OSError, PermissionError):
             pass
 
+        # Sort by date, most recent first
+        results.sort(key=lambda x: x[1].created, reverse=True)
         return results

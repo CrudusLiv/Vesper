@@ -501,6 +501,32 @@ class TestSearch:
         results = vault_reader.search("nonexistent")
         assert results == []
 
+    def test_search_results_sorted_by_date(self, vault_writer, vault_reader):
+        """Search results should be sorted by date (most recent first)."""
+        # Add notes with different dates
+        vault_writer.add_note(
+            path="notes/old.md",
+            content="searchable content",
+            created="2026-06-06"
+        )
+        vault_writer.add_note(
+            path="notes/new.md",
+            content="searchable content",
+            created="2026-06-08"
+        )
+        vault_writer.add_note(
+            path="notes/middle.md",
+            content="searchable content",
+            created="2026-06-07"
+        )
+
+        results = vault_reader.search("searchable")
+        assert len(results) == 3
+        # Results should be sorted most recent first
+        assert results[0][1].created == "2026-06-08"
+        assert results[1][1].created == "2026-06-07"
+        assert results[2][1].created == "2026-06-06"
+
 
 class TestRoundTrip:
     """Test write -> read round-trip consistency."""
