@@ -3,7 +3,7 @@ import logging
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 from ..models import ToolCall
 
 logger = logging.getLogger(__name__)
@@ -235,7 +235,7 @@ class GCalToolExecutor:
                 "error": f"GCal API error: {str(e)}"
             }
 
-    def _check_for_duplicates(self, service, title: str, date_str: str) -> Optional[list]:
+    def _check_for_duplicates(self, service: Any, title: str, date_str: str) -> Optional[list]:
         """
         Check if an event with the same title exists on the given date.
 
@@ -249,7 +249,7 @@ class GCalToolExecutor:
         """
         try:
             # Query events on that date with the same title
-            date_obj = datetime.fromisoformat(date_str)
+            date_obj = datetime.fromisoformat(date_str).replace(tzinfo=timezone.utc)
             day_start = date_obj.isoformat()
             day_end = (date_obj + timedelta(days=1)).isoformat()
 

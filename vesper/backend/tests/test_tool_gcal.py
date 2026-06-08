@@ -1,7 +1,7 @@
 """Tests for Google Calendar sync tool."""
 import pytest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
 from app.agent.tools.integrations import GCalToolExecutor
 from app.agent.models import ToolCall
 
