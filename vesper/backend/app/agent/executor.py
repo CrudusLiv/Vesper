@@ -1,7 +1,7 @@
 import logging
 from .models import ToolCall
 from .tools.vault import VaultToolExecutor
-from .tools.integrations import GCalToolExecutor
+from .tools.integrations import GCalToolExecutor, GitHubToolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +12,7 @@ class ToolExecutor:
     def __init__(self):
         self.vault = VaultToolExecutor()
         self.gcal = GCalToolExecutor()
+        self.github = GitHubToolExecutor()
 
     def execute(self, tool_call: ToolCall) -> dict:
         """
@@ -23,6 +24,8 @@ class ToolExecutor:
                 return self.vault.execute(tool_call)
             elif tool_call.tool_name == "gcal_sync":
                 return self.gcal.execute(tool_call)
+            elif tool_call.tool_name == "github_sync":
+                return self.github.execute(tool_call)
             else:
                 return {
                     "success": False,

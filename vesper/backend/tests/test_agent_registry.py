@@ -9,14 +9,14 @@ def test_registry_creation():
     assert len(registry.tools) > 0  # Should have some default tools
 
 
-def test_registry_has_seven_default_tools():
-    """Test that registry has exactly 7 default tools"""
+def test_registry_has_eight_default_tools():
+    """Test that registry has exactly 8 default tools"""
     registry = ToolRegistry()
-    assert len(registry.tools) == 7
+    assert len(registry.tools) == 8
 
 
 def test_registry_default_tools_exist():
-    """Test that all 7 core tools are registered"""
+    """Test that all 8 core tools are registered"""
     registry = ToolRegistry()
     expected_tools = {
         "vault_add_note",
@@ -26,6 +26,7 @@ def test_registry_default_tools_exist():
         "summarize_document",
         "categorize_item",
         "gcal_sync",
+        "github_sync",
     }
     assert set(registry.tools.keys()) == expected_tools
 
@@ -49,7 +50,7 @@ def test_registry_list_tools():
     """Test listing all tools"""
     registry = ToolRegistry()
     tools = registry.list_tools()
-    assert len(tools) == 7
+    assert len(tools) == 8
     assert all(isinstance(tool, Tool) for tool in tools)
 
 
@@ -58,7 +59,7 @@ def test_registry_to_ollama_schema():
     registry = ToolRegistry()
     schema = registry.to_ollama_schema()
     assert isinstance(schema, list)
-    assert len(schema) == 7
+    assert len(schema) == 8
     assert all(item["type"] == "function" for item in schema)
 
 
@@ -210,7 +211,7 @@ def test_register_custom_tool():
         ]
     )
     registry.register(custom_tool)
-    assert len(registry.tools) == 8
+    assert len(registry.tools) == 9
     assert registry.get_tool("custom_tool") == custom_tool
 
 
@@ -235,3 +236,52 @@ def test_registry_parameter_required_flags():
     # Optional parameters
     optional_params = {p.name for p in tool.parameters if not p.required}
     assert "overwrite" in optional_params
+
+
+def test_github_sync_parameters():
+    """Test github_sync has correct parameters"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("github_sync")
+    assert tool is not None
+    param_names = {p.name for p in tool.parameters}
+    assert "action" in param_names
+    assert "owner_repo" in param_names
+    assert "state" in param_names
+    assert "labels" in param_names
+    assert "limit" in param_names
+
+
+def test_github_sync_action_enum():
+    """Test github_sync action has correct enum values"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("github_sync")
+    assert tool is not None
+    action_param = next(p for p in tool.parameters if p.name == "action")
+    assert action_param.enum is not None
+    assert set(action_param.enum) == {"pull_prs", "pull_issues"}
+
+
+def test_github_sync_state_enum():
+    """Test github_sync state has correct enum values"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("github_sync")
+    assert tool is not None
+    state_param = next(p for p in tool.parameters if p.name == "state")
+    assert state_param.enum is not None
+    assert set(state_param.enum) == {"open", "closed", "all"}
+
+
+def test_github_sync_required_parameters():
+    """Test github_sync required parameters"""
+    registry = ToolRegistry()
+    tool = registry.get_tool("github_sync")
+    assert tool is not None
+
+    required_params = {p.name for p in tool.parameters if p.required}
+    assert "action" in required_params
+    assert "owner_repo" in required_params
+
+    optional_params = {p.name for p in tool.parameters if not p.required}
+    assert "state" in optional_params
+    assert "labels" in optional_params
+    assert "limit" in optional_params

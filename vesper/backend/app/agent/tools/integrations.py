@@ -26,6 +26,14 @@ except ImportError:
     logger.warning("google-api-python-client not installed")
     build = None
 
+try:
+    from github import Github
+except ImportError:
+    logger.warning("PyGithub not installed")
+    Github = None
+
+import os
+
 
 def _build_calendar_service():
     """Build and return Google Calendar service."""
@@ -269,3 +277,181 @@ class GCalToolExecutor:
         except Exception as e:
             logger.warning(f"Could not check for duplicates: {e}")
             return None
+
+
+class GitHubToolExecutor:
+    """Executes GitHub repository monitoring operations."""
+
+    def __init__(self):
+        """Initialize GitHub client with token from environment."""
+        self.token = os.getenv('GITHUB_TOKEN')
+        if not self.token:
+            logger.warning("GITHUB_TOKEN not set in environment")
+
+    def execute(self, tool_call: ToolCall) -> dict:
+        """Dispatch to specific action handler."""
+        action = tool_call.parameters.get('action')
+
+        if action == 'pull_prs':
+            owner_repo = tool_call.parameters.get('owner_repo')
+            state = tool_call.parameters.get('state', 'open')
+            limit = tool_call.parameters.get('limit', 10)
+            return self.pull_prs(owner_repo, state=state, limit=limit)
+        elif action == 'pull_issues':
+            owner_repo = tool_call.parameters.get('owner_repo')
+            labels = tool_call.parameters.get('labels')
+            limit = tool_call.parameters.get('limit', 10)
+            return self.pull_issues(owner_repo, labels=labels, limit=limit)
+        else:
+            return {
+                "success": False,
+                "result": None,
+                "error": f"Unknown action: {action}. Use 'pull_prs' or 'pull_issues'."
+            }
+
+    def pull_prs(self, owner_repo: str, state: str = 'open', limit: int = 10) -> dict:
+        """
+        Fetch pull requests from a GitHub repository.
+
+        Args:
+            owner_repo: Repository in format "owner/repo" (e.g., "anthropics/claude-code")
+            state: PR state - "open", "closed", or "all" (default: "open")
+            limit: Maximum number of PRs to retrieve (default: 10)
+
+        Returns:
+            {"success": bool, "result": list[dict], "error": str | None}
+        """
+        if not Github:
+            return {
+                "success": False,
+                "result": None,
+                "error": "PyGithub not installed"
+            }
+
+        if not self.token:
+            return {
+                "success": False,
+                "result": None,
+                "error": "GITHUB_TOKEN not configured. Set GITHUB_TOKEN environment variable."
+            }
+
+        try:
+            g = Github(self.token)
+            owner, repo = owner_repo.split('/')
+            repository = g.get_user(owner).get_repo(repo)
+
+            # Fetch PRs with specified state
+            prs = repository.get_pulls(state=state)
+
+            prs_list = []
+            for i, pr in enumerate(prs):
+                if i >= limit:
+                    break
+
+                prs_list.append({
+                    'number': pr.number,
+                    'title': pr.title,
+                    'state': pr.state,
+                    'created_at': pr.created_at.isoformat() if pr.created_at else None,
+                    'url': pr.html_url,
+                    'author': pr.user.login if pr.user else 'unknown',
+                    'draft': pr.draft,
+                })
+
+            logger.info(f"Successfully fetched {len(prs_list)} PRs from {owner_repo}")
+            return {
+                "success": True,
+                "result": prs_list,
+                "error": None
+            }
+
+        except ValueError as e:
+            logger.error(f"Invalid repository format: {owner_repo}", exc_info=True)
+            return {
+                "success": False,
+                "result": None,
+                "error": f"Invalid repository format. Use 'owner/repo'. Error: {str(e)}"
+            }
+        except Exception as e:
+            logger.error(f"Failed to pull PRs from {owner_repo}: {e}", exc_info=True)
+            return {
+                "success": False,
+                "result": None,
+                "error": f"GitHub API error: {str(e)}"
+            }
+
+    def pull_issues(self, owner_repo: str, labels: Optional[str] = None, limit: int = 10) -> dict:
+        """
+        Fetch issues from a GitHub repository.
+
+        Args:
+            owner_repo: Repository in format "owner/repo" (e.g., "anthropics/claude-code")
+            labels: Comma-separated labels to filter by (optional)
+            limit: Maximum number of issues to retrieve (default: 10)
+
+        Returns:
+            {"success": bool, "result": list[dict], "error": str | None}
+        """
+        if not Github:
+            return {
+                "success": False,
+                "result": None,
+                "error": "PyGithub not installed"
+            }
+
+        if not self.token:
+            return {
+                "success": False,
+                "result": None,
+                "error": "GITHUB_TOKEN not configured. Set GITHUB_TOKEN environment variable."
+            }
+
+        try:
+            g = Github(self.token)
+            owner, repo = owner_repo.split('/')
+            repository = g.get_user(owner).get_repo(repo)
+
+            # Build query parameters
+            kwargs = {'state': 'open'}
+            if labels:
+                kwargs['labels'] = [label.strip() for label in labels.split(',')]
+
+            # Fetch issues
+            issues = repository.get_issues(**kwargs)
+
+            issues_list = []
+            for i, issue in enumerate(issues):
+                if i >= limit:
+                    break
+
+                issues_list.append({
+                    'number': issue.number,
+                    'title': issue.title,
+                    'state': issue.state,
+                    'created_at': issue.created_at.isoformat() if issue.created_at else None,
+                    'url': issue.html_url,
+                    'author': issue.user.login if issue.user else 'unknown',
+                    'labels': [label.name for label in issue.labels] if issue.labels else [],
+                })
+
+            logger.info(f"Successfully fetched {len(issues_list)} issues from {owner_repo}")
+            return {
+                "success": True,
+                "result": issues_list,
+                "error": None
+            }
+
+        except ValueError as e:
+            logger.error(f"Invalid repository format: {owner_repo}", exc_info=True)
+            return {
+                "success": False,
+                "result": None,
+                "error": f"Invalid repository format. Use 'owner/repo'. Error: {str(e)}"
+            }
+        except Exception as e:
+            logger.error(f"Failed to pull issues from {owner_repo}: {e}", exc_info=True)
+            return {
+                "success": False,
+                "result": None,
+                "error": f"GitHub API error: {str(e)}"
+            }

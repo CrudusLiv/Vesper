@@ -229,6 +229,47 @@ class ToolRegistry:
             )
         )
 
+        self.register(
+            Tool(
+                name="github_sync",
+                description="Fetch PRs and issues from GitHub repositories",
+                parameters=[
+                    ToolParameter(
+                        name="action",
+                        type="string",
+                        enum=["pull_prs", "pull_issues"],
+                        description="Action: 'pull_prs' to fetch pull requests, 'pull_issues' to fetch issues",
+                        required=True,
+                    ),
+                    ToolParameter(
+                        name="owner_repo",
+                        type="string",
+                        description="Repository in format 'owner/repo' (e.g., 'anthropics/claude-code')",
+                        required=True,
+                    ),
+                    ToolParameter(
+                        name="state",
+                        type="string",
+                        enum=["open", "closed", "all"],
+                        description="Filter by state (for pull_prs action)",
+                        required=False,
+                    ),
+                    ToolParameter(
+                        name="labels",
+                        type="string",
+                        description="Comma-separated labels to filter by (for pull_issues action)",
+                        required=False,
+                    ),
+                    ToolParameter(
+                        name="limit",
+                        type="number",
+                        description="Max results to return (default 10)",
+                        required=False,
+                    ),
+                ],
+            )
+        )
+
     def register(self, tool: Tool):
         """Register a tool"""
         self.tools[tool.name] = tool
