@@ -61,8 +61,15 @@ export const api = {
   status: (secret) => request('/status', { secret }),
   search: (q, topK = 5) =>
     request(`/memory/search?q=${encodeURIComponent(q)}&top_k=${topK}`),
-  chat: (message, history) =>
-    request('/chat', { method: 'POST', body: { message, history } }),
+  chat: async (message, history) => {
+    const data = await request('/chat', { method: 'POST', body: { message, history } })
+    return {
+      reply: data.reply ?? data.response ?? '',
+      sources: data.sources ?? [],
+      tool_calls: data.tool_calls ?? [],
+      tool_results: data.tool_results ?? [],
+    }
+  },
   finance: (amount, category, note = '') =>
     request('/finance', { method: 'POST', body: { amount, category, note } }),
   financeSummary: () => request('/finance/summary'),

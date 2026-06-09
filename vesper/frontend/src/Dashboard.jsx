@@ -18,7 +18,7 @@ const SETTINGS_OPEN_KEY = 'settings-open'
 
 export default function Dashboard() {
   const { state } = useStore()
-  const { sendChat, search, startVoice, stopVoice, sttSupported } = useVesper()
+  const { search } = useVesper()
   const cap = useCapture()
   const debounce = useRef(null)
   const [settingsOpen, setSettingsOpen] = useState(() => localStorage.getItem(SETTINGS_OPEN_KEY) === 'true')
@@ -107,12 +107,6 @@ export default function Dashboard() {
         <ActivePanel
           memoryResults={state.memory.results}
           onSearch={onSearch}
-          messages={state.chat.messages}
-          pending={state.chat.pending}
-          onSend={sendChat}
-          voiceSupported={sttSupported}
-          listening={state.orb === 'listening'}
-          onMic={() => (state.orb === 'listening' ? stopVoice() : startVoice())}
           onMinimize={handleMinimize}
         />
       )}

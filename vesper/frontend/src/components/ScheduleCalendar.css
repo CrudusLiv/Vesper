@@ -1,0 +1,104 @@
+.sched-cal {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--dim);
+  overflow: hidden;
+}
+
+.sched-cal-empty {
+  text-align: center;
+  padding: 16px;
+  color: var(--dim);
+  font-size: 11px;
+}
+
+/* Header row: day labels */
+.sched-cal-header {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 3px;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+}
+
+.sched-cal-time-gutter {
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.sched-cal-day-label {
+  flex: 1;
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent2);
+}
+
+/* Body: scrollable grid */
+.sched-cal-body {
+  display: flex;
+  overflow-y: auto;
+  max-height: 320px;
+  position: relative;
+}
+
+.sched-cal-time-col {
+  width: 28px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.sched-cal-hour-label {
+  position: absolute;
+  left: 0;
+  font-size: 8px;
+  color: var(--dim);
+  transform: translateY(-50%);
+  user-select: none;
+}
+
+/* Day columns */
+.sched-cal-day-col {
+  flex: 1;
+  position: relative;
+  border-left: 1px solid var(--line);
+  min-height: 392px; /* 14 hours × 28px */
+}
+
+.sched-cal-slot {
+  width: 100%;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* Events */
+.sched-cal-event {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 1px 3px;
+  overflow: hidden;
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sched-cal-event-title {
+  font-size: 8px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.sched-cal-event-time {
+  font-size: 7px;
+  color: var(--dim);
+  line-height: 1;
+}

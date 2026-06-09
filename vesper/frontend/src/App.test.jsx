@@ -43,12 +43,12 @@ describe('Dashboard Integration', () => {
     const orb = screen.getByTestId('orb-idle')
     expect(orb).toBeInTheDocument()
 
-    // Verify info panel with search tab is present (default active tab)
-    expect(screen.getByText('Search')).toBeInTheDocument()
-    expect(screen.getByText('Chat')).toBeInTheDocument()
+    // Verify info panel tabs are present
+    expect(screen.getByRole('tab', { name: 'Search' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Chat' })).toBeInTheDocument()
 
-    // Verify search input is visible
-    expect(screen.getByPlaceholderText('search vault…')).toBeInTheDocument()
+    // Default tab is Chat — verify message input is visible
+    expect(screen.getByPlaceholderText('message Vesper…')).toBeInTheDocument()
   })
 
   test('allows switching between search and chat tabs', async () => {
@@ -61,22 +61,20 @@ describe('Dashboard Integration', () => {
     // Wait for dashboard to load
     expect(await screen.findByText('System')).toBeInTheDocument()
 
-    // Initially on search tab - should see search input
-    expect(screen.getByPlaceholderText('search vault…')).toBeInTheDocument()
-
-    // Click chat tab
-    const chatTab = screen.getByText('Chat')
-    await user.click(chatTab)
-
-    // Chat input should now be visible
+    // Initially on chat tab — message input visible
     expect(screen.getByPlaceholderText('message Vesper…')).toBeInTheDocument()
 
-    // Click search tab again
-    const searchTab = screen.getByText('Search')
-    await user.click(searchTab)
+    // Click search tab
+    await user.click(screen.getByRole('tab', { name: 'Search' }))
 
-    // Search input should be visible again
-    expect(screen.getByPlaceholderText('search vault…')).toBeInTheDocument()
+    // LeftDock + ActivePanel both show a search input when Search tab is active
+    expect(screen.getAllByPlaceholderText('search vault…').length).toBeGreaterThanOrEqual(1)
+
+    // Click chat tab again
+    await user.click(screen.getByRole('tab', { name: 'Chat' }))
+
+    // Chat input should be visible again
+    expect(screen.getByPlaceholderText('message Vesper…')).toBeInTheDocument()
   })
 
   test('persists panel positions to localStorage after drag', async () => {
@@ -132,7 +130,7 @@ describe('Dashboard Integration', () => {
     await new Promise((resolve) => setTimeout(resolve, 350))
 
     // Now API should have been called
-    expect(mockSearch).toHaveBeenCalledWith('test query', 5)
+    expect(mockSearch).toHaveBeenCalledWith('test query', 8)
   })
 
   test('orb state changes with chat interaction', async () => {
