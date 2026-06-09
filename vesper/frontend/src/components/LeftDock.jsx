@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Brain, DollarSign, FileText, Calendar, Folder, Upload, Bell } from 'lucide-react'
 import { useFeed } from '../hooks/useFeed.js'
 import MemoryPanel from './MemoryPanel.jsx'
 import FinancePanel from './FinancePanel.jsx'
@@ -10,22 +11,23 @@ import FeedPanel from './FeedPanel.jsx'
 import './LeftDock.css'
 
 const TABS = [
-  { id: 'Memory',   icon: '🧠' },
-  { id: 'Finance',  icon: '💰' },
-  { id: 'Notes',    icon: '📝' },
-  { id: 'Schedule', icon: '📅' },
-  { id: 'Files',    icon: '📁' },
-  { id: 'Uploads',  icon: '⬆' },
-  { id: 'Alerts',   icon: '🔔' },
+  { id: 'Memory',   icon: Brain },
+  { id: 'Finance',  icon: DollarSign },
+  { id: 'Notes',    icon: FileText },
+  { id: 'Schedule', icon: Calendar },
+  { id: 'Files',    icon: Folder },
+  { id: 'Uploads',  icon: Upload },
+  { id: 'Alerts',   icon: Bell },
 ]
 
 export default function LeftDock({ memoryResults, onSearch, cap, onResizeStart, minimizedPanels = [], onRestorePanel }) {
   const [tab, setTab] = useState(() => localStorage.getItem('left-dock-tab') || 'Memory')
   const { items: feedItems, unreadCount, markRead } = useFeed()
+
   return (
     <div className="left-dock">
       <nav className="left-dock-nav" role="tablist">
-        {TABS.map(({ id, icon }) => (
+        {TABS.map(({ id, icon: Icon }) => (
           <button
             key={id}
             role="tab"
@@ -33,7 +35,9 @@ export default function LeftDock({ memoryResults, onSearch, cap, onResizeStart, 
             onClick={() => { setTab(id); localStorage.setItem('left-dock-tab', id) }}
             className="left-dock-tab"
           >
-            <span className="left-dock-tab-icon" aria-hidden="true">{icon}</span>
+            <span className="left-dock-tab-icon" aria-hidden="true">
+              <Icon size={15} strokeWidth={1.75} />
+            </span>
             <span className="left-dock-tab-label">{id}</span>
             {id === 'Alerts' && unreadCount > 0 && (
               <span className="left-dock-badge">{unreadCount}</span>
@@ -41,6 +45,7 @@ export default function LeftDock({ memoryResults, onSearch, cap, onResizeStart, 
           </button>
         ))}
       </nav>
+
       <div className="left-dock-content">
         {tab === 'Memory'   && <MemoryPanel results={memoryResults} onSearch={onSearch} />}
         {tab === 'Finance'  && <FinancePanel onLog={cap.logFinance} onLoadSummary={cap.loadFinanceSummary} />}
@@ -50,6 +55,7 @@ export default function LeftDock({ memoryResults, onSearch, cap, onResizeStart, 
         {tab === 'Uploads'  && <UploadPanel onUpload={cap.uploadDocument} onListUploads={cap.listUploads} />}
         {tab === 'Alerts'   && <FeedPanel items={feedItems} markRead={markRead} />}
       </div>
+
       {minimizedPanels.length > 0 && (
         <div className="left-dock-minimized">
           <span className="left-dock-minimized-label">Panels</span>
@@ -66,6 +72,7 @@ export default function LeftDock({ memoryResults, onSearch, cap, onResizeStart, 
           ))}
         </div>
       )}
+
       <div className="left-dock-resizer" onMouseDown={onResizeStart} />
     </div>
   )

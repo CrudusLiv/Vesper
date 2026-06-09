@@ -3,34 +3,38 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  border-right: 1px solid var(--line);
-  background: rgba(8, 12, 22, 0.88);
+  border-right: 1px solid var(--border);
+  background: rgba(17, 17, 27, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
+/* ── Navigation tabs ─────────────────────────────── */
 .left-dock-nav {
-  padding: 6px;
+  padding: 8px 6px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  border-bottom: 1px solid var(--line);
+  gap: 1px;
+  border-bottom: 1px solid var(--border);
 }
 
 .left-dock-tab {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   width: 100%;
-  padding: 9px 12px;
-  border-radius: 7px;
+  padding: 8px 10px;
+  border-radius: var(--r-md);
   border: none;
-  border-left: 3px solid transparent;
+  border-left: 2px solid transparent;
   background: transparent;
   color: var(--dim);
-  font-size: 15px;
-  font-family: var(--sans);
+  font-size: 13px;
+  font-family: var(--font-ui);
   cursor: pointer;
   text-align: left;
-  transition: color 120ms ease, background 120ms ease, border-left-color 120ms ease;
+  transition: color var(--t-fast), background var(--t-fast), border-left-color var(--t-fast);
+  line-height: 1.4;
 }
 
 .left-dock-tab:hover {
@@ -39,58 +43,67 @@
 }
 
 .left-dock-tab:focus-visible {
-  outline: 2px solid var(--accent-cyan);
-  outline-offset: 2px;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .left-dock-tab[aria-selected="true"] {
-  border-left-color: var(--accent-cyan);
-  background: rgba(137, 220, 235, 0.06);
+  border-left-color: var(--accent);
+  background: rgba(203, 166, 247, 0.07);
   color: var(--ink);
 }
 
 .left-dock-tab-icon {
-  font-size: 18px;
-  width: 22px;
-  text-align: center;
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  color: inherit;
+}
+
+.left-dock-tab[aria-selected="true"] .left-dock-tab-icon {
+  color: var(--accent);
 }
 
 .left-dock-tab-label {
   flex: 1;
+  font-weight: 450;
 }
 
 .left-dock-badge {
   background: var(--led-off);
   color: #fff;
-  border-radius: 9px;
+  border-radius: 99px;
   padding: 1px 6px;
   font-size: 10px;
+  font-weight: 600;
   line-height: 1.4;
   flex-shrink: 0;
 }
 
+/* ── Panel content ───────────────────────────────── */
 .left-dock-content {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
 }
 
+/* ── Minimized panels tray ───────────────────────── */
 .left-dock-minimized {
   padding: 6px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .left-dock-minimized-label {
   font-size: 9px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--dim);
-  padding: 2px 10px 4px;
-  opacity: 0.6;
+  color: var(--muted);
+  padding: 2px 8px 4px;
 }
 
 .left-dock-minimized-btn {
@@ -98,34 +111,35 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 7px 12px;
-  border-radius: 6px;
-  border: 1px solid rgba(137, 220, 235, 0.15);
-  background: rgba(137, 220, 235, 0.04);
+  padding: 6px 10px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(203, 166, 247, 0.12);
+  background: rgba(203, 166, 247, 0.04);
   color: var(--dim);
-  font-size: 13px;
-  font-family: var(--sans);
+  font-size: 12px;
+  font-family: var(--font-ui);
   cursor: pointer;
   text-align: left;
-  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+  transition: color var(--t-fast), background var(--t-fast), border-color var(--t-fast);
 }
 
 .left-dock-minimized-btn:hover {
   color: var(--ink);
-  background: rgba(137, 220, 235, 0.1);
-  border-color: rgba(137, 220, 235, 0.3);
+  background: rgba(203, 166, 247, 0.1);
+  border-color: rgba(203, 166, 247, 0.28);
 }
 
 .left-dock-minimized-btn:focus-visible {
-  outline: 2px solid var(--accent-cyan);
-  outline-offset: 2px;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .left-dock-minimized-icon {
-  font-size: 14px;
+  font-size: 13px;
   flex-shrink: 0;
 }
 
+/* ── Resize handle ───────────────────────────────── */
 .left-dock-resizer {
   position: absolute;
   top: 0;
@@ -134,9 +148,9 @@
   height: 100%;
   cursor: col-resize;
   z-index: 10;
-  transition: background 120ms ease;
+  transition: background var(--t-fast);
 }
 
 .left-dock-resizer:hover {
-  background: rgba(137, 220, 235, 0.3);
+  background: rgba(203, 166, 247, 0.3);
 }

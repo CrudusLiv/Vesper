@@ -13,9 +13,7 @@ export default function StatusBar({ status, onMinimize }) {
       <div className="status-grid">
         {Object.entries(integrations).map(([name, info]) => (
           <div key={name} className="status-item">
-            <div className="status-icon" data-ready={info.ready}>
-              ●
-            </div>
+            <span className="status-dot" data-ready={info.ready} aria-hidden="true" />
             <div className="status-label">{name}</div>
             {info.missing && info.missing.length > 0 && (
               <div className="status-missing" title={info.missing.join(', ')}>

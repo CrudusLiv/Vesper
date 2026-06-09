@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { Settings } from 'lucide-react'
 import { useStore } from './state/store.jsx'
 import { useVesper } from './hooks/useVesper.js'
 import { useCapture } from './hooks/useCapture.js'
@@ -122,7 +123,7 @@ export default function Dashboard() {
         }}
         aria-label="Toggle settings"
       >
-        ⚙
+        <Settings size={15} strokeWidth={1.75} />
       </button>
     </div>
   )

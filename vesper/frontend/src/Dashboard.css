@@ -27,34 +27,35 @@
   position: relative;
 }
 
+/* ── Settings gear button ────────────────────────── */
 .gear-btn {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: rgba(49, 50, 68, 0.9);
-  border: 1px solid rgba(180, 190, 254, 0.3);
-  color: var(--dim);
-  font-size: 16px;
+  background: rgba(24, 24, 37, 0.92);
+  border: 1px solid var(--border2);
+  color: var(--muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 12px rgba(180, 190, 254, 0.1);
-  transition: border-color 150ms ease, color 150ms ease;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+  transition: border-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
   z-index: 200;
 }
 
 .gear-btn:hover {
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 18px rgba(203, 166, 247, 0.22);
 }
 
 .gear-btn:focus-visible {
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
-  outline: 2px solid var(--accent-cyan);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
+  border-color: var(--accent);
+  color: var(--accent);
 }

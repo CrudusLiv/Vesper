@@ -26,7 +26,7 @@ describe('Dashboard Integration', () => {
   beforeEach(() => {
     localStorage.clear()
     vi.spyOn(client.api, 'status').mockResolvedValue({
-      integrations: { gmail: { ready: true }, discord: { ready: true } },
+      integrations: { gmail: { ready: true }, github: { ready: true } },
       vault: {},
       memory: 'ok',
     })
@@ -105,7 +105,7 @@ describe('Dashboard Integration', () => {
 
     // Both mocked integrations should be visible
     expect(screen.getByText('gmail')).toBeInTheDocument()
-    expect(screen.getByText('discord')).toBeInTheDocument()
+    expect(screen.getByText('github')).toBeInTheDocument()
   })
 
   test('handles search input with debounce', async () => {

@@ -35,3 +35,6 @@ __pycache__/
 !.claude/chat/intent_parser.py
 !.claude/chat/about.py
 Dynamous/Memory/.obsidian/
+
+.playwright-test-results/
+.playwright-mcp

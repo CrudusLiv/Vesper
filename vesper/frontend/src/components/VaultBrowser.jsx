@@ -1,17 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Folder, FileText, ChevronUp, RotateCcw, Trash2 } from 'lucide-react'
+import './panels.css'
 
 const OBSIDIAN_VAULT = 'Memory'
-const obsidianHref = (path) => `obsidian://open?vault=${OBSIDIAN_VAULT}&file=${encodeURIComponent(path)}`
+const obsidianHref = (path) =>
+  `obsidian://open?vault=${OBSIDIAN_VAULT}&file=${encodeURIComponent(path)}`
 
 export default function VaultBrowser({ onList, onDelete, onUndo }) {
-  const [dir, setDir] = useState('')
+  const [dir, setDir]         = useState('')
   const [entries, setEntries] = useState([])
-  const [status, setStatus] = useState('')
+  const [status, setStatus]   = useState('')
 
   const load = useCallback((d) => {
     onList(d)
       .then((r) => { if (r) { setDir(r.directory); setEntries(r.entries) } })
-      .catch(() => setStatus('cannot open folder'))
+      .catch(() => setStatus('Cannot open folder'))
   }, [onList])
 
   useEffect(() => { load('') }, [load])
@@ -28,10 +31,10 @@ export default function VaultBrowser({ onList, onDelete, onUndo }) {
     try {
       const r = await onDelete(childPath(name))
       if (!r) return
-      setStatus(`moved to ${r.trash_path}`)
+      setStatus(`Moved to trash`)
       load(dir)
     } catch {
-      setStatus('delete failed')
+      setStatus('Delete failed')
     }
   }
 
@@ -42,33 +45,82 @@ export default function VaultBrowser({ onList, onDelete, onUndo }) {
       setStatus(r.message)
       load(dir)
     } catch {
-      setStatus('undo failed')
+      setStatus('Undo failed')
     }
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10 }}>
-      <div style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--dim)' }}>Files</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <button type="button" onClick={up} disabled={!dir} style={{ fontSize: 10, padding: '2px 6px', background: 'transparent', border: '1px solid var(--line)', borderRadius: 4, color: 'var(--dim)', cursor: dir ? 'pointer' : 'default' }}>↑ up</button>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--accent2)' }}>{dir || 'vault root'}</span>
-        <button type="button" onClick={undo} style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 6px', background: 'transparent', border: '1px solid var(--line)', borderRadius: 4, color: 'var(--dim)', cursor: 'pointer' }}>undo</button>
+    <div className="panel">
+      <div className="vault-nav">
+        <button
+          type="button"
+          onClick={up}
+          disabled={!dir}
+          className="panel-btn-ghost"
+          aria-label="Go up"
+        >
+          <ChevronUp size={12} /> Up
+        </button>
+        <span className="vault-path">{dir || 'vault root'}</span>
+        <button
+          type="button"
+          onClick={undo}
+          className="panel-btn-ghost"
+          aria-label="Undo last delete"
+          title="Undo last delete"
+        >
+          <RotateCcw size={12} />
+        </button>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, overflow: 'auto' }}>
+
+      <div className="vault-entries">
+        {entries.length === 0 && (
+          <div className="panel-empty">
+            <Folder size={22} style={{ opacity: 0.25, marginBottom: 4 }} />
+            Empty folder
+          </div>
+        )}
         {entries.map((e) => (
-          <div key={e.name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div key={e.name} className="vault-entry">
+            <span className={`vault-entry-icon${e.is_dir ? ' is-dir' : ''}`}>
+              {e.is_dir
+                ? <Folder size={14} />
+                : <FileText size={14} />
+              }
+            </span>
             {e.is_dir ? (
-              <button type="button" aria-label={e.name} onClick={() => load(childPath(e.name))} className="mono" style={{ flex: 1, textAlign: 'left', fontSize: 11, background: 'transparent', border: 'none', color: 'var(--ink)', cursor: 'pointer' }}>📁 {e.name}</button>
+              <button
+                type="button"
+                className="vault-entry-name"
+                onClick={() => load(childPath(e.name))}
+                aria-label={e.name}
+              >
+                {e.name}
+              </button>
             ) : (
               <>
-                <a href={obsidianHref(childPath(e.name))} className="mono" style={{ flex: 1, fontSize: 11, color: 'var(--ink)', textDecoration: 'none' }}>📄 {e.name}</a>
-                <button type="button" aria-label={`delete ${e.name}`} onClick={() => del(e.name)} style={{ fontSize: 10, padding: '1px 6px', background: 'transparent', border: '1px solid var(--led-off)', borderRadius: 4, color: 'var(--led-off)', cursor: 'pointer' }}>✕</button>
+                <a
+                  href={obsidianHref(childPath(e.name))}
+                  className="vault-entry-name"
+                >
+                  {e.name}
+                </a>
+                <button
+                  type="button"
+                  className="panel-btn-danger"
+                  onClick={() => del(e.name)}
+                  aria-label={`Delete ${e.name}`}
+                  title="Move to trash"
+                >
+                  <Trash2 size={11} />
+                </button>
               </>
             )}
           </div>
         ))}
       </div>
-      {status && <div className="mono" style={{ fontSize: 10, color: 'var(--dim)' }}>{status}</div>}
+
+      {status && <p className="panel-hint">{status}</p>}
     </div>
   )
 }

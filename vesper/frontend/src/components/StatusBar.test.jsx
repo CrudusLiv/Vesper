@@ -3,7 +3,7 @@ import { expect, test } from 'vitest'
 import StatusBar from './StatusBar.jsx'
 
 const status = {
-  integrations: { discord: { ready: true }, outlook: { ready: false } },
+  integrations: { github: { ready: true }, outlook: { ready: false } },
   vault: { online: true },
   memory: 'ok',
 }
@@ -11,15 +11,15 @@ const status = {
 test('renders the system title and an entry per integration', () => {
   render(<StatusBar status={status} />)
   expect(screen.getByText('System')).toBeInTheDocument()
-  expect(screen.getByText('discord')).toBeInTheDocument()
+  expect(screen.getByText('github')).toBeInTheDocument()
   expect(screen.getByText('outlook')).toBeInTheDocument()
 })
 
 test('marks ready integrations on and not-ready off via data-ready attribute', () => {
   render(<StatusBar status={status} />)
-  const discordStatus = screen.getByText('discord').closest('.status-item').querySelector('.status-icon')
-  const outlookStatus = screen.getByText('outlook').closest('.status-item').querySelector('.status-icon')
-  expect(discordStatus).toHaveAttribute('data-ready', 'true')
+  const githubStatus = screen.getByText('github').closest('.status-item').querySelector('.status-dot')
+  const outlookStatus = screen.getByText('outlook').closest('.status-item').querySelector('.status-dot')
+  expect(githubStatus).toHaveAttribute('data-ready', 'true')
   expect(outlookStatus).toHaveAttribute('data-ready', 'false')
 })
 

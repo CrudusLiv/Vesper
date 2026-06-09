@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react'
-
-const inputStyle = { background: '#0b0f15', border: '1px solid var(--line)', borderRadius: 6, padding: '6px 8px', fontSize: 12, color: 'var(--ink)' }
+import './panels.css'
 
 export default function FinancePanel({ onLog, onLoadSummary }) {
-  const [amount, setAmount] = useState('')
+  const [amount, setAmount]     = useState('')
   const [category, setCategory] = useState('')
-  const [note, setNote] = useState('')
-  const [result, setResult] = useState(null)
-  const [summary, setSummary] = useState('')
-  const [error, setError] = useState('')
+  const [note, setNote]         = useState('')
+  const [result, setResult]     = useState(null)
+  const [summary, setSummary]   = useState('')
+  const [error, setError]       = useState('')
 
   useEffect(() => {
     onLoadSummary().then((r) => { if (r) setSummary(r.summary) }).catch(() => {})
@@ -17,8 +16,8 @@ export default function FinancePanel({ onLog, onLoadSummary }) {
   async function submit(e) {
     e.preventDefault()
     const amt = parseFloat(amount)
-    if (!(amt > 0)) { setError('amount must be positive'); return }
-    if (!category.trim()) { setError('category required'); return }
+    if (!(amt > 0)) { setError('Amount must be positive'); return }
+    if (!category.trim()) { setError('Category is required'); return }
     setError('')
     try {
       const r = await onLog(amt, category.trim(), note.trim())
@@ -28,26 +27,50 @@ export default function FinancePanel({ onLog, onLoadSummary }) {
       const s = await onLoadSummary()
       if (s) setSummary(s.summary)
     } catch {
-      setError('could not log expense')
+      setError('Could not log expense')
     }
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10 }}>
-      <div style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--dim)' }}>Finance</div>
+    <div className="panel">
       <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <input className="mono" placeholder="amount" value={amount} onChange={(e) => setAmount(e.target.value)} style={inputStyle} />
-        <input className="mono" placeholder="category" value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle} />
-        <input className="mono" placeholder="note (optional)" value={note} onChange={(e) => setNote(e.target.value)} style={inputStyle} />
-        <button type="submit" style={{ ...inputStyle, cursor: 'pointer', borderColor: 'var(--accent)', color: 'var(--accent2)' }}>Log expense</button>
+        <input
+          className="panel-input"
+          type="number"
+          placeholder="Amount"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          min="0"
+          step="0.01"
+        />
+        <input
+          className="panel-input"
+          placeholder="Category"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        />
+        <input
+          className="panel-input"
+          placeholder="Note (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+        <button type="submit" className="panel-btn">
+          Log expense
+        </button>
       </form>
-      {error && <div className="mono" style={{ fontSize: 10, color: 'var(--led-off)' }}>{error}</div>}
+
+      {error && <p className="panel-err">{error}</p>}
+
       {result && (
-        <div className="mono" style={{ fontSize: 10, color: 'var(--dim)' }}>
-          logged · month {result.currency} {result.month_total} · {result.currency} {result.category_total} in category
+        <div className="finance-result">
+          Logged · month total {result.currency} {result.month_total}
+          <br />
+          {result.currency} {result.category_total} in {result.category || category}
         </div>
       )}
-      {summary && <pre className="mono" style={{ fontSize: 10, color: 'var(--dim)', whiteSpace: 'pre-wrap', margin: 0 }}>{summary}</pre>}
+
+      {summary && <pre className="finance-summary">{summary}</pre>}
     </div>
   )
 }
