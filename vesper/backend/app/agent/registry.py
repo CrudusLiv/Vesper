@@ -270,6 +270,97 @@ class ToolRegistry:
             )
         )
 
+        # System tools
+        self.register(
+            Tool(
+                name="browser_open",
+                description="Open a URL in the browser or perform a web search",
+                parameters=[
+                    ToolParameter(
+                        name="action",
+                        type="string",
+                        enum=["open_url", "search"],
+                        description="Action: 'open_url' to open a specific URL, 'search' to search the web",
+                        required=True,
+                    ),
+                    ToolParameter(
+                        name="url",
+                        type="string",
+                        description="URL to open (for open_url action)",
+                        required=False,
+                    ),
+                    ToolParameter(
+                        name="query",
+                        type="string",
+                        description="Search query (for search action)",
+                        required=False,
+                    ),
+                ],
+            )
+        )
+
+        self.register(
+            Tool(
+                name="file_manage",
+                description="Manage files and directories (list, copy, move, delete)",
+                parameters=[
+                    ToolParameter(
+                        name="action",
+                        type="string",
+                        enum=["list", "copy", "move", "delete"],
+                        description="Action to perform on files",
+                        required=True,
+                    ),
+                    ToolParameter(
+                        name="path",
+                        type="string",
+                        description="File or directory path",
+                        required=True,
+                    ),
+                    ToolParameter(
+                        name="destination",
+                        type="string",
+                        description="Destination path (for copy and move actions)",
+                        required=False,
+                    ),
+                    ToolParameter(
+                        name="recursive",
+                        type="boolean",
+                        description="For delete action, recursively delete directories",
+                        required=False,
+                    ),
+                ],
+            )
+        )
+
+        self.register(
+            Tool(
+                name="system_control",
+                description="Execute system control commands (timer, open app, etc.)",
+                parameters=[
+                    ToolParameter(
+                        name="action",
+                        type="string",
+                        enum=["timer", "open_app", "shutdown", "sleep"],
+                        description="System action to perform",
+                        required=True,
+                    ),
+                    ToolParameter(
+                        name="duration",
+                        type="number",
+                        description="Duration in seconds (for timer and sleep actions)",
+                        required=False,
+                    ),
+                    ToolParameter(
+                        name="command",
+                        type="string",
+                        description="Application to open (for open_app action)",
+                        required=False,
+                    ),
+                ],
+            )
+        )
+
     def register(self, tool: Tool):
         """Register a tool"""
         self.tools[tool.name] = tool

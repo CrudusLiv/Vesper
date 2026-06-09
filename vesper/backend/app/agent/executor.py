@@ -2,6 +2,7 @@ import logging
 from .models import ToolCall
 from .tools.vault import VaultToolExecutor
 from .tools.integrations import GCalToolExecutor, GitHubToolExecutor
+from .tools.system import BrowserToolExecutor, FileManagementToolExecutor, SystemControlToolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,9 @@ class ToolExecutor:
         self.vault = VaultToolExecutor()
         self.gcal = GCalToolExecutor()
         self.github = GitHubToolExecutor()
+        self.browser = BrowserToolExecutor()
+        self.file_mgmt = FileManagementToolExecutor()
+        self.system = SystemControlToolExecutor()
 
     def execute(self, tool_call: ToolCall) -> dict:
         """
@@ -26,6 +30,12 @@ class ToolExecutor:
                 return self.gcal.execute(tool_call)
             elif tool_call.tool_name == "github_sync":
                 return self.github.execute(tool_call)
+            elif tool_call.tool_name == "browser_open":
+                return self.browser.execute(tool_call)
+            elif tool_call.tool_name == "file_manage":
+                return self.file_mgmt.execute(tool_call)
+            elif tool_call.tool_name == "system_control":
+                return self.system.execute(tool_call)
             else:
                 return {
                     "success": False,

@@ -9,14 +9,14 @@ def test_registry_creation():
     assert len(registry.tools) > 0  # Should have some default tools
 
 
-def test_registry_has_eight_default_tools():
-    """Test that registry has exactly 8 default tools"""
+def test_registry_has_eleven_default_tools():
+    """Test that registry has exactly 11 default tools"""
     registry = ToolRegistry()
-    assert len(registry.tools) == 8
+    assert len(registry.tools) == 11
 
 
 def test_registry_default_tools_exist():
-    """Test that all 8 core tools are registered"""
+    """Test that all 11 core tools are registered"""
     registry = ToolRegistry()
     expected_tools = {
         "vault_add_note",
@@ -27,6 +27,9 @@ def test_registry_default_tools_exist():
         "categorize_item",
         "gcal_sync",
         "github_sync",
+        "browser_open",
+        "file_manage",
+        "system_control",
     }
     assert set(registry.tools.keys()) == expected_tools
 
@@ -50,7 +53,7 @@ def test_registry_list_tools():
     """Test listing all tools"""
     registry = ToolRegistry()
     tools = registry.list_tools()
-    assert len(tools) == 8
+    assert len(tools) == 11
     assert all(isinstance(tool, Tool) for tool in tools)
 
 
@@ -59,7 +62,7 @@ def test_registry_to_ollama_schema():
     registry = ToolRegistry()
     schema = registry.to_ollama_schema()
     assert isinstance(schema, list)
-    assert len(schema) == 8
+    assert len(schema) == 11
     assert all(item["type"] == "function" for item in schema)
 
 
@@ -211,7 +214,7 @@ def test_register_custom_tool():
         ]
     )
     registry.register(custom_tool)
-    assert len(registry.tools) == 9
+    assert len(registry.tools) == 12
     assert registry.get_tool("custom_tool") == custom_tool
 
 
