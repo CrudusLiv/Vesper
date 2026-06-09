@@ -14,7 +14,6 @@ Usage:
 
 Add --json to most subcommands for machine-readable output.
 
-NOTE: Discord integration moved to standalone app (DiscordNotif).
 """
 from __future__ import annotations
 

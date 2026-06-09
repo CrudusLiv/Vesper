@@ -19,9 +19,9 @@ _STUBS = [
     "_env",
     "heartbeat.deadlines", "heartbeat.habits", "heartbeat.imminent",
     "heartbeat.inbox", "heartbeat.llm", "heartbeat.notify", "heartbeat.snapshot",
-    "heartbeat.toast", "heartbeat.discord_ping", "heartbeat.discord_dm_capture",
+    "heartbeat.toast",
     "heartbeat.gcal_sync", "heartbeat.vault_state_writer", "heartbeat.dashboard",
-    "heartbeat.dashboard_state", "heartbeat.thread_chat",
+    "heartbeat.dashboard_state",
     "security", "security.sanitize",
     "vault", "vault.daily",
 ]

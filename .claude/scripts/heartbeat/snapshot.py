@@ -29,12 +29,8 @@ def _safe(fn) -> dict:
 
 
 def build_snapshot() -> dict:
-    # Gmail and Calendar intentionally omitted -- user opted out 2026-05-11.
-    # The integration modules still exist on disk if you ever want them back;
-    # just re-add `"gmail": _safe(_snapshot_gmail)` etc. here.
     return {
         "timestamp": time.time(),
-        "discord":  _safe(_snapshot_discord),
         "github":   _safe(_snapshot_github),
         "inbox":    _safe(_snapshot_inbox),
     }
@@ -53,25 +49,6 @@ def _snapshot_gmail() -> dict:
                 "snippet": (x.get("snippet") or "")[:200],
             }
             for x in items
-        ],
-    }
-
-
-def _snapshot_discord() -> dict:
-    from integrations import discord_int
-    rows = discord_int.recent(hours=24, limit=50, dms_only=True)
-    return {
-        "new_count": len(rows),
-        "items": [
-            {
-                "id": r["id"],
-                "is_dm": bool(r["is_dm"]),
-                "author": r["author_name"],
-                "channel": r["channel_name"],
-                "guild": r["guild_name"],
-                "content": (r.get("content") or "")[:200],
-            }
-            for r in rows
         ],
     }
 
@@ -103,9 +80,8 @@ def _snapshot_inbox() -> dict:
 def diff_snapshot(prev: dict | None, curr: dict) -> dict:
     prev = prev or {}
     return {
-        "new_discord":     _diff_by_id(prev.get("discord", {}),  curr.get("discord", {}), "items", "id"),
-        "new_pushes":      _diff_by_id(prev.get("github", {}),   curr.get("github", {}),  "items", "sha"),
-        "new_inbox_files": _diff_files(prev.get("inbox", {}),    curr.get("inbox", {})),
+        "new_pushes":      _diff_by_id(prev.get("github", {}), curr.get("github", {}), "items", "sha"),
+        "new_inbox_files": _diff_files(prev.get("inbox", {}),  curr.get("inbox", {})),
     }
 
 
@@ -126,7 +102,6 @@ def _diff_files(prev: dict, curr: dict) -> list:
 
 def has_changes(diff: dict) -> bool:
     return any([
-        diff.get("new_discord"),
         diff.get("new_pushes"),
         diff.get("new_inbox_files"),
     ])

@@ -40,7 +40,7 @@ def test_note_append_empty_raises(monkeypatch, tmp_path):
 
 
 def test_schedule_get_returns_rendered(monkeypatch):
-    monkeypatch.setattr(bridge.schedule_parser, "format_for_discord", lambda: "Mon 9-10 Maths")
+    monkeypatch.setattr(bridge.schedule_parser, "format_for_frontend", lambda: "Mon 9-10 Maths")
     assert bridge.schedule_get() == {"schedule": "Mon 9-10 Maths"}
 
 

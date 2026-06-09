@@ -46,19 +46,20 @@ def test_parse_timetable_raises_on_malformed_entries():
             schedule_parser.parse_timetable("bad entries")
 
 
-def test_format_for_discord_none_when_missing(tmp_vault):
-    assert schedule_parser.format_for_discord() is None
+def test_format_for_frontend_none_when_missing(tmp_vault):
+    assert schedule_parser.format_for_frontend() is None
 
 
-def test_format_for_discord_includes_grid_and_breakdown(tmp_vault):
+def test_format_for_frontend_plain_text_parseable(tmp_vault):
     schedule_parser.write_schedule(_SAMPLE_ENTRIES)
-    out = schedule_parser.format_for_discord()
+    out = schedule_parser.format_for_frontend()
     assert out is not None
-    assert "Weekly Grid" in out
-    assert "```" in out  # grid wrapped in a code fence
-    assert "Day Breakdown" in out
-    assert "CS101" in out
-    assert "Monday" in out
+    lines = out.splitlines()
+    # Day headers are bare day names (no markdown, no emoji)
+    assert "Monday" in lines
+    # Time entries follow day header: HH:MM-HH:MM Course
+    assert any(ln.startswith("08:00-09:30 CS101") for ln in lines)
+    assert any(ln.startswith("10:00-11:30 MAT101") for ln in lines)
 
 
 def test_align_grid_pads_columns():

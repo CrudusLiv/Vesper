@@ -27,29 +27,6 @@ services:
     networks:
       - vesper-net
 
-  # Discord bot is opt-in: docker compose --profile workers up
-  discord:
-    build:
-      context: ..
-      dockerfile: vesper/worker/Dockerfile
-    profiles: ["workers"]
-    command: ["python", ".claude/chat/discord_bot.py"]
-    env_file:
-      - ../.env
-    environment:
-      - CLAUDE_PROJECT_DIR=/workspace
-      - TZ=Asia/Kuala_Lumpur
-    volumes:
-      # Vault is read-WRITE here — the bot caches messages (cache-only after Phase 4).
-      - ../Dynamous/Memory:/workspace/Dynamous/Memory
-      - ../.claude/scripts:/workspace/.claude/scripts:ro
-      - ../.claude/chat:/workspace/.claude/chat:ro
-      - ../.claude/data:/workspace/.claude/data
-      - ../.env:/workspace/.env:ro
-    restart: unless-stopped
-    networks:
-      - vesper-net
-
   scheduler:
     build:
       context: ..
@@ -64,7 +41,6 @@ services:
       - ../Dynamous/Memory:/workspace/Dynamous/Memory
       - ../.claude/scripts:/workspace/.claude/scripts:ro
       - ../.claude/skills:/workspace/.claude/skills:ro
-      - ../.claude/chat:/workspace/.claude/chat:ro
       - ../.claude/data:/workspace/.claude/data
       - ../.env:/workspace/.env:ro
     restart: unless-stopped

@@ -27,9 +27,9 @@ PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolv
 
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts" / "integrations"))
-import _env  # noqa: F401, E402 -- side effect: loads .env into os.environ so notify can read DISCORD_BOT_TOKEN
+import _env  # noqa: F401, E402 -- side effect: loads .env into os.environ
 
-from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, gcal_sync, vault_state_writer, dashboard, dashboard_state, thread_chat  # noqa: E402
+from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, gcal_sync, vault_state_writer, dashboard, dashboard_state  # noqa: E402
 # Deadlines are now sourced from inbox classification (project documents
 # mentioning dated milestones), not Gmail/Calendar.
 from security import sanitize  # noqa: E402
@@ -62,8 +62,8 @@ def in_active_hours(now: datetime | None = None) -> bool:
 
 
 HEARTBEAT_TASK = """You are CrudusLiv's heartbeat reasoner. Every 30 min, Python
-gathers a snapshot of his Discord cache, GitHub assignment-repo pushes, and
-vault inbox. You receive the diff vs the previous tick.
+gathers a snapshot of GitHub assignment-repo pushes and vault inbox. You receive
+the diff vs the previous tick.
 
 Your job: decide what (if anything) deserves a notification right now. Output
 STRICT JSON only -- no prose, no markdown fences.
@@ -76,9 +76,8 @@ Output schema:
 }
 
 Rules:
-- NOTIFY on: new Discord DMs from non-self users; new pushes to assignment
-  repos.
-- SKIP: bots, automated notifications, server channels.
+- NOTIFY on: new pushes to assignment repos; new inbox files.
+- SKIP: automated noise, personal repos with trivial commits.
 - If nothing in the diff matches these criteria, return: {"notifications": []}"""
 
 
@@ -173,13 +172,11 @@ _BUCKET_KIND: dict[str, tuple[str, str]] = {
 
 
 def _route_deadlines() -> None:
-    """Slice 3: post threshold-crossings into per-row forum threads in
-    #deadlines and refresh the edited 'Next 3 deadlines' rollup.
+    """Slice 3: post threshold-crossings to the feed for each deadline row.
 
-    First sighting of any row creates the thread with the matching embed
-    (72h / 24h / overdue) and the row's stable key is recorded. Subsequent
-    ticks only post when the row crosses into a higher-urgency bucket
-    that hasn't already fired. Idempotent across ticks; safe to re-run."""
+    Each row is tracked by its stable key. Subsequent ticks only post when
+    the row crosses into a higher-urgency bucket that hasn't already fired.
+    Idempotent across ticks; safe to re-run."""
     buckets = imminent.scan()
     state = dashboard_state.load()
     deadlines_state = state.setdefault("deadlines", {})
@@ -188,77 +185,26 @@ def _route_deadlines() -> None:
         kind, threshold = _BUCKET_KIND[item["bucket"]]
         key = item["key"]
         record = deadlines_state.get(key)
-        if record is None:
-            # First time we've seen this row at any threshold -- create
-            # the forum thread with the matching embed.
-            course = item.get("course") or ""
-            title = item.get("title") or "(untitled)"
-            thread_name = (f"{course} — {title}" if course else title)[:100]
-            resp = dashboard.notify(kind, item, thread_name=thread_name)
-            if resp is not None:
-                # Forum-channel create returns channel_id = new thread,
-                # id = starter message of that thread.
-                thread_id = str(resp.get("channel_id") or resp.get("id") or "")
-                msg_id = str(resp.get("id") or "")
-                if thread_id and msg_id:
-                    deadlines_state[key] = {
-                        "fired": [threshold],
-                        "thread_id": thread_id,
-                        "starter_message_id": msg_id,
-                        "last_message_id": msg_id,
-                    }
-        else:
-            fired = record.get("fired") or []
-            if threshold not in fired:
-                thread_id = record.get("thread_id")
-                if thread_id:
-                    resp = dashboard.notify(kind, item, thread_id=thread_id)
-                    if resp is not None:
-                        fired.append(threshold)
-                        record["fired"] = fired
-                        last_id = resp.get("id")
-                        if last_id:
-                            record["last_message_id"] = str(last_id)
+        fired = (record or {}).get("fired") or []
+        if threshold not in fired:
+            dashboard.notify(kind, item)
+            fired.append(threshold)
+            deadlines_state[key] = {"fired": fired}
 
-    # "Next 3" rollup: edited-in-place inside its own forum thread so
-    # CrudusLiv can pin the starter message once by hand.
     top3 = imminent.all_upcoming(buckets)[:3]
-    next3 = state.setdefault("next3", {"thread_id": None, "message_id": None})
-    msg_id = next3.get("message_id")
-    thread_id = next3.get("thread_id")
-    if msg_id and thread_id:
-        resp = dashboard.edit_message(
-            "next3", {"items": top3},
-            message_id=msg_id, thread_id=thread_id,
-        )
-        if resp is None and top3:
-            # Edit failed (thread/message deleted out-of-band). Forget it
-            # and let the next tick recreate -- avoids edit-recreate flap
-            # when the route itself is broken.
-            next3["thread_id"] = None
-            next3["message_id"] = None
-    elif top3:
-        resp = dashboard.notify("next3", {"items": top3}, thread_name="Next 3 deadlines")
-        if resp is not None:
-            new_thread = resp.get("channel_id") or resp.get("id")
-            new_msg = resp.get("id")
-            if new_thread and new_msg:
-                next3["thread_id"] = str(new_thread)
-                next3["message_id"] = str(new_msg)
-    state["next3"] = next3
+    if top3:
+        dashboard.notify("next3", {"items": top3})
 
     dashboard_state.save(state)
 
 
 def _route_pr_events() -> None:
     """Slice 5: pull recent PR events across every repo the GITHUB_TOKEN
-    can see (not just GITHUB_ASSIGNMENT_REPOS -- that env var stays scoped
-    to the code-reviewer skill) and route each through #pr-activity.
+    can see and post each to the feed.
 
-    Dedupe via dashboard_state['pr_activity']['seen_event_ids'] -- event
-    ids are stable strings (open/merge/comment + repo + number) so the
-    same transition can never post twice. The seen list is capped to the
-    last 500 ids to bound state-file growth."""
+    Dedupe via dashboard_state['pr_activity']['seen_event_ids'] — event
+    ids are stable strings so the same transition can never post twice.
+    The seen list is capped to the last 500 ids."""
     try:
         from integrations import github_int
     except Exception as exc:
@@ -284,13 +230,11 @@ def _route_pr_events() -> None:
         if not eid or eid in seen:
             continue
         try:
-            resp = dashboard.notify(ev["kind"], ev)
-        except Exception as exc:
-            print(f"pr_event post failed for {eid}: {exc}", file=sys.stderr)
-            continue
-        if resp is not None:
+            dashboard.notify(ev["kind"], ev)
             seen.add(eid)
             posted += 1
+        except Exception as exc:
+            print(f"pr_event post failed for {eid}: {exc}", file=sys.stderr)
 
     if posted:
         # Preserve insertion order (chronological), keep last 500.
@@ -303,17 +247,9 @@ def _route_pr_events() -> None:
 
 
 def _route_lecture(summary: dict, rel_path: str) -> None:
-    """Slice 4: post a freshly-summarised lecture as a new forum thread in
-    #lectures, then record the thread id in dashboard_state.lectures so
-    future slices (Slice 7 in-thread chat) can recognise it.
+    """Slice 4: post a freshly-summarised lecture to the feed.
 
-    `summary` is one entry from inbox.process_new_files(); it carries name
-    (course), title, tldr, source, etc. `rel_path` is the note's path
-    relative to the vault root."""
-    # Dedupe by rel_path -- inbox.process_new_files() won't return the
-    # same lecture twice (source files move to _processed/), but a manual
-    # re-invocation of _route_lecture for the same note shouldn't spawn a
-    # second forum thread.
+    Dedupe by rel_path so a manual re-run doesn't double-post the same note."""
     try:
         prior = dashboard_state.load().get("lectures", {}).get(rel_path)
     except Exception:
@@ -323,7 +259,6 @@ def _route_lecture(summary: dict, rel_path: str) -> None:
 
     course = summary.get("name") or ""
     title = summary.get("title") or "(untitled)"
-    thread_name = (f"{course} — {title}" if course else title)[:100]
     payload = {
         "name": course,
         "title": title,
@@ -332,23 +267,13 @@ def _route_lecture(summary: dict, rel_path: str) -> None:
         "source": summary.get("source") or "",
     }
     try:
-        resp = dashboard.notify("lecture_new", payload, thread_name=thread_name)
+        dashboard.notify("lecture_new", payload)
     except Exception as exc:
         print(f"_route_lecture failed for {rel_path}: {exc}", file=sys.stderr)
         return
-    if resp is None:
-        return
-    thread_id = str(resp.get("channel_id") or resp.get("id") or "")
-    msg_id = str(resp.get("id") or "")
-    if not thread_id or not msg_id:
-        return
     try:
         state = dashboard_state.load()
-        lectures_state = state.setdefault("lectures", {})
-        lectures_state[rel_path] = {
-            "thread_id": thread_id,
-            "starter_message_id": msg_id,
-        }
+        state.setdefault("lectures", {})[rel_path] = {"notified": True}
         dashboard_state.save(state)
     except Exception as exc:
         print(f"_route_lecture state save failed for {rel_path}: {exc}", file=sys.stderr)
@@ -370,7 +295,7 @@ def _mark_tick_started() -> None:
 
 
 MIN_INTERVAL_SECONDS = 15 * 60  # prevent double-fire on Task Scheduler catch-up
-NETWORK_PROBE_HOST = "discord.com"
+NETWORK_PROBE_HOST = "github.com"
 NETWORK_PROBE_RETRIES = 6
 NETWORK_PROBE_INTERVAL = 5  # seconds between retries (max wait ≈ 30 s)
 
@@ -478,9 +403,7 @@ def _main_impl() -> int:
     # as a continuous timeline. Cheap (one read+write per daily file).
     inbox.refresh_daily_timeline()
 
-    # Slice 3: imminent scan -> per-row forum threads in #deadlines.
-    # Threshold crossings (72h/24h/overdue) become embeds inside the
-    # row's thread; the "Next 3" rollup is edited in place every tick.
+    # Slice 3: imminent scan -> threshold notifications + "Next 3" feed card.
     try:
         _route_deadlines()
     except Exception as exc:
@@ -492,9 +415,6 @@ def _main_impl() -> int:
     except Exception as exc:
         print(f"_route_pr_events failed: {exc}", file=sys.stderr)
 
-    # Discord ping detection moved to standalone DiscordNotif app (Phase 5).
-    # See: https://github.com/CrudusLiv/DiscordNotif
-
     # Section 6: push new DEADLINES.md rows and gcal: tags to Google Calendar.
     if _features.get("gcal_sync", True):
         try:
@@ -505,12 +425,9 @@ def _main_impl() -> int:
             print(f"gcal_sync failed: {exc}", file=sys.stderr)
 
     curr = snapshot.build_snapshot()
-    # heartbeat_ran_at = when integrations finished (and Discord post fires),
-    # not curr["timestamp"] which is stamped before integration calls run.
-    # This keeps Obsidian "Last heartbeat" in sync with Discord message time.
     curr["heartbeat_ran_at"] = time.time()
-    prev = snapshot.load_state()    # capture before persisting
-    _persist(curr)                  # save state first so _too_soon guards correctly if post crashes
+    prev = snapshot.load_state()
+    _persist(curr)
     _maybe_post_heartbeat_tick(curr)
     diff = snapshot.diff_snapshot(prev, curr)
     _log_commits(diff)
@@ -561,8 +478,7 @@ def _main_impl() -> int:
 
 def main() -> int:
     """Wrap _main_impl in a try/except so any uncaught exception is routed
-    to #errors before re-raising. Lets Task Scheduler still register a
-    non-zero exit, while Discord sees the trace immediately."""
+    to the feed before re-raising."""
     try:
         return _main_impl()
     except Exception:
@@ -573,7 +489,7 @@ def main() -> int:
                 "tick_ts": time.time(),
             })
         except Exception as exc:
-            print(f"failed to route error to #errors: {exc}", file=sys.stderr)
+            print(f"failed to route error to feed: {exc}", file=sys.stderr)
         raise
 
 

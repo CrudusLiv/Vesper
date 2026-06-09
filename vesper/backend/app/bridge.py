@@ -29,7 +29,6 @@ from finance import tracker  # noqa: E402
 import schedule_parser  # noqa: E402
 from vault import actions as vault_actions  # noqa: E402
 from vault import paths as vault_paths  # noqa: E402
-from heartbeat import discord_dm_capture  # noqa: E402
 from heartbeat import inbox  # noqa: E402
 from heartbeat import feed as _feed_store  # noqa: E402
 from datetime import datetime, timedelta, timezone  # noqa: E402
@@ -160,17 +159,41 @@ def finance_summary() -> dict:
     return {"summary": tracker.month_summary()}
 
 
+_NOTES_SEED = (
+    "# Notes\n\n"
+    "Rolling file for topic-based notes captured mid-conversation. "
+    "Append a new `- YYYY-MM-DD — <topic>` bullet per note "
+    "(multi-line bodies indent under the bullet). Don't split into multiple files.\n"
+)
+
+
 def note_append(text: str) -> dict:
+    raw = (text or "").strip()
+    if not raw:
+        raise ValueError("note was empty after stripping")
     notes_file = _vault_dir() / "notes" / "NOTES.md"
     notes_file.parent.mkdir(parents=True, exist_ok=True)
-    stripped = discord_dm_capture._append_note(notes_file, datetime.now(_KL), text)
-    if not stripped:
-        raise ValueError("note was empty after stripping")
-    return {"ok": True, "appended_chars": len(stripped)}
+    dt = datetime.now(_KL)
+    lines = raw.split("\n")
+    first = lines[0].strip()
+    extra_lines = [ln.rstrip() for ln in lines[1:] if ln.strip()]
+    bullet = f"- {dt.strftime('%Y-%m-%d')} — {first}\n"
+    if extra_lines:
+        bullet += "\n".join("  " + ln for ln in extra_lines) + "\n"
+    if not notes_file.exists():
+        notes_file.write_text(_NOTES_SEED, encoding="utf-8")
+    file_text = notes_file.read_text(encoding="utf-8")
+    trimmed = file_text.rstrip()
+    last_line = trimmed.rsplit("\n", 1)[-1].lstrip()
+    sep = "\n" if last_line.startswith(("- ", "  ")) else "\n\n"
+    notes_file.write_text(trimmed + sep, encoding="utf-8")
+    rel = notes_file.relative_to(_vault_dir()).as_posix()
+    vault_actions.append(rel, bullet)
+    return {"ok": True, "appended_chars": len(raw)}
 
 
 def schedule_get() -> dict:
-    return {"schedule": schedule_parser.format_for_discord()}
+    return {"schedule": schedule_parser.format_for_frontend()}
 
 
 def schedule_set(text: str, confirm: bool = False) -> dict:

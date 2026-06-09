@@ -1,6 +1,6 @@
 """Lightweight personal expense tracker.
 
-Input format (sent as a Discord DM to the bot):
+Input format:
     <amount> <category> [note...]
 
 Examples:

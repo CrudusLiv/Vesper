@@ -18,7 +18,7 @@ sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts" / "integrations"))
 
 import _env  # noqa: F401, E402
 
-from heartbeat import discord_ping, inbox, notify, snapshot, toast, vault_state_writer  # noqa: E402
+from heartbeat import inbox, notify, snapshot, toast, vault_state_writer  # noqa: E402
 
 KL = timezone(timedelta(hours=8))
 
@@ -50,7 +50,6 @@ def main() -> int:
     # snapshot so write_github() has data instead of blanking the file.
     curr = {
         "timestamp": time.time(),
-        "discord": snapshot._safe(snapshot._snapshot_discord),
         "github":  (prev_saved or {}).get("github") or {},
         "inbox":   snapshot._safe(snapshot._snapshot_inbox),
     }
@@ -61,41 +60,11 @@ def main() -> int:
     vault_state_writer.write_all(curr)
     snapshot.save_state(curr)
 
-    # Ping count: @mentions + DMs from others since last refresh
-    ping_count = 0
-    ping_error = None
-    user_id = __import__("os").environ.get("DISCORD_USER_ID")
-    if user_id:
-        db_path = PROJECT_DIR / ".claude" / "data" / "discord_cache.db"
-        state_path = PROJECT_DIR / ".claude" / "data" / "discord_last_tick.json"
-        try:
-            pings = discord_ping.scan_pings(db_path, user_id=user_id, state_path=state_path)
-            ping_count = len(pings)
-            for ping in pings:
-                toast_title, toast_body = discord_ping.format_toast(ping, user_id=user_id)
-                dm_title, dm_body, _ = discord_ping.format_dm(ping, user_id=user_id)
-                toast.show(toast_title, toast_body)
-                notify.send(dm_title, dm_body, priority="high")
-        except Exception as exc:
-            ping_error = str(exc)
-
-    # Write ping count to vault state so dashboard can read it
-    state_dir = VAULT / "state"
-    state_dir.mkdir(parents=True, exist_ok=True)
-    dt_iso = datetime.now(tz=KL).strftime("%Y-%m-%dT%H:%M:%S")
-    (state_dir / "discord-pings.md").write_text(
-        f"---\nupdated: {dt_iso}\nping_count: {ping_count}\n---\n",
-        encoding="utf-8",
-    )
-
-    discord = curr.get("discord") or {}
     github = curr.get("github") or {}
     inbox_state = curr.get("inbox") or {}
 
-    ping_detail = ping_error or f"{ping_count} new pings"
     github_detail = "(unavailable — carried from last heartbeat)" if github.get("error") else f"{github.get('push_count', 0)} pushes"
     inbox_detail  = "(error)" if inbox_state.get("error") else f"{inbox_state.get('count', 0)} files"
-    lines.append(f"  Discord: {ping_detail}")
     lines.append(f"  GitHub:  {github_detail}")
     lines.append(f"  Inbox:   {inbox_detail}")
     lines.append("Done.")

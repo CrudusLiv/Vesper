@@ -26,16 +26,12 @@ __pycache__/
 # Generated plans
 .agent/
 
-# Plan 2026-05-13: new heartbeat state files
-.claude/data/discord_last_tick.json
+# Heartbeat state files
 .claude/data/gcal_synced.json
 
 # Local-only state (do not commit)
 .claude/settings.local.json
 .claude/chat/*
-!.claude/chat/discord_bot.py
 !.claude/chat/intent_parser.py
 !.claude/chat/about.py
-!.claude/chat/handler.py
-!.claude/chat/dry_run.py
 Dynamous/Memory/.obsidian/

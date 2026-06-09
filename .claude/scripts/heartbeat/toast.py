@@ -1,9 +1,7 @@
-"""Windows toast notifications via winotify. Used for Discord pings only
-(see Section 2 of the 2026-05-12 restructure design). Other heartbeat
-notifications still go through notify.py → Discord DM.
+"""Windows toast notifications via winotify.
 
-This module degrades cleanly on non-Windows platforms or if winotify
-isn't installed: callers get a logged warning and no exception."""
+Degrades cleanly on non-Windows platforms or if winotify isn't installed:
+callers get a logged warning and no exception."""
 from __future__ import annotations
 
 import sys

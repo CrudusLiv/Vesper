@@ -8,20 +8,6 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".claude" / "scripts"))
 
-import pytest
-
-
-@pytest.fixture(autouse=True)
-def _no_discord(monkeypatch):
-    """Blank all Discord webhook env vars so no network calls happen in tests."""
-    for key in (
-        "DISCORD_HOOK_HEARTBEAT", "DISCORD_HOOK_DEADLINES", "DISCORD_HOOK_ERRORS",
-        "DISCORD_HOOK_DAILY", "DISCORD_HOOK_LECTURES", "DISCORD_HOOK_INBOX",
-        "DISCORD_HOOK_PR_ACTIVITY", "DISCORD_HOOK_CODE_REVIEW", "DISCORD_HOOK_IDEAS",
-        "DISCORD_HOOK_EMAIL_UNI", "DISCORD_HOOK_EMAIL_PERSONAL", "DISCORD_HOOK_VESPER",
-    ):
-        monkeypatch.setenv(key, "")
-
 
 def test_ok_tick_not_appended_to_feed():
     appended = []
@@ -102,20 +88,13 @@ def test_feed_failure_does_not_raise():
             dashboard.notify("morning_digest", {"body": "hello"})
 
 
-def test_feed_runs_despite_discord_failure():
-    """feed.append must be called even when discord_webhook.post raises."""
+def test_notify_idempotent_on_repeated_calls():
+    """notify() must not raise even if called multiple times with the same kind."""
     appended = []
-    record = {"title": "Morning", "body": "..."}
-    with patch("heartbeat.feed.append", side_effect=lambda k, p: appended.append(k) or record):
+    with patch("heartbeat.feed.append", side_effect=lambda k, p: appended.append(k) or {"title": "t", "body": "b"}):
         with patch("heartbeat.toast.show", return_value=True):
-            # Patch the discord webhook post to raise
-            with patch("integrations.discord_webhook.post", side_effect=ConnectionError("timeout")):
-                from heartbeat import dashboard
-                import importlib; importlib.reload(dashboard)
-                # Give it a real-looking URL so the Discord block runs
-                import os; os.environ["DISCORD_HOOK_DAILY"] = "https://fake-url"
-                try:
-                    dashboard.notify("morning_digest", {"body": "good morning"})
-                finally:
-                    os.environ["DISCORD_HOOK_DAILY"] = ""
-    assert "morning_digest" in appended, "feed.append must run even when Discord raises"
+            from heartbeat import dashboard
+            import importlib; importlib.reload(dashboard)
+            dashboard.notify("morning_digest", {"body": "first"})
+            dashboard.notify("morning_digest", {"body": "second"})
+    assert appended.count("morning_digest") == 2

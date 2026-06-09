@@ -24,5 +24,5 @@ COPY vesper/worker /workspace/vesper/worker
 ENV CLAUDE_PROJECT_DIR=/workspace \
     PYTHONUNBUFFERED=1
 
-# Compose overrides `command` per service (discord vs scheduler).
+# Compose overrides `command` per service.
 CMD ["python", "vesper/worker/scheduler.py"]

@@ -283,6 +283,39 @@ def schedule_view() -> dict | None:
     }
 
 
+_ENTRY_RE = re.compile(r'(\d{1,2}:\d{2})[–\-](\d{1,2}:\d{2})\s+\*\*([^*]+)\*\*')
+_LOC_RE = re.compile(r'📍\s*(.+)')
+_FREE_LINE = re.compile(r'—\s*free')
+
+
+def format_for_frontend() -> str | None:
+    """Day-header plain-text schedule readable by the frontend scheduleParser.js.
+    Returns None when no schedule exists."""
+    data = schedule_view()
+    if not data or not data["days"]:
+        return None
+    lines: list[str] = []
+    for d in data["days"]:
+        day_lines: list[str] = []
+        for raw in d["lines"]:
+            if _FREE_LINE.search(raw):
+                continue
+            m = _ENTRY_RE.search(raw)
+            if not m:
+                continue
+            start, end, course = m.group(1), m.group(2), m.group(3).strip()
+            loc_m = _LOC_RE.search(raw)
+            loc = loc_m.group(1).strip() if loc_m else ""
+            entry = f"{start}-{end} {course}"
+            if loc:
+                entry += f" ({loc})"
+            day_lines.append(entry)
+        if day_lines:
+            lines.append(d["day"])
+            lines.extend(day_lines)
+    return "\n".join(lines) if lines else None
+
+
 def format_for_discord() -> str | None:
     """Plain-text Discord rendering of the schedule (fallback for non-embed
     callers): an aligned grid code fence followed by the day breakdown. Returns

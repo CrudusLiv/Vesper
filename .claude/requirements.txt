@@ -9,7 +9,6 @@ fastembed>=0.4.0
 sqlite-vec>=0.1.6
 
 # Phase 4: integrations
-discord.py>=2.6
 PyGithub>=2.1
 google-api-python-client>=2.100
 google-auth-oauthlib>=1.2
@@ -17,7 +16,6 @@ google-auth-httplib2>=0.2
 python-pptx>=0.6
 pypdf>=4.0
 
-# Plan 2026-05-13: Windows toast for Discord pings
 winotify>=1.1.0
 
 # Plan 2026-05-13: test framework (first tests in project)

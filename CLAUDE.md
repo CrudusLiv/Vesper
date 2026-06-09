@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Vesper is a personal second brain running as a web application. Two layers live here:
 
 1. **Web app** — `vesper/` contains the React frontend, FastAPI backend, nginx reverse proxy, and Docker Compose wiring. This is the primary UI.
-2. **Claude Code agent system** — `.claude/scripts/`, `.claude/hooks/`, and `.claude/settings.json` are the running agent layer (heartbeat, memory, integrations, Discord bot).
+2. **Claude Code agent system** — `.claude/scripts/`, `.claude/hooks/`, and `.claude/settings.json` are the running agent layer (heartbeat, memory, integrations).
 
 The personal vault (notes, schedules, finances) lives locally at `Dynamous/Memory/` — gitignored. Each machine keeps its own vault.
 
@@ -69,7 +69,7 @@ The DB lives at `.claude/data/memory.db` (gitignored). Embeddings use `fast-all-
 |------|---------|
 | `vesper/frontend/` | React dashboard (Vite, served by nginx) |
 | `vesper/backend/` | FastAPI layer wrapping the Vesper scripts |
-| `vesper/worker/` | Docker worker base image (heartbeat + Discord bot) |
+| `vesper/worker/` | Docker worker base image (heartbeat scheduler) |
 | `vesper/nginx/` | nginx reverse proxy config |
 | `vesper/docker-compose.yml` | Service wiring |
 

@@ -16,10 +16,10 @@ sys.path.insert(0, str(SCRIPTS))
 _STUBS = [
     "_env",
     "heartbeat.deadlines", "heartbeat.imminent", "heartbeat.inbox",
-    "heartbeat.notify", "heartbeat.toast", "heartbeat.discord_ping",
-    "heartbeat.discord_dm_capture", "heartbeat.gcal_sync",
+    "heartbeat.notify", "heartbeat.toast",
+    "heartbeat.gcal_sync",
     "heartbeat.vault_state_writer", "heartbeat.dashboard",
-    "heartbeat.dashboard_state", "heartbeat.thread_chat",
+    "heartbeat.dashboard_state",
     "security", "security.sanitize",
 ]
 _PREV = {}
@@ -49,10 +49,10 @@ def test_execute_writes_alert_line(tmp_vault, monkeypatch):
     heartbeat.dashboard.notify = MagicMock()
 
     heartbeat.execute({"notifications": [
-        {"title": "New Discord DM", "body": "someone replied in #general"},
+        {"title": "New GitHub push", "body": "CrudusLiv/Vesper — fix auth bug"},
     ]})
 
-    assert written == ["Alert: New Discord DM — someone replied in #general"]
+    assert written == ["Alert: New GitHub push — CrudusLiv/Vesper — fix auth bug"]
 
 
 def test_execute_writes_multiple_alert_lines(tmp_vault, monkeypatch):

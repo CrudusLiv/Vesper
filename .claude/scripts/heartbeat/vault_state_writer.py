@@ -23,35 +23,6 @@ def _iso(ts: float | None = None) -> str:
     return t.strftime("%Y-%m-%dT%H:%M:%S")
 
 
-def write_discord(snapshot: dict) -> None:
-    discord = snapshot.get("discord") or {}
-    if "error" in discord:
-        return
-
-    items = discord.get("items") or []
-    dm_items = [i for i in items if i.get("is_dm")]
-    unread = len(dm_items)
-
-    log_lines = []
-    for item in dm_items[:3]:
-        author = item.get("author") or "?"
-        content = (item.get("content") or "")[:200]
-        log_lines.append(f"**{author}** — {content}")
-
-    body = "\n".join(log_lines) if log_lines else "_No recent DMs_"
-    content = (
-        f"---\n"
-        f"updated: {_iso(snapshot.get('timestamp'))}\n"
-        f"unread_dms: {unread}\n"
-        f"---\n"
-        f"{body}\n"
-    )
-
-    d = _vault_state_dir()
-    d.mkdir(parents=True, exist_ok=True)
-    (d / "discord-recent.md").write_text(content, encoding="utf-8")
-
-
 def write_github(snapshot: dict) -> None:
     github = snapshot.get("github") or {}
     if "error" in github:
@@ -112,7 +83,6 @@ def write_gcal_today(snapshot: dict) -> None:
 
 
 def write_all(snapshot: dict) -> None:
-    write_discord(snapshot)
     write_github(snapshot)
     write_gcal_today(snapshot)
     write_heartbeat_state(snapshot)

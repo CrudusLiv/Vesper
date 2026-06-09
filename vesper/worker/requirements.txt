@@ -1,10 +1,9 @@
-# Runtime deps for the worker image (discord bot + scheduler).
+# Runtime deps for the worker image (scheduler).
 # Curated subset of .claude/requirements.txt — omits the host/GUI deps
 # (winotify, pystray, customtkinter, pyinstaller, Pillow): winotify is
 # Windows-only and toasts no-op in the container; the tray GUI never runs here.
 fastembed>=0.4.0
 sqlite-vec>=0.1.6
-discord.py>=2.6
 PyGithub>=2.1
 google-api-python-client>=2.100
 google-auth-oauthlib>=1.2
