@@ -255,8 +255,30 @@ def inbox_enqueue(filename: str) -> dict:
     return inbox_status.add(filename)
 
 
+_STALE_SECONDS = 600  # 10 minutes without progress → failed
+
+
 def inbox_recent(limit: int = 10) -> list[dict]:
-    return inbox_status.recent(limit)
+    records = inbox_status.recent(limit)
+    inbox_dir = _inbox_dir()
+    now = datetime.now(_KL)
+    for r in records:
+        if r["status"] not in ("queued", "processing"):
+            continue
+        fname = r.get("filename")
+        if fname and not (inbox_dir / fname).exists():
+            inbox_status.update(r["id"], status="done")
+            r["status"] = "done"
+            continue
+        try:
+            updated = datetime.fromisoformat(r["updated_at"])
+            if (now - updated).total_seconds() > _STALE_SECONDS:
+                inbox_status.update(r["id"], status="failed",
+                                    error="processor unavailable — check scheduler logs")
+                r["status"] = "failed"
+        except (KeyError, ValueError, TypeError):
+            pass
+    return records
 
 
 def inbox_process_upload(upload_id: str, saved_path: Path) -> None:

@@ -9,7 +9,7 @@ const STATUS_LABEL = {
   queued: '⏳ queued',
   processing: '⏳ processing',
   done: '✓ done',
-  failed: '✗ failed — will retry automatically',
+  failed: '✗ failed — re-upload to retry',
 }
 
 export default function UploadPanel({ onUpload, onListUploads }) {
