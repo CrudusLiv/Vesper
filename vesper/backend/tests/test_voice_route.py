@@ -4,11 +4,14 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app import deps
 
-
-# Override auth for tests
-app.dependency_overrides[deps.require_auth] = lambda: None
-
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _override_auth():
+    app.dependency_overrides[deps.require_auth] = lambda: None
+    yield
+    app.dependency_overrides.pop(deps.require_auth, None)
 
 
 def test_voice_chat_endpoint_exists():

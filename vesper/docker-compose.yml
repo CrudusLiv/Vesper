@@ -12,6 +12,8 @@ services:
       - CLAUDE_PROJECT_DIR=/workspace
       - VAULT_PATH=/workspace/Dynamous/Memory
       - OLLAMA_URL=http://ollama:11434
+      - WHISPER_URL=http://whisper:9000
+      - TTS_URL=http://tts:5500
     volumes:
       - ../Dynamous/Memory:/workspace/Dynamous/Memory
       - ../.claude/scripts:/workspace/.claude/scripts:ro
@@ -93,7 +95,29 @@ services:
     networks:
       - vesper-net
 
-  # Whisper (speech-to-text) and TTS services added in Phase 4 with proper image setup
+  # Voice services — opt-in: docker compose --profile voice up
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    profiles: ["voice"]
+    ports:
+      - "9000:9000"
+    environment:
+      - ASR_MODEL=base
+      - ASR_ENGINE=openai_whisper
+    restart: unless-stopped
+    networks:
+      - vesper-net
+
+  tts:
+    image: synesthesiam/piper:latest
+    profiles: ["voice"]
+    ports:
+      - "5500:5500"
+    environment:
+      - PIPER_VOICE=en_US-lessac-medium
+    restart: unless-stopped
+    networks:
+      - vesper-net
 
 volumes:
   ollama_data:
