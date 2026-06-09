@@ -1,5 +1,6 @@
 import logging
 import requests
+from requests.exceptions import ReadTimeout
 from datetime import datetime
 from .models import AgentRequest, AgentResponse, ToolCall
 from .registry import ToolRegistry
@@ -20,7 +21,7 @@ _SYSTEM_PROMPT = (
 class AgentLoop:
     """Main agent loop: user input → Ollama → tools → response."""
 
-    def __init__(self, ollama_url: str = None):
+    def __init__(self, ollama_url: str | None = None):
         self.ollama_url = ollama_url or config.OLLAMA_URL
         self.model = config.OLLAMA_MODEL
         self.registry = ToolRegistry()
@@ -78,6 +79,13 @@ class AgentLoop:
                 tool_calls=[],
                 tool_results=[],
             )
+        except ReadTimeout:
+            logger.warning("Ollama timed out after %ds", config.OLLAMA_TIMEOUT)
+            return AgentResponse(
+                response="Ollama took too long to respond. The model may still be loading — try again in a moment.",
+                tool_calls=[],
+                tool_results=[],
+            )
         except Exception:
             logger.exception("Agent loop error")
             return AgentResponse(
@@ -97,7 +105,7 @@ class AgentLoop:
         resp = requests.post(
             f"{self.ollama_url}/api/chat",
             json=payload,
-            timeout=60,
+            timeout=(10, config.OLLAMA_TIMEOUT),
         )
         resp.raise_for_status()
         return resp.json()
