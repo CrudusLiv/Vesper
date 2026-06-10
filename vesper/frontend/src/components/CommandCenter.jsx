@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { useAgent } from '../hooks/useAgent.js'
 import { useVoice } from '../hooks/useVoice.js'
 import ToolPalette from './ToolPalette.jsx'
@@ -61,7 +62,11 @@ export default function CommandCenter({ onToolSelect }) {
         )}
         {messages.map((m, i) => (
           <div key={i} className={`cc-msg cc-msg--${m.role}${m.error ? ' cc-msg--error' : ''}`}>
-            <span className="cc-msg-content">{m.content}</span>
+            <div className="cc-msg-content">
+              {m.role === 'assistant' && !m.error
+                ? <ReactMarkdown>{m.content}</ReactMarkdown>
+                : m.content}
+            </div>
             {m.role === 'assistant' && m.sources?.length > 0 && (
               <span className="cc-msg-sources">▸ {m.sources.length} sources</span>
             )}
@@ -72,7 +77,9 @@ export default function CommandCenter({ onToolSelect }) {
                     <span className="cc-tool-name">{tc.tool_name}</span>
                     {toolResults[j] && (
                       <span className={`cc-tool-result ${toolResults[j].result?.success === false ? 'cc-tool-result--err' : 'cc-tool-result--ok'}`}>
-                        {toolResults[j].result?.result ?? toolResults[j].result?.error ?? '✓'}
+                        {toolResults[j].result?.success === false
+                          ? (toolResults[j].result?.error ?? '✗')
+                          : '✓'}
                       </span>
                     )}
                   </div>

@@ -1,10 +1,8 @@
+import json
 import logging
-import requests
-from requests.exceptions import ReadTimeout
+import subprocess
 from datetime import datetime
-from .models import AgentRequest, AgentResponse, ToolCall
-from .registry import ToolRegistry
-from .executor import ToolExecutor
+from .models import AgentRequest, AgentResponse
 from ..config import config
 
 logger = logging.getLogger(__name__)
@@ -13,99 +11,77 @@ _SYSTEM_PROMPT = (
     "You are Vesper, a personal assistant and study partner. "
     "You are direct and efficient, with a slightly dry tone. "
     "Today is {date}. "
-    "Use tools to manage notes, finances, and schedules when asked. "
-    "After executing a tool, confirm what you did in one short sentence."
+    "The personal vault is at: {vault_path}. "
+    "Files live under: notes/, lectures/<COURSE>/, finance/, schedule/. "
+    "When displaying note or lecture content, present it directly using markdown — "
+    "bullet points, headers, bold as appropriate. Do NOT paraphrase or summarise into prose."
 )
 
 
 class AgentLoop:
-    """Main agent loop: user input → Ollama → tools → response."""
-
-    def __init__(self, ollama_url: str | None = None):
-        self.ollama_url = ollama_url or config.OLLAMA_URL
-        self.model = config.OLLAMA_MODEL
-        self.registry = ToolRegistry()
-        self.executor = ToolExecutor()
+    """Main agent loop: user input → claude -p → response."""
 
     def process(self, request: AgentRequest) -> AgentResponse:
-        messages = list(request.conversation_history or [])
-        messages.append({"role": "user", "content": request.input})
-
-        tools_schema = self.registry.to_ollama_schema()
-
+        prompt = self._build_prompt(request)
+        system = _SYSTEM_PROMPT.format(
+            date=datetime.now().strftime("%Y-%m-%d"),
+            vault_path=config.VAULT_PATH,
+        )
         try:
-            ollama_resp = self._call_ollama(messages, tools_schema)
-            msg = ollama_resp.get("message", {})
-            raw_tool_calls = msg.get("tool_calls") or []
-
-            executed: list[ToolCall] = []
-            results: list[dict] = []
-
-            if raw_tool_calls:
-                for tc in raw_tool_calls:
-                    fn = tc.get("function", {})
-                    tool_call = ToolCall(
-                        tool_name=fn.get("name", ""),
-                        parameters=fn.get("arguments", {}),
-                    )
-                    result = self.executor.execute(tool_call)
-                    executed.append(tool_call)
-                    results.append({"tool_name": tool_call.tool_name, "result": result})
-
-                # Feed tool results back for a natural-language summary
-                messages.append({
-                    "role": "assistant",
-                    "content": msg.get("content") or "",
-                    "tool_calls": raw_tool_calls,
-                })
-                for r in results:
-                    messages.append({"role": "tool", "content": str(r["result"])})
-
-                final = self._call_ollama(messages, tools_schema)
-                response_text = final.get("message", {}).get("content") or "Done."
-            else:
-                response_text = msg.get("content") or "Done."
-
+            response_text = self._call_claude(prompt, system)
+            return AgentResponse(response=response_text, tool_calls=[], tool_results=[])
+        except subprocess.TimeoutExpired:
+            logger.warning("claude -p timed out after %ds", config.ANTHROPIC_TIMEOUT)
             return AgentResponse(
-                response=response_text,
-                tool_calls=executed,
-                tool_results=results,
+                response="Claude took too long to respond. Try again.",
+                tool_calls=[], tool_results=[],
             )
-
-        except requests.ConnectionError:
-            logger.warning("Ollama not reachable at %s", self.ollama_url)
+        except FileNotFoundError:
+            logger.error("claude CLI not found in PATH")
             return AgentResponse(
-                response="Ollama isn't reachable right now. Make sure it's running and a model is loaded.",
-                tool_calls=[],
-                tool_results=[],
-            )
-        except ReadTimeout:
-            logger.warning("Ollama timed out after %ds", config.OLLAMA_TIMEOUT)
-            return AgentResponse(
-                response="Ollama took too long to respond. The model may still be loading — try again in a moment.",
-                tool_calls=[],
-                tool_results=[],
+                response="The `claude` CLI isn't installed or not in PATH.",
+                tool_calls=[], tool_results=[],
             )
         except Exception:
             logger.exception("Agent loop error")
             return AgentResponse(
                 response="Something went wrong on my end. Check the backend logs.",
-                tool_calls=[],
-                tool_results=[],
+                tool_calls=[], tool_results=[],
             )
 
-    def _call_ollama(self, messages: list[dict], tools_schema: list[dict]) -> dict:
-        system = _SYSTEM_PROMPT.format(date=datetime.now().strftime("%Y-%m-%d"))
-        payload = {
-            "model": self.model,
-            "messages": [{"role": "system", "content": system}] + messages,
-            "tools": tools_schema,
-            "stream": False,
-        }
-        resp = requests.post(
-            f"{self.ollama_url}/api/chat",
-            json=payload,
-            timeout=(10, config.OLLAMA_TIMEOUT),
+    def _build_prompt(self, request: AgentRequest) -> str:
+        parts = []
+        for msg in request.conversation_history or []:
+            role = msg.get("role", "user")
+            content = msg.get("content") or ""
+            if isinstance(content, list):
+                content = " ".join(
+                    b.get("text", "")
+                    for b in content
+                    if isinstance(b, dict) and b.get("type") == "text"
+                )
+            if content:
+                parts.append(f"{role.upper()}: {content}")
+        parts.append(f"USER: {request.input}")
+        return "\n\n".join(parts)
+
+    def _call_claude(self, prompt: str, system: str) -> str:
+        cmd = [
+            "claude", "-p", prompt,
+            "--output-format", "json",
+            "--system-prompt", system,
+            "--model", config.ANTHROPIC_MODEL,
+        ]
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=config.ANTHROPIC_TIMEOUT,
         )
-        resp.raise_for_status()
-        return resp.json()
+        if result.returncode != 0:
+            logger.error("claude -p stderr: %s", result.stderr)
+            raise RuntimeError(result.stderr or "claude exited non-zero")
+        output = json.loads(result.stdout)
+        if output.get("is_error"):
+            raise RuntimeError(output.get("result", "Unknown error from claude"))
+        return output.get("result", "Done.")

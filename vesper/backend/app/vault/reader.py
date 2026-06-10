@@ -368,24 +368,27 @@ class VaultReader:
 
         try:
             # Search notes
-            if search_type in ("all", "note"):
-                notes_dir = Path(self.vault_path) / "notes"
-                for md_file in notes_dir.rglob("*.md"):
-                    try:
-                        content = md_file.read_text(encoding="utf-8")
-                        metadata, body = parse_vault_file(content)
-                        if isinstance(metadata, Note):
-                            # Search in body and tags
-                            if (
-                                query_lower in body.lower()
-                                or any(query_lower in tag.lower() for tag in (metadata.tags or []))
-                            ):
-                                rel_path = str(
-                                    md_file.relative_to(self.vault_path)
-                                ).replace("\\", "/")
-                                results.append((rel_path, metadata))
-                    except (ValueError, IOError):
+            if search_type in ("all", "note", "notes"):
+                for search_dir in ["notes", "lectures"]:
+                    notes_dir = Path(self.vault_path) / search_dir
+                    if not notes_dir.exists():
                         continue
+                    for md_file in notes_dir.rglob("*.md"):
+                        try:
+                            content = md_file.read_text(encoding="utf-8")
+                            metadata, body = parse_vault_file(content)
+                            if isinstance(metadata, Note):
+                                if (
+                                    query_lower in body.lower()
+                                    or query_lower in md_file.stem.lower()
+                                    or any(query_lower in tag.lower() for tag in (metadata.tags or []))
+                                ):
+                                    rel_path = str(
+                                        md_file.relative_to(self.vault_path)
+                                    ).replace("\\", "/")
+                                    results.append((rel_path, metadata))
+                        except (ValueError, IOError):
+                            continue
 
             # Search finances
             if search_type in ("all", "finance"):

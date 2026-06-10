@@ -42,6 +42,10 @@ class VaultToolExecutor:
             return self.add_schedule(**tool_call.parameters)
         elif tool_call.tool_name == "vault_search":
             return self.search(**tool_call.parameters)
+        elif tool_call.tool_name == "vault_read_note":
+            return self.read_note(**tool_call.parameters)
+        elif tool_call.tool_name == "vault_list":
+            return self.list_files(**tool_call.parameters)
         else:
             return {
                 "success": False,
@@ -197,6 +201,39 @@ class VaultToolExecutor:
                 "result": None,
                 "error": str(e)
             }
+
+    def list_files(self, directory: str = "notes") -> dict:
+        try:
+            validated = self.reader._validate_path(directory)
+            if not validated:
+                return {"success": False, "result": None, "error": f"Invalid path: {directory}"}
+            full_path = Path(self.vault_path) / validated
+            if not full_path.exists() or not full_path.is_dir():
+                return {"success": False, "result": None, "error": f"Directory not found: {directory}"}
+            files = [
+                str(f.relative_to(Path(self.vault_path))).replace("\\", "/")
+                for f in full_path.rglob("*.md")
+                if f.name != ".gitkeep"
+            ]
+            return {"success": True, "result": {"directory": directory, "files": sorted(files)}, "error": None}
+        except Exception as e:
+            logger.error(f"Failed to list files: {e}", exc_info=True)
+            return {"success": False, "result": None, "error": str(e)}
+
+    def read_note(self, path: str) -> dict:
+        try:
+            result = self.reader.get_file(path)
+            if result is None:
+                return {"success": False, "result": None, "error": f"File not found: {path}"}
+            metadata, body = result
+            return {
+                "success": True,
+                "result": {"path": path, "content": body},
+                "error": None,
+            }
+        except Exception as e:
+            logger.error(f"Failed to read note: {e}", exc_info=True)
+            return {"success": False, "result": None, "error": str(e)}
 
     def search(self, query: str, search_type: str = "all", limit: int = 10) -> dict:
         """

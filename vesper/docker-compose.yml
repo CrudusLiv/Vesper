@@ -11,7 +11,6 @@ services:
     environment:
       - CLAUDE_PROJECT_DIR=/workspace
       - VAULT_PATH=/workspace/Dynamous/Memory
-      - OLLAMA_URL=http://ollama:11434
       - WHISPER_URL=http://whisper:9000
       - TTS_URL=http://tts:5500
     volumes:
@@ -59,18 +58,6 @@ services:
     networks:
       - vesper-net
 
-  ollama:
-    image: ollama/ollama:latest
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
-    environment:
-      - OLLAMA_HOST=0.0.0.0:11434
-    restart: unless-stopped
-    networks:
-      - vesper-net
-
   # Voice services — opt-in: docker compose --profile voice up
   whisper:
     image: onerahmet/openai-whisper-asr-webservice:latest
@@ -94,9 +81,6 @@ services:
     restart: unless-stopped
     networks:
       - vesper-net
-
-volumes:
-  ollama_data:
 
 networks:
   vesper-net:

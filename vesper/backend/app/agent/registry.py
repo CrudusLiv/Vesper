@@ -126,7 +126,7 @@ class ToolRegistry:
         self.register(
             Tool(
                 name="vault_search",
-                description="Search the vault for existing content",
+                description="Search the vault for existing content including lecture notes",
                 parameters=[
                     ToolParameter(
                         name="query",
@@ -138,13 +138,43 @@ class ToolRegistry:
                         name="search_type",
                         type="string",
                         enum=["all", "notes", "finances", "schedule"],
-                        description="What to search",
+                        description="What to search — 'notes' also searches lectures/",
                         required=False,
                     ),
                     ToolParameter(
                         name="limit",
                         type="number",
                         description="Max results",
+                        required=False,
+                    ),
+                ],
+            )
+        )
+
+        self.register(
+            Tool(
+                name="vault_read_note",
+                description="Read the full content of a specific vault file by path",
+                parameters=[
+                    ToolParameter(
+                        name="path",
+                        type="string",
+                        description="File path relative to vault root (e.g., 'lectures/BCS102/Lecture 1.md')",
+                        required=True,
+                    ),
+                ],
+            )
+        )
+
+        self.register(
+            Tool(
+                name="vault_list",
+                description="List files in a vault directory to discover what notes exist",
+                parameters=[
+                    ToolParameter(
+                        name="directory",
+                        type="string",
+                        description="Directory to list, relative to vault root (e.g., 'notes', 'lectures', 'lectures/BCS102'). Defaults to 'notes'.",
                         required=False,
                     ),
                 ],
@@ -376,3 +406,7 @@ class ToolRegistry:
     def to_ollama_schema(self) -> list[dict]:
         """Export all tools to Ollama function-calling schema"""
         return [tool.to_ollama_schema() for tool in self.tools.values()]
+
+    def to_anthropic_schema(self) -> list[dict]:
+        """Export all tools to Anthropic tool-calling schema"""
+        return [tool.to_anthropic_schema() for tool in self.tools.values()]

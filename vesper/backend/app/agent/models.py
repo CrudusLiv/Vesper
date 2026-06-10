@@ -26,14 +26,37 @@ class Tool(BaseModel):
                     "type": "object",
                     "properties": {
                         param.name: {
-                            "type": param.type,
-                            "description": param.description,
-                            "enum": param.enum,
+                            k: v for k, v in {
+                                "type": param.type,
+                                "description": param.description,
+                                "enum": param.enum,
+                            }.items() if v is not None
                         }
                         for param in self.parameters
                     },
                     "required": [p.name for p in self.parameters if p.required],
                 }
+            }
+        }
+
+    def to_anthropic_schema(self) -> dict:
+        """Export to Anthropic tool-calling schema"""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    param.name: {
+                        k: v for k, v in {
+                            "type": param.type,
+                            "description": param.description,
+                            "enum": param.enum,
+                        }.items() if v is not None
+                    }
+                    for param in self.parameters
+                },
+                "required": [p.name for p in self.parameters if p.required],
             }
         }
 

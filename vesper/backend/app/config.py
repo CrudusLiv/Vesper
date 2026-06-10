@@ -2,11 +2,10 @@ import os
 
 
 class Config:
-    # Ollama settings
-    # Use localhost for local dev, ollama for Docker
-    OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral:7b")
-    OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))
+    # Anthropic settings
+    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+    ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
+    ANTHROPIC_TIMEOUT = int(os.getenv("ANTHROPIC_TIMEOUT", "120"))
 
     # Whisper settings (Phase 4)
     WHISPER_URL = os.getenv("WHISPER_URL", "http://whisper:9000")
