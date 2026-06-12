@@ -311,9 +311,12 @@ def _route_lecture(summary: dict, rel_path: str) -> None:
         "tldr": summary.get("tldr") or [],
         "vault_path": rel_path,
         "source": summary.get("source") or "",
+        "date": summary.get("date") or "",
+        "study_cards": summary.get("study_cards"),
     }
+    thread_name = (f"{course} — {title}" if course else title)[:100]
     try:
-        dashboard.notify("lecture_new", payload)
+        dashboard.notify("lecture_new", payload, thread_name=thread_name)
     except Exception as exc:
         print(f"_route_lecture failed for {rel_path}: {exc}", file=sys.stderr)
         return

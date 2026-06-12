@@ -73,6 +73,7 @@ def delete(url: str, message_id: str, *, thread_id: str | None = None) -> None:
 
 
 def _request(url: str, *, method: str, body: dict | None, expect_json: bool = True) -> dict[str, Any]:
+    import urllib.error
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(
         url,
@@ -83,8 +84,14 @@ def _request(url: str, *, method: str, body: dict | None, expect_json: bool = Tr
             "User-Agent": USER_AGENT,
         },
     )
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-        raw = resp.read()
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            raw = resp.read()
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise urllib.error.HTTPError(
+            exc.url, exc.code, f"{exc.msg} — {detail}", exc.headers, None
+        ) from None
     if not expect_json or not raw:
         return {}
     return json.loads(raw)
