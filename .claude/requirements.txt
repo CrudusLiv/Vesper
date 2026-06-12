@@ -9,6 +9,7 @@ fastembed>=0.4.0
 sqlite-vec>=0.1.6
 
 # Phase 4: integrations
+discord.py>=2.3
 PyGithub>=2.1
 google-api-python-client>=2.100
 google-auth-oauthlib>=1.2

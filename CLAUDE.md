@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Vesper is a personal second brain running as a web application. Two layers live here:
+Vesper is a personal second brain. Two layers live here:
 
-1. **Web app** — `vesper/` contains the React frontend, FastAPI backend, nginx reverse proxy, and Docker Compose wiring. This is the primary UI.
+1. **Discord UI** — the primary interface. A discord.py bot (`chat/discord_bot.py`) handles `#vesper` chat, `#inbox`, `#finance`, and slash commands. The heartbeat posts embeds to channel webhooks (`DISCORD_HOOK_*`). Both run as Docker services in `vesper/docker-compose.yml`.
 2. **Claude Code agent system** — `.claude/scripts/`, `.claude/hooks/`, and `.claude/settings.json` are the running agent layer (heartbeat, memory, integrations).
 
 The personal vault (notes, schedules, finances) lives locally at `Dynamous/Memory/` — gitignored. Each machine keeps its own vault.
@@ -21,16 +21,17 @@ py -m pip install -r .claude/requirements.txt
 
 Credentials and secrets go in `.env` at the project root — never committed. The `_env.py` loader reads it on import; existing shell env vars take precedence.
 
-## Running the web app
+## Running the bot
 
 ```powershell
-cd vesper
-docker compose up -d          # backend + web (always)
-docker compose --profile workers up -d  # add heartbeat scheduler
-docker compose ps             # verify
+docker compose up -d --build   # discord-bot + scheduler
+docker compose ps              # verify
 ```
 
-Open http://localhost in the browser.
+Or locally without Docker:
+```powershell
+py .claude/chat/discord_bot.py
+```
 
 ## Running integrations (CLI)
 
@@ -63,17 +64,14 @@ The DB lives at `.claude/data/memory.db` (gitignored). Embeddings use `fast-all-
 
 ## Architecture
 
-### Web app (`vesper/`)
+### Docker services (`vesper/`)
 
 | Path | Purpose |
 |------|---------|
-| `vesper/frontend/` | React dashboard (Vite, served by nginx) |
-| `vesper/backend/` | FastAPI layer wrapping the Vesper scripts |
-| `vesper/worker/` | Docker worker base image (heartbeat scheduler) |
-| `vesper/nginx/` | nginx reverse proxy config |
-| `vesper/docker-compose.yml` | Service wiring |
+| `worker/` | Shared Docker image for bot + scheduler |
+| `docker-compose.yml` | Two services: `discord-bot`, `scheduler` |
 
-Backend API prefix: `/api`. Routes: `chat`, `feed`, `finance`, `heartbeat`, `inbox`, `memory`, `note`, `schedule`, `settings`, `status`, `vault`.
+`discord-bot` runs `.claude/chat/discord_bot.py`. `scheduler` runs the heartbeat on a 30-min tick.
 
 ### Memory layer (`Dynamous/Memory/`)
 
@@ -123,9 +121,7 @@ Place `google_credentials.json` at `.claude/data/google_credentials.json`. The t
 
 ### Settings Management
 
-User settings (active hours, feature toggles, heartbeat interval) are stored in `.claude/data/tray_settings.json` and configured via the **Settings** floating panel on the web Dashboard. The scheduler reads the interval at startup; feature toggles are honored by each heartbeat task.
-
-API: GET/POST `/api/settings` (requires auth).
+User settings (active hours, feature toggles, heartbeat interval) are stored in `.claude/data/tray_settings.json`. The scheduler reads the interval at startup; feature toggles are honored by each heartbeat task.
 
 ## Vault write rules
 
@@ -142,5 +138,6 @@ Skills live in `.claude/skills/<name>/SKILL.md`:
 |-------|---------|
 | `deadline-tracker` | Parse and track deadlines from documents |
 | `lecture-summarizer` | Convert `.pptx`/`.pdf` lectures into structured Obsidian notes |
+| `concept-wiki` | Cross-reference concepts from lectures into `concepts/` wiki pages |
 | `note-search` | Hybrid semantic + keyword search over the vault |
 | `vault-structure` | Vault layout, Obsidian conventions, read/write rules |

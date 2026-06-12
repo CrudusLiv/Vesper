@@ -1,0 +1,37 @@
+services:
+  discord-bot:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    command: ["python", ".claude/chat/discord_bot.py"]
+    env_file:
+      - .env
+    environment:
+      - CLAUDE_PROJECT_DIR=/workspace
+      - TZ=Asia/Kuala_Lumpur
+    volumes:
+      - ./Dynamous/Memory:/workspace/Dynamous/Memory
+      - ./.claude/scripts:/workspace/.claude/scripts:ro
+      - ./.claude/skills:/workspace/.claude/skills:ro
+      - ./.claude/chat:/workspace/.claude/chat:ro
+      - ./.claude/data:/workspace/.claude/data
+      - ./.env:/workspace/.env:ro
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    command: ["python", "worker/scheduler.py"]
+    env_file:
+      - .env
+    environment:
+      - CLAUDE_PROJECT_DIR=/workspace
+      - TZ=Asia/Kuala_Lumpur
+    volumes:
+      - ./Dynamous/Memory:/workspace/Dynamous/Memory
+      - ./.claude/scripts:/workspace/.claude/scripts:ro
+      - ./.claude/skills:/workspace/.claude/skills:ro
+      - ./.claude/data:/workspace/.claude/data
+      - ./.env:/workspace/.env:ro
+    restart: unless-stopped

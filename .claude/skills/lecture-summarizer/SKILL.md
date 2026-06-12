@@ -70,6 +70,8 @@ Turn a raw `.pptx` or `.pdf` into a study-friendly markdown note under `Dynamous
 
 7. **Tick the habit.** If `HABITS.md` `Lecture engagement` is unchecked today, check it off.
 
+8. **Update the concept wiki.** Invoke the `concept-wiki` skill with the path of the note just saved.
+
 ## Quality bar
 
 - **Worked examples are verbatim.** Math notation, code, formulas — leave them exactly as on the slides. Paraphrasing math turns wrong.

@@ -29,7 +29,7 @@ sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts" / "integrations"))
 import _env  # noqa: F401, E402 -- side effect: loads .env into os.environ
 
-from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, gcal_sync, vault_state_writer, dashboard, dashboard_state  # noqa: E402
+from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, gcal_sync, vault_state_writer, dashboard, dashboard_state, thread_chat  # noqa: E402
 # Deadlines are now sourced from inbox classification (project documents
 # mentioning dated milestones), not Gmail/Calendar.
 from security import sanitize  # noqa: E402
@@ -172,11 +172,13 @@ _BUCKET_KIND: dict[str, tuple[str, str]] = {
 
 
 def _route_deadlines() -> None:
-    """Slice 3: post threshold-crossings to the feed for each deadline row.
+    """Slice 3: post threshold-crossings into per-row forum threads in
+    #deadlines and refresh the edited 'Next 3 deadlines' rollup.
 
-    Each row is tracked by its stable key. Subsequent ticks only post when
-    the row crosses into a higher-urgency bucket that hasn't already fired.
-    Idempotent across ticks; safe to re-run."""
+    First sighting of any row creates the thread with the matching embed
+    (72h / 24h / overdue) and the row's stable key is recorded. Subsequent
+    ticks only post when the row crosses into a higher-urgency bucket
+    that hasn't already fired. Idempotent across ticks; safe to re-run."""
     buckets = imminent.scan()
     state = dashboard_state.load()
     deadlines_state = state.setdefault("deadlines", {})
@@ -185,15 +187,59 @@ def _route_deadlines() -> None:
         kind, threshold = _BUCKET_KIND[item["bucket"]]
         key = item["key"]
         record = deadlines_state.get(key)
-        fired = (record or {}).get("fired") or []
-        if threshold not in fired:
-            dashboard.notify(kind, item)
-            fired.append(threshold)
-            deadlines_state[key] = {"fired": fired}
+        if record is None:
+            # First time we've seen this row at any threshold -- create
+            # the forum thread with the matching embed.
+            course = item.get("course") or ""
+            title = item.get("title") or "(untitled)"
+            thread_name = (f"{course} — {title}" if course else title)[:100]
+            resp = dashboard.notify(kind, item, thread_name=thread_name)
+            if resp is not None:
+                thread_id = str(resp.get("channel_id") or resp.get("id") or "")
+                msg_id = str(resp.get("id") or "")
+                if thread_id and msg_id:
+                    deadlines_state[key] = {
+                        "fired": [threshold],
+                        "thread_id": thread_id,
+                        "starter_message_id": msg_id,
+                        "last_message_id": msg_id,
+                    }
+        else:
+            fired = record.get("fired") or []
+            if threshold not in fired:
+                thread_id = record.get("thread_id")
+                if thread_id:
+                    resp = dashboard.notify(kind, item, thread_id=thread_id)
+                    if resp is not None:
+                        fired.append(threshold)
+                        record["fired"] = fired
+                        last_id = resp.get("id")
+                        if last_id:
+                            record["last_message_id"] = str(last_id)
 
+    # "Next 3" rollup: edited-in-place inside its own forum thread so
+    # it can be pinned once by hand.
     top3 = imminent.all_upcoming(buckets)[:3]
-    if top3:
-        dashboard.notify("next3", {"items": top3})
+    next3 = state.setdefault("next3", {"thread_id": None, "message_id": None})
+    msg_id = next3.get("message_id")
+    thread_id = next3.get("thread_id")
+    if msg_id and thread_id:
+        resp = dashboard.edit_message(
+            "next3", {"items": top3},
+            message_id=msg_id, thread_id=thread_id,
+        )
+        if resp is None and top3:
+            next3["thread_id"] = None
+            next3["message_id"] = None
+    elif top3:
+        resp = dashboard.notify("next3", {"items": top3}, thread_name="Next 3 deadlines")
+        if resp is not None:
+            new_thread = resp.get("channel_id") or resp.get("id")
+            new_msg = resp.get("id")
+            if new_thread and new_msg:
+                next3["thread_id"] = str(new_thread)
+                next3["message_id"] = str(new_msg)
+    state["next3"] = next3
 
     dashboard_state.save(state)
 
@@ -414,6 +460,22 @@ def _main_impl() -> int:
         _route_pr_events()
     except Exception as exc:
         print(f"_route_pr_events failed: {exc}", file=sys.stderr)
+
+    # Slice 7: reply in agent-owned forum threads (deadlines + lectures).
+    user_id = os.environ.get("DISCORD_USER_ID")
+    if user_id and _features.get("thread_chat", True):
+        db_path = PROJECT_DIR / ".claude" / "data" / "discord_cache.db"
+        state_path = PROJECT_DIR / ".claude" / "data" / "discord_last_tick.json"
+        try:
+            posted = thread_chat.scan_and_reply(
+                db_path,
+                user_id=user_id,
+                state_path=state_path,
+            )
+            if posted:
+                print(f"thread_chat: posted {posted} in-thread reply/replies")
+        except Exception as exc:
+            print(f"thread_chat failed: {exc}", file=sys.stderr)
 
     # Section 6: push new DEADLINES.md rows and gcal: tags to Google Calendar.
     if _features.get("gcal_sync", True):
