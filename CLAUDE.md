@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Vesper is a personal second brain. Two layers live here:
 
-1. **Discord UI** — the primary interface. A discord.py bot (`chat/discord_bot.py`) handles `#vesper` chat, `#inbox`, `#finance`, and slash commands. The heartbeat posts embeds to channel webhooks (`DISCORD_HOOK_*`). Both run as Docker services in `vesper/docker-compose.yml`.
+1. **Discord UI** — the primary interface. A discord.py bot (`chat/discord_bot.py`) handles `#vesper` chat, `#inbox`, `#finance`, and slash commands. The heartbeat posts embeds to channel webhooks (`DISCORD_HOOK_*`). Both run as Docker services in `docker-compose.yml`.
 2. **Claude Code agent system** — `.claude/scripts/`, `.claude/hooks/`, and `.claude/settings.json` are the running agent layer (heartbeat, memory, integrations).
 
 The personal vault (notes, schedules, finances) lives locally at `Dynamous/Memory/` — gitignored. Each machine keeps its own vault.
@@ -64,12 +64,12 @@ The DB lives at `.claude/data/memory.db` (gitignored). Embeddings use `fast-all-
 
 ## Architecture
 
-### Docker services (`vesper/`)
+### Docker services
 
 | Path | Purpose |
 |------|---------|
 | `worker/` | Shared Docker image for bot + scheduler |
-| `docker-compose.yml` | Two services: `discord-bot`, `scheduler` |
+| `docker-compose.yml` | Two services: `discord-bot`, `scheduler` (root of repo) |
 
 `discord-bot` runs `.claude/chat/discord_bot.py`. `scheduler` runs the heartbeat on a 30-min tick.
 
