@@ -15,11 +15,13 @@ import os
 import subprocess
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import schedule
 
 LOOP_SLEEP_SECONDS = 5
+KL = timezone(timedelta(hours=8))
 
 
 def _proj() -> Path:
@@ -40,6 +42,31 @@ def _reflect_script() -> Path:
 
 def _sentinel() -> Path:
     return _proj() / ".claude" / "data" / "state" / "heartbeat-trigger"
+
+
+def _reflect_stamp() -> Path:
+    return _proj() / ".claude" / "data" / "state" / "reflect-last-run"
+
+
+def _reflect_ran_today() -> bool:
+    stamp = _reflect_stamp()
+    if not stamp.exists():
+        return False
+    return stamp.read_text(encoding="utf-8").strip() == datetime.now(KL).strftime("%Y-%m-%d")
+
+
+def _mark_reflect_ran() -> None:
+    stamp = _reflect_stamp()
+    stamp.parent.mkdir(parents=True, exist_ok=True)
+    stamp.write_text(datetime.now(KL).strftime("%Y-%m-%d"), encoding="utf-8")
+
+
+def run_reflect_if_needed() -> None:
+    if _reflect_ran_today():
+        return
+    rc = run_job(_reflect_script())
+    if rc == 0:
+        _mark_reflect_ran()
 
 
 def run_job(script: Path, *, env_extra: dict | None = None) -> int:
@@ -87,13 +114,15 @@ def _load_heartbeat_interval() -> int:
 def setup_schedule(interval_minutes: int = 30) -> None:
     schedule.every(interval_minutes).minutes.do(run_job, _heartbeat_script())
     schedule.every(10).minutes.do(run_job, _index_script())
-    schedule.every().day.at("08:00").do(run_job, _reflect_script())
+    schedule.every(60).minutes.do(run_reflect_if_needed)
 
 
 def main() -> int:
     interval = _load_heartbeat_interval()
     setup_schedule(interval)
-    print(f"[scheduler] started; heartbeat/{interval}m, index/10m, reflect@08:00", flush=True)
+    print(f"[scheduler] started; heartbeat/{interval}m, index/10m, reflect/once-per-day", flush=True)
+    # Run reflect immediately on startup in case today's hasn't happened yet.
+    run_reflect_if_needed()
     while True:
         schedule.run_pending()
         check_sentinel()

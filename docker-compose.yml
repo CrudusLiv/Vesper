@@ -32,6 +32,7 @@ services:
       - ./Dynamous/Memory:/workspace/Dynamous/Memory
       - ./.claude/scripts:/workspace/.claude/scripts:ro
       - ./.claude/skills:/workspace/.claude/skills:ro
+      - ./.claude/chat:/workspace/.claude/chat:ro
       - ./.claude/data:/workspace/.claude/data
       - ./.env:/workspace/.env:ro
     restart: unless-stopped
