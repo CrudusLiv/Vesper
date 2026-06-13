@@ -121,28 +121,15 @@ def _slash_text(reaction: str | None, text: str | None) -> str:
     return {"✅": "Done.", "❌": "Failed.", "❓": "Unrecognized."}.get(reaction or "", "Done.")
 
 
-SCHEDULE_EMBED_COLOR = 0x8A7FB5  # muted lilac — Vesper's palette
-
-
-def _schedule_embed(data: dict) -> "discord.Embed":
-    """Build the /schedule embed from schedule_parser.schedule_view() data:
-    a coloured card with the aligned grid in a code block and one inline field
-    per weekday, semester/updated in the footer. Content is the owner's own
-    SCHEDULE.md, sent ephemerally — same trust boundary as the other replies."""
-    import discord  # noqa: F811 -- lazy import; discord is only available at runtime
-    emb = discord.Embed(title="🗓 Weekly Timetable", color=SCHEDULE_EMBED_COLOR)
-    if data.get("grid"):
-        emb.description = "```\n" + data["grid"] + "\n```"
-    for d in data.get("days", []):
-        value = "\n".join(d["lines"]) if d["lines"] else "—"
-        emb.add_field(name=d["day"], value=value[:1024], inline=True)
-    footer_bits = [b for b in (
-        data.get("semester", ""),
-        f"updated {data['updated']}" if data.get("updated") else "",
-    ) if b]
-    if footer_bits:
-        emb.set_footer(text=" · ".join(footer_bits))
-    return emb
+def _build_schedule_embeds(data: dict) -> list["discord.Embed"]:
+    import discord  # noqa: F811
+    embeds = []
+    for ed in schedule_parser.schedule_embeds(data):
+        emb = discord.Embed(title=ed["title"], description="\n".join(ed["lines"]), color=ed["color"])
+        if ed.get("footer"):
+            emb.set_footer(text=ed["footer"])
+        embeds.append(emb)
+    return embeds
 
 
 def run_schedule(raw: str, *, confirm: bool) -> tuple[str | None, str | None]:
@@ -176,18 +163,6 @@ def run_schedule(raw: str, *, confirm: bool) -> tuple[str | None, str | None]:
         print(f"run_schedule failed: {exc}", file=sys.stderr)
         return "❌", f"[schedule] Write error: {type(exc).__name__}"
 
-
-def run_schedule_view() -> tuple[str | None, str | None]:
-    """Render the current schedule for display. Returns (reaction, text):
-    (None, <schedule>) when one exists, else ("❓", <hint>). Blocking I/O."""
-    try:
-        text = schedule_parser.format_for_discord()
-    except Exception as exc:
-        print(f"run_schedule_view failed: {exc}", file=sys.stderr)
-        return "❌", f"[schedule] read error: {type(exc).__name__}"
-    if not text:
-        return "❓", "No schedule set yet. Send `/schedule text:<your timetable>` to add one."
-    return None, text
 
 
 def run_note(content: str, *, force: bool = False) -> tuple[str | None, str | None]:
@@ -497,12 +472,13 @@ def main() -> int:
                 print(f"slash_schedule view failed: {exc}", file=sys.stderr)
                 await interaction.followup.send("❌ [schedule] read error.", ephemeral=True)
                 return
-            if not data:
+            if not data or not data.get("entries"):
                 await interaction.followup.send(
-                    "No schedule set yet. Send `/schedule text:<your timetable>` to add one.",
+                    "No schedule found. Use `/schedule add` to set one up.",
                     ephemeral=True)
                 return
-            await interaction.followup.send(embed=_schedule_embed(data), ephemeral=True)
+            embeds = _build_schedule_embeds(data)
+            await interaction.followup.send(embeds=embeds, ephemeral=True)
             return
         # Parsing routes through an LLM subprocess (run_schedule -> parse_timetable),
         # which far exceeds Discord's ~3s interaction-ack deadline. Defer first to ACK
