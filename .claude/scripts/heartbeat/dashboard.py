@@ -422,7 +422,8 @@ def _format_lecture_new(p: dict[str, Any]) -> dict[str, Any]:
         embed["footer"]["text"] = (
             f"{embed['footer']['text']}  ·  source: {source}"
         )[:2048]
-    return {"embeds": [embed]}
+    thread_name = f"[{course}] {title}" if course else title
+    return {"embeds": [embed], "thread_name": thread_name[:100]}
 
 
 def _next3_dot(days: Any) -> str:
