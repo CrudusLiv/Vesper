@@ -16,21 +16,14 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import date, timedelta, timezone
+from datetime import date, timedelta
 from pathlib import Path
 
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
 STATE_FILE = PROJECT_DIR / ".claude" / "data" / "state" / "habits_state.json"
-KL = timezone(timedelta(hours=8))
 TOTAL_PILLARS = 4
 
 _WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-
-_DEFAULT_STATE: dict = {
-    "current_streak": 0,
-    "best_streak": 0,
-    "history": {},
-}
 
 
 def load_state() -> dict:
@@ -58,18 +51,20 @@ def save_state(state: dict) -> None:
 
 
 def compute_streak(history: dict, as_of: str) -> int:
-    """Count consecutive days ending at as_of where >=1 pillar was completed."""
+    """Count consecutive days ending at as_of where >=1 pillar was completed.
+
+    Clamps as_of to today so future-dated history entries never inflate the streak."""
     try:
         current = date.fromisoformat(as_of)
     except ValueError:
         return 0
+    current = min(current, date.today())
 
     streak = 0
     day = current
     while True:
         day_str = day.isoformat()
         day_history = history.get(day_str, {})
-        # A day counts if at least one pillar is marked True
         if any(v for v in day_history.values()):
             streak += 1
             day -= timedelta(days=1)
@@ -79,7 +74,14 @@ def compute_streak(history: dict, as_of: str) -> int:
 
 
 def record_completion(day: str, pillar: str) -> dict:
-    """Mark pillar done for YYYY-MM-DD date. Recomputes streak. Returns updated state."""
+    """Mark pillar done for YYYY-MM-DD date. Recomputes streak. Returns updated state.
+
+    Raises ValueError for malformed date strings."""
+    try:
+        day = date.fromisoformat(day).isoformat()
+    except ValueError:
+        raise ValueError(f"record_completion: invalid date {day!r}")
+
     state = load_state()
     history = state["history"]
 
