@@ -62,9 +62,9 @@ INTEGRATIONS: list[Integration] = [
     ),
     Integration(
         name="outlook",
-        description="University Outlook (deferred until classes start, June 2026)",
-        requires_env=["OUTLOOK_TENANT_ID"],
-        notes="Stub. Build in Phase 4.4 once university email is available.",
+        description="Microsoft Outlook — university email and calendar (Graph API)",
+        requires_env=["OUTLOOK_TENANT_ID", "OUTLOOK_CLIENT_ID"],
+        notes="Run 'py query.py outlook auth' once to complete device-code flow.",
     ),
 ]
 
