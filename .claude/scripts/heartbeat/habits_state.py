@@ -21,8 +21,6 @@ from pathlib import Path
 
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
 STATE_FILE = PROJECT_DIR / ".claude" / "data" / "state" / "habits_state.json"
-TOTAL_PILLARS = 4
-
 _WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
 
@@ -102,11 +100,11 @@ def record_completion(day: str, pillar: str) -> dict:
     return state
 
 
-def get_weekly_summary(history: dict, week_start: str) -> list[dict]:
+def get_weekly_summary(history: dict, week_start: str, total: int = 0) -> list[dict]:
     """Return 7 dicts for days starting from week_start.
 
     Each dict: {date, weekday, completions, total, pct}
-    total is always TOTAL_PILLARS (4).
+    total should be the current number of tracked pillars.
     """
     try:
         start = date.fromisoformat(week_start)
@@ -119,12 +117,12 @@ def get_weekly_summary(history: dict, week_start: str) -> list[dict]:
         day_str = day.isoformat()
         day_history = history.get(day_str, {})
         completions = sum(1 for v in day_history.values() if v)
-        pct = round(completions / TOTAL_PILLARS * 100) if TOTAL_PILLARS > 0 else 0
+        pct = round(completions / total * 100) if total > 0 else 0
         result.append({
             "date": day_str,
             "weekday": _WEEKDAYS[day.weekday()],
             "completions": completions,
-            "total": TOTAL_PILLARS,
+            "total": total,
             "pct": pct,
         })
     return result

@@ -1,8 +1,9 @@
 """HABITS.md auto-detection and late-day nudge.
 
-Two pillars are auto-detected from the snapshot + filesystem; the other two
-are self-reported. Late-day nudge fires at most once per day after 18:00 KL,
-listing whichever pillars are still unchecked."""
+Pillar names are read dynamically from HABITS.md — add/remove lines there and
+the system picks them up automatically. Auto-detection rules and categories live
+in .claude/data/habits_config.json.
+"""
 from __future__ import annotations
 
 import json
@@ -17,6 +18,7 @@ VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 HABITS = VAULT / "HABITS.md"
 LECTURES = VAULT / "lectures"
 NUDGE_STATE = PROJECT_DIR / ".claude" / "data" / "state" / "nudges.json"
+HABITS_CONFIG = PROJECT_DIR / ".claude" / "data" / "habits_config.json"
 
 _SCRIPTS_DIR = str(PROJECT_DIR / ".claude" / "scripts")
 if _SCRIPTS_DIR not in sys.path:
@@ -28,24 +30,24 @@ from heartbeat import habits_state  # noqa: E402
 KL = timezone(timedelta(hours=8))
 NUDGE_HOUR = 18
 
-PILLAR_NAMES = (
-    "Lecture engagement",
-    "Project progress",
-    "Research / learning",
-    "Personal goals",
-)
+_PILLAR_LINE_RE = re.compile(r"^- \[[ xX]\] \*\*(.+?)\*\*", re.MULTILINE)
 
-PILLAR_CATEGORIES: dict[str, list[str]] = {
-    "Academic": ["Lecture engagement", "Research / learning"],
-    "Technical": ["Project progress"],
-    "Personal": ["Personal goals"],
-}
 
-CATEGORY_EMOJI: dict[str, str] = {
-    "Academic": "🎓",
-    "Technical": "⚙️",
-    "Personal": "✨",
-}
+def _load_config() -> dict:
+    if not HABITS_CONFIG.exists():
+        return {"auto_detect": {}, "categories": {}, "category_emoji": {}}
+    try:
+        return json.loads(HABITS_CONFIG.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"auto_detect": {}, "categories": {}, "category_emoji": {}}
+
+
+def get_pillar_names() -> list[str]:
+    """Return pillar names in the order they appear in HABITS.md."""
+    if not HABITS.exists():
+        return []
+    text = HABITS.read_text(encoding="utf-8")
+    return _PILLAR_LINE_RE.findall(text)
 
 
 def _today_kl() -> str:
@@ -101,23 +103,33 @@ def _commits_today(snapshot: dict) -> bool:
     return False
 
 
+_AUTO_DETECT_FNS: dict[str, str] = {
+    "lectures_touched_today": "_lectures_touched_today",
+    "commits_today": "_commits_today",
+}
+
+
 def auto_check(snapshot: dict) -> list[str]:
     """Tick auto-detected pillars in HABITS.md. Returns names of newly-ticked pillars."""
     if not HABITS.exists():
         return []
+    config = _load_config()
+    auto_detect: dict[str, str] = config.get("auto_detect", {})
     text = HABITS.read_text(encoding="utf-8")
     newly: list[str] = []
     today = _today_kl()
 
-    if _lectures_touched_today():
-        text, changed = _check_pillar(text, "Lecture engagement")
-        if changed:
-            newly.append("Lecture engagement")
-
-    if _commits_today(snapshot):
-        text, changed = _check_pillar(text, "Project progress")
-        if changed:
-            newly.append("Project progress")
+    for pillar, fn_key in auto_detect.items():
+        if fn_key == "lectures_touched_today":
+            triggered = _lectures_touched_today()
+        elif fn_key == "commits_today":
+            triggered = _commits_today(snapshot)
+        else:
+            continue
+        if triggered:
+            text, changed = _check_pillar(text, pillar)
+            if changed:
+                newly.append(pillar)
 
     if newly:
         HABITS.write_text(text, encoding="utf-8")
@@ -130,8 +142,8 @@ def auto_check(snapshot: dict) -> list[str]:
 # ---------- Manual check-in ----------
 
 def check_pillar(pillar: str) -> bool:
-    """Manually check a pillar. Returns True if newly checked, False if already done or unknown."""
-    if pillar not in PILLAR_NAMES:
+    """Manually check a pillar. Returns True if newly checked, False if already done or not found."""
+    if pillar not in get_pillar_names():
         return False
     if not HABITS.exists():
         return False
@@ -150,21 +162,23 @@ def check_pillar(pillar: str) -> bool:
 
 def get_status_data() -> dict:
     """Return structured data for building the /habits Discord embed."""
+    config = _load_config()
+    pillar_names = get_pillar_names()
     text = HABITS.read_text(encoding="utf-8") if HABITS.exists() else ""
     state = habits_state.load_state()
     today = _today_kl()
     today_dt = datetime.strptime(today, "%Y-%m-%d")
     week_start = (today_dt - timedelta(days=today_dt.weekday())).strftime("%Y-%m-%d")
-    weekly = habits_state.get_weekly_summary(state["history"], week_start)
-    checked = {p: _is_pillar_checked(text, p) for p in PILLAR_NAMES}
+    weekly = habits_state.get_weekly_summary(state["history"], week_start, total=len(pillar_names))
+    checked = {p: _is_pillar_checked(text, p) for p in pillar_names}
     done_count = sum(checked.values())
     return {
         "today": today,
-        "categories": PILLAR_CATEGORIES,
-        "category_emoji": CATEGORY_EMOJI,
+        "categories": config.get("categories", {}),
+        "category_emoji": config.get("category_emoji", {}),
         "checked": checked,
         "done_count": done_count,
-        "total": len(PILLAR_NAMES),
+        "total": len(pillar_names),
         "current_streak": state.get("current_streak", 0),
         "best_streak": state.get("best_streak", 0),
         "weekly": weekly,
@@ -177,7 +191,7 @@ def unchecked_pillars() -> list[str]:
     if not HABITS.exists():
         return []
     text = HABITS.read_text(encoding="utf-8")
-    return [p for p in PILLAR_NAMES if not _is_pillar_checked(text, p)]
+    return [p for p in get_pillar_names() if not _is_pillar_checked(text, p)]
 
 
 def _load_nudge_state() -> dict:
@@ -208,7 +222,6 @@ def mark_nudged(now: datetime | None = None) -> None:
 
 
 def nudge_message(unchecked: list[str]) -> tuple[str, str]:
-    """Build (title, body) for the toast. Plain, concrete, short."""
     if len(unchecked) == 1:
         title = "Habit nudge"
         body = f"Still unchecked: {unchecked[0]}."

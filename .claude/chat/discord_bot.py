@@ -333,19 +333,19 @@ def run_habits_status() -> tuple[str | None, "discord.Embed | None"]:
 def run_habits_check(pillar_raw: str) -> tuple[str | None, str | None]:
     """Manually tick a habit. Returns (reaction, text).
 
-    Fuzzy-matches against PILLAR_NAMES; requires >=3 chars to avoid
-    single-character inputs silently matching the wrong pillar."""
-    from heartbeat.habits import PILLAR_NAMES
+    Fuzzy-matches against current pillar names from HABITS.md; requires >=3
+    chars to avoid single-character inputs silently matching the wrong pillar."""
+    pillar_names = habits.get_pillar_names()
     pillar_raw_lower = pillar_raw.lower().strip()
     if len(pillar_raw_lower) < 3:
-        choices = ", ".join(f'"{p}"' for p in PILLAR_NAMES)
+        choices = ", ".join(f'"{p}"' for p in pillar_names)
         return "❓", f"Too short — type at least 3 chars. Pillars: {choices}"
     matched = next(
-        (p for p in PILLAR_NAMES if pillar_raw_lower in p.lower()),
+        (p for p in pillar_names if pillar_raw_lower in p.lower()),
         None,
     )
     if matched is None:
-        choices = ", ".join(f'"{p}"' for p in PILLAR_NAMES)
+        choices = ", ".join(f'"{p}"' for p in pillar_names)
         return "❓", f"Unknown pillar. Choose from: {choices}"
     if not habits.HABITS.exists():
         return "❌", "HABITS.md not found — set it up in your vault first."
