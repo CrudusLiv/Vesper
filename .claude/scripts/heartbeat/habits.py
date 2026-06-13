@@ -23,6 +23,7 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 from vault import daily  # noqa: E402
+from heartbeat import habits_state  # noqa: E402
 
 KL = timezone(timedelta(hours=8))
 NUDGE_HOUR = 18
@@ -33,6 +34,18 @@ PILLAR_NAMES = (
     "Research / learning",
     "Personal goals",
 )
+
+PILLAR_CATEGORIES: dict[str, list[str]] = {
+    "Academic": ["Lecture engagement", "Research / learning"],
+    "Technical": ["Project progress"],
+    "Personal": ["Personal goals"],
+}
+
+CATEGORY_EMOJI: dict[str, str] = {
+    "Academic": "🎓",
+    "Technical": "⚙️",
+    "Personal": "✨",
+}
 
 
 def _today_kl() -> str:
@@ -94,6 +107,7 @@ def auto_check(snapshot: dict) -> list[str]:
         return []
     text = HABITS.read_text(encoding="utf-8")
     newly: list[str] = []
+    today = _today_kl()
 
     if _lectures_touched_today():
         text, changed = _check_pillar(text, "Lecture engagement")
@@ -109,7 +123,52 @@ def auto_check(snapshot: dict) -> list[str]:
         HABITS.write_text(text, encoding="utf-8")
         for pillar in newly:
             daily.append_line(f"Habit: {pillar}")
+            habits_state.record_completion(today, pillar)
     return newly
+
+
+# ---------- Manual check-in ----------
+
+def check_pillar(pillar: str) -> bool:
+    """Manually check a pillar. Returns True if newly checked, False if already done or unknown."""
+    if pillar not in PILLAR_NAMES:
+        return False
+    if not HABITS.exists():
+        return False
+    text = HABITS.read_text(encoding="utf-8")
+    new_text, changed = _check_pillar(text, pillar)
+    if not changed:
+        return False
+    HABITS.write_text(new_text, encoding="utf-8")
+    today = _today_kl()
+    daily.append_line(f"Habit: {pillar} (manual)")
+    habits_state.record_completion(today, pillar)
+    return True
+
+
+# ---------- Status data ----------
+
+def get_status_data() -> dict:
+    """Return structured data for building the /habits Discord embed."""
+    text = HABITS.read_text(encoding="utf-8") if HABITS.exists() else ""
+    state = habits_state.load_state()
+    today = _today_kl()
+    today_dt = datetime.strptime(today, "%Y-%m-%d")
+    week_start = (today_dt - timedelta(days=today_dt.weekday())).strftime("%Y-%m-%d")
+    weekly = habits_state.get_weekly_summary(state["history"], week_start)
+    checked = {p: _is_pillar_checked(text, p) for p in PILLAR_NAMES}
+    done_count = sum(checked.values())
+    return {
+        "today": today,
+        "categories": PILLAR_CATEGORIES,
+        "category_emoji": CATEGORY_EMOJI,
+        "checked": checked,
+        "done_count": done_count,
+        "total": len(PILLAR_NAMES),
+        "current_streak": state.get("current_streak", 0),
+        "best_streak": state.get("best_streak", 0),
+        "weekly": weekly,
+    }
 
 
 # ---------- Late-day nudge ----------
