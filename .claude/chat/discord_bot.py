@@ -286,11 +286,10 @@ def run_habits_status() -> tuple[str | None, "discord.Embed | None"]:
     import discord  # noqa: F811 -- lazy import; discord is only available at runtime
     try:
         data = habits.get_status_data()
+        today_label = datetime.strptime(data["today"], "%Y-%m-%d").strftime("%a %d %b %Y")
     except Exception as exc:
         print(f"run_habits_status failed: {exc}", file=sys.stderr)
         return f"[habits] error: {type(exc).__name__}", None
-
-    today_label = datetime.strptime(data["today"], "%Y-%m-%d").strftime("%a %d %b %Y")
 
     emb = discord.Embed(
         title=f"📋 Today's Habits — {today_label}",
@@ -304,7 +303,8 @@ def run_habits_status() -> tuple[str | None, "discord.Embed | None"]:
         for p in pillars:
             mark = "✅" if data["checked"].get(p) else "⬜"
             lines.append(f"{mark}  {p}")
-        emb.add_field(name=f"{emoji} {cat}", value="\n".join(lines), inline=True)
+        # ​ (zero-width space) guards against Discord 400 on empty field value
+        emb.add_field(name=f"{emoji} {cat}", value="\n".join(lines) or "​", inline=True)
 
     # Weekly grid
     weekday_labels = [d["weekday"][:3] for d in data["weekly"]]
@@ -331,16 +331,24 @@ def run_habits_status() -> tuple[str | None, "discord.Embed | None"]:
 
 
 def run_habits_check(pillar_raw: str) -> tuple[str | None, str | None]:
-    """Manually tick a habit. Returns (reaction, text). Supports fuzzy matching."""
+    """Manually tick a habit. Returns (reaction, text).
+
+    Fuzzy-matches against PILLAR_NAMES; requires >=3 chars to avoid
+    single-character inputs silently matching the wrong pillar."""
     from heartbeat.habits import PILLAR_NAMES
     pillar_raw_lower = pillar_raw.lower().strip()
+    if len(pillar_raw_lower) < 3:
+        choices = ", ".join(f'"{p}"' for p in PILLAR_NAMES)
+        return "❓", f"Too short — type at least 3 chars. Pillars: {choices}"
     matched = next(
-        (p for p in PILLAR_NAMES if pillar_raw_lower in p.lower() or p.lower().startswith(pillar_raw_lower)),
+        (p for p in PILLAR_NAMES if pillar_raw_lower in p.lower()),
         None,
     )
     if matched is None:
         choices = ", ".join(f'"{p}"' for p in PILLAR_NAMES)
         return "❓", f"Unknown pillar. Choose from: {choices}"
+    if not habits.HABITS.exists():
+        return "❌", "HABITS.md not found — set it up in your vault first."
     try:
         changed = habits.check_pillar(matched)
     except Exception as exc:
