@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -16,6 +17,12 @@ VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 HABITS = VAULT / "HABITS.md"
 LECTURES = VAULT / "lectures"
 NUDGE_STATE = PROJECT_DIR / ".claude" / "data" / "state" / "nudges.json"
+
+_SCRIPTS_DIR = str(PROJECT_DIR / ".claude" / "scripts")
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+
+from vault import daily  # noqa: E402
 
 KL = timezone(timedelta(hours=8))
 NUDGE_HOUR = 18
@@ -100,9 +107,6 @@ def auto_check(snapshot: dict) -> list[str]:
 
     if newly:
         HABITS.write_text(text, encoding="utf-8")
-        import sys as _sys
-        _sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
-        from vault import daily  # type: ignore
         for pillar in newly:
             daily.append_line(f"Habit: {pillar}")
     return newly
