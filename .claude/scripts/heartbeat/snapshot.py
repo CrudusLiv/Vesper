@@ -36,34 +36,11 @@ def build_snapshot() -> dict:
     }
 
 
-def _snapshot_gmail() -> dict:
-    from integrations import gmail_int
-    items = gmail_int.list_unread(max_results=25)
-    return {
-        "unread_count": len(items),
-        "items": [
-            {
-                "id": x["id"],
-                "from": x["from"],
-                "subject": x["subject"],
-                "snippet": (x.get("snippet") or "")[:200],
-            }
-            for x in items
-        ],
-    }
-
-
 def _snapshot_github() -> dict:
     from integrations import github_int
     rows = github_int.recent_pushes(days=1)
     clean = [r for r in rows if "error" not in r]
     return {"push_count": len(clean), "items": clean[:20]}
-
-
-def _snapshot_calendar() -> dict:
-    from integrations import gcal_int
-    items = gcal_int.upcoming(days=14, max_results=50)
-    return {"event_count": len(items), "items": items[:20]}
 
 
 def _snapshot_inbox() -> dict:
