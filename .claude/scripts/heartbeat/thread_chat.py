@@ -117,11 +117,16 @@ def scan_and_reply(
 
         if reply_text:
             kind = "deadline_reply" if thread_meta["kind"] == "deadline" else "lecture_reply"
+            channel_id = row.get("channel_id") or ""
+            if not str(channel_id).isdigit():
+                print(f"thread_chat: skipping msg {row['id']} — bad channel_id {channel_id!r}", file=sys.stderr)
+                _mark_seen(state, row)
+                continue
             try:
                 resp = dashboard.notify(
                     kind,
                     {"text": reply_text},
-                    thread_id=str(row["channel_id"]),
+                    thread_id=str(channel_id),
                 )
                 if resp is not None:
                     posted += 1

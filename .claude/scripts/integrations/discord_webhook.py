@@ -41,7 +41,7 @@ def post(
         body["applied_tags"] = applied_tags
 
     query = "?wait=true"
-    if thread_id:
+    if thread_id and str(thread_id).isdigit():
         query += f"&thread_id={thread_id}"
     return _request(f"{url}{query}", method="POST", body=body)
 

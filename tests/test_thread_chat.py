@@ -35,7 +35,7 @@ def _make_db(path: Path, messages: list[dict]) -> Path:
         conn.execute(
             "INSERT INTO messages VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                m["id"], m.get("channel_id", "t1"), m.get("content", ""),
+                m["id"], m.get("channel_id", "1000000000000000000"), m.get("content", ""),
                 m.get("author_id", "u1"), m.get("author_name", "user"),
                 m.get("created_at", time.time()),
                 m.get("is_dm", 0), m.get("is_self", 0), m.get("is_bot", 0),
@@ -102,7 +102,7 @@ class TestScanAndReply:
         assert result == 0
 
     def test_missing_db_returns_zero(self, tmp_data):
-        ds = self._ds_state({"lab1": "t1"})
+        ds = self._ds_state({"lab1": "1000000000000000001"})
         with patch("heartbeat.dashboard_state.load", return_value=ds):
             from heartbeat import thread_chat as mod
             importlib.reload(mod)
@@ -112,12 +112,12 @@ class TestScanAndReply:
         assert result == 0
 
     def test_already_seen_message_skipped(self, tmp_data):
-        ds = self._ds_state({"lab1": "t1"})
+        ds = self._ds_state({"lab1": "1000000000000000001"})
         with patch("heartbeat.dashboard_state.load", return_value=ds):
             from heartbeat import thread_chat as mod
             importlib.reload(mod)
         db = _make_db(tmp_data, [
-            {"id": "m1", "channel_id": "t1", "content": "hi", "author_id": "u1",
+            {"id": "m1", "channel_id": "1000000000000000001", "content": "hi", "author_id": "u1",
              "created_at": time.time()},
         ])
         sp = tmp_data / "state.json"
@@ -132,12 +132,12 @@ class TestScanAndReply:
         assert result == 0
 
     def test_new_message_generates_and_posts_reply(self, tmp_data):
-        ds = self._ds_state({"lab1": "t1"})
+        ds = self._ds_state({"lab1": "1000000000000000002"})
         with patch("heartbeat.dashboard_state.load", return_value=ds):
             from heartbeat import thread_chat as mod
             importlib.reload(mod)
         db = _make_db(tmp_data, [
-            {"id": "m2", "channel_id": "t1", "content": "can you explain?",
+            {"id": "m2", "channel_id": "1000000000000000002", "content": "can you explain?",
              "author_id": "u1", "created_at": time.time()},
         ])
         sp = tmp_data / "state.json"
@@ -149,12 +149,12 @@ class TestScanAndReply:
         mock_notify.assert_called_once()
 
     def test_reply_uses_deadline_kind(self, tmp_data):
-        ds = self._ds_state({"lab1": "t1"})
+        ds = self._ds_state({"lab1": "1000000000000000003"})
         with patch("heartbeat.dashboard_state.load", return_value=ds):
             from heartbeat import thread_chat as mod
             importlib.reload(mod)
         db = _make_db(tmp_data, [
-            {"id": "m3", "channel_id": "t1", "content": "when is it due?",
+            {"id": "m3", "channel_id": "1000000000000000003", "content": "when is it due?",
              "author_id": "u1", "created_at": time.time()},
         ])
         notified_kinds = []
@@ -166,12 +166,12 @@ class TestScanAndReply:
         assert notified_kinds == ["deadline_reply"]
 
     def test_llm_failure_marks_seen_does_not_raise(self, tmp_data):
-        ds = self._ds_state({"lab1": "t1"})
+        ds = self._ds_state({"lab1": "1000000000000000004"})
         with patch("heartbeat.dashboard_state.load", return_value=ds):
             from heartbeat import thread_chat as mod
             importlib.reload(mod)
         db = _make_db(tmp_data, [
-            {"id": "m4", "channel_id": "t1", "content": "hello",
+            {"id": "m4", "channel_id": "1000000000000000004", "content": "hello",
              "author_id": "u1", "created_at": time.time()},
         ])
         sp = tmp_data / "state.json"
@@ -183,12 +183,12 @@ class TestScanAndReply:
         assert any(s["id"] == "m4" for s in state["seen_message_ids"])
 
     def test_bot_messages_ignored(self, tmp_data):
-        ds = self._ds_state({"lab1": "t1"})
+        ds = self._ds_state({"lab1": "1000000000000000005"})
         with patch("heartbeat.dashboard_state.load", return_value=ds):
             from heartbeat import thread_chat as mod
             importlib.reload(mod)
         db = _make_db(tmp_data, [
-            {"id": "bot1", "channel_id": "t1", "content": "I am a bot",
+            {"id": "bot1", "channel_id": "1000000000000000005", "content": "I am a bot",
              "author_id": "u1", "is_bot": 1, "created_at": time.time()},
         ])
         with patch("heartbeat.dashboard_state.load", return_value=ds):
@@ -200,13 +200,13 @@ class TestScanAndReply:
     def test_lecture_thread_uses_lecture_reply_kind(self, tmp_data):
         ds = {
             "deadlines": {},
-            "lectures": {"lectures/cs101/week1.md": {"thread_id": "lt1"}},
+            "lectures": {"lectures/cs101/week1.md": {"thread_id": "2000000000000000001"}},
         }
         with patch("heartbeat.dashboard_state.load", return_value=ds):
             from heartbeat import thread_chat as mod
             importlib.reload(mod)
         db = _make_db(tmp_data, [
-            {"id": "lm1", "channel_id": "lt1", "content": "explain big-O",
+            {"id": "lm1", "channel_id": "2000000000000000001", "content": "explain big-O",
              "author_id": "u1", "created_at": time.time()},
         ])
         notified_kinds = []
