@@ -56,6 +56,12 @@ INTEGRATIONS: list[Integration] = [
         notes="Shares OAuth token with Gmail.",
     ),
     Integration(
+        name="gmail",
+        description="Gmail inbox (read-only) -- recent messages",
+        requires_files=[GOOGLE_CREDS],
+        notes="Shares OAuth token with Google Calendar.",
+    ),
+    Integration(
         name="vault",
         description="Local vault filesystem -- inbox watcher for new .pptx and .pdf",
         notes="No auth needed.",

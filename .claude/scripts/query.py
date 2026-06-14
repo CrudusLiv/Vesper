@@ -10,6 +10,8 @@ Usage:
 
     py query.py gcal upcoming [--days 14]
 
+    py query.py gmail recent [--days 7] [--max 30]
+
     py query.py vault inbox
 
     py query.py outlook auth             Authenticate (first time)
@@ -31,6 +33,7 @@ from integrations import _env  # noqa: F401, E402  -- loads .env
 from integrations import (  # noqa: E402
     gcal_int,
     github_int,
+    gmail_int,
     outlook_int,
     registry,
     vault_fs,
@@ -39,6 +42,7 @@ from integrations import (  # noqa: E402
 DISPATCH = {
     "github": github_int.handle_query,
     "gcal": gcal_int.handle_query,
+    "gmail": gmail_int.handle_query,
     "outlook": outlook_int.handle_query,
     "vault": vault_fs.handle_query,
 }
