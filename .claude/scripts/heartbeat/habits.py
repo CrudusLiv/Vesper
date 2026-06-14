@@ -103,9 +103,27 @@ def _commits_today(snapshot: dict) -> bool:
     return False
 
 
+def classes_today() -> list[dict]:
+    """Return today's schedule entries from SCHEDULE.md. Empty list = no classes."""
+    try:
+        import schedule_parser  # noqa: PLC0415
+    except ImportError:
+        return []
+    view = schedule_parser.schedule_view()
+    if not view:
+        return []
+    today_abbr = datetime.now(KL).strftime("%a")
+    return [e for e in view.get("entries", []) if e.get("day") == today_abbr]
+
+
+def _no_classes_today() -> bool:
+    return len(classes_today()) == 0
+
+
 _AUTO_DETECT_FNS: dict[str, str] = {
     "lectures_touched_today": "_lectures_touched_today",
     "commits_today": "_commits_today",
+    "no_classes_today": "_no_classes_today",
 }
 
 
@@ -124,6 +142,8 @@ def auto_check(snapshot: dict) -> list[str]:
             triggered = _lectures_touched_today()
         elif fn_key == "commits_today":
             triggered = _commits_today(snapshot)
+        elif fn_key == "no_classes_today":
+            triggered = _no_classes_today()
         else:
             continue
         if triggered:

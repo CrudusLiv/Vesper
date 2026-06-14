@@ -211,12 +211,46 @@ def curate_about() -> int:
     return added
 
 
+def _post_morning_digest() -> None:
+    try:
+        import schedule_parser
+        from heartbeat import habits, dashboard
+    except ImportError as exc:
+        print(f"morning digest skipped (import error): {exc}", file=sys.stderr)
+        return
+
+    view = schedule_parser.schedule_view()
+    today_abbr = datetime.now(KL).strftime("%a")
+    classes = [e for e in (view or {}).get("entries", []) if e.get("day") == today_abbr]
+
+    lines: list[str] = []
+    if classes:
+        lines.append("**Classes today**")
+        for cls in classes:
+            loc = f" · {cls['location']}" if cls.get("location") else ""
+            lines.append(f"  └─ {cls['course']} · {cls['type']}  {cls['start']}–{cls['end']}{loc}")
+        lines.append("")
+
+    pillar_names = habits.get_pillar_names()
+    if pillar_names:
+        lines.append("**Habits**")
+        for p in pillar_names:
+            lines.append(f"  □ {p}")
+
+    body = "\n".join(lines) if lines else "New day. Checkboxes reset."
+    try:
+        dashboard.notify("morning_digest", {"body": body})
+    except Exception as exc:
+        print(f"morning digest post failed (non-fatal): {exc}", file=sys.stderr)
+
+
 def main() -> int:
     items = reflect()
     appended = append_to_memory(items)
     habits_status = reset_habits()
     print(f"Reflection: {appended} item(s) added to MEMORY.md.")
     print(f"Habits: {habits_status}.")
+    _post_morning_digest()
     try:
         curate_about()
     except Exception as exc:

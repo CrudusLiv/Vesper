@@ -15,9 +15,9 @@ two-pronged and AND-ed:
 
 Slash commands add a third outbound surface (interaction responses). They are
 owner-gated the same way -- every callback checks `interaction.user.id ==
-DISCORD_USER_ID` before doing anything -- and every reply is ephemeral, so
-nothing is posted to a channel for other members. The pinned help message is
-static preset text built by build_help_text(), not user/LLM content.
+DISCORD_USER_ID` before doing anything. Replies are posted publicly to the
+channel (non-ephemeral) so they persist in chat history. The pinned help
+message is static preset text built by build_help_text(), not user/LLM content.
 
 DMs from the owner are CACHE-ONLY: they are stored in discord_cache.db but
 trigger no handler, no reply, no react. The pre-pivot DM-input branches
@@ -451,7 +451,7 @@ def main() -> int:
     async def slash_help(interaction) -> None:
         if not _is_owner(interaction):
             return await _deny(interaction)
-        await interaction.response.send_message(build_help_text(), ephemeral=True)
+        await interaction.response.send_message(build_help_text())
 
     @tree.command(name="schedule", description="View your timetable, or set/replace it with text")
     @discord.app_commands.describe(
@@ -465,27 +465,26 @@ def main() -> int:
         # a rich embed. Defer first: file I/O on a synced vault can easily
         # exceed Discord's 3-second ack window.
         if not text and not confirm:
-            await interaction.response.defer(ephemeral=True)
+            await interaction.response.defer()
             try:
                 data = await asyncio.to_thread(schedule_parser.schedule_view)
             except Exception as exc:
                 print(f"slash_schedule view failed: {exc}", file=sys.stderr)
-                await interaction.followup.send("❌ [schedule] read error.", ephemeral=True)
+                await interaction.followup.send("❌ [schedule] read error.")
                 return
             if not data or not data.get("entries"):
                 await interaction.followup.send(
-                    "No schedule found. Use `/schedule add` to set one up.",
-                    ephemeral=True)
+                    "No schedule found. Use `/schedule add` to set one up.")
                 return
             embeds = _build_schedule_embeds(data)
-            await interaction.followup.send(embeds=embeds, ephemeral=True)
+            await interaction.followup.send(embeds=embeds)
             return
         # Parsing routes through an LLM subprocess (run_schedule -> parse_timetable),
         # which far exceeds Discord's ~3s interaction-ack deadline. Defer first to ACK
         # immediately, then deliver the result via followup.
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         reaction, msg = await asyncio.to_thread(run_schedule, text, confirm=confirm)
-        await interaction.followup.send(_slash_text(reaction, msg), ephemeral=True)
+        await interaction.followup.send(_slash_text(reaction, msg))
 
     @tree.command(name="note", description="Save a quick note to NOTES.md")
     @discord.app_commands.describe(text="The note text")
@@ -493,7 +492,7 @@ def main() -> int:
         if not _is_owner(interaction):
             return await _deny(interaction)
         reaction, msg = await asyncio.to_thread(run_note, text, force=True)
-        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+        await interaction.response.send_message(_slash_text(reaction, msg))
 
     @tree.command(name="finance", description="Log an expense (e.g. 12.50 food lunch)")
     @discord.app_commands.describe(text="Amount, category, and optional note")
@@ -501,14 +500,14 @@ def main() -> int:
         if not _is_owner(interaction):
             return await _deny(interaction)
         reaction, msg = await asyncio.to_thread(run_finance, text)
-        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+        await interaction.response.send_message(_slash_text(reaction, msg))
 
     @tree.command(name="totals", description="This month's spending summary")
     async def slash_totals(interaction) -> None:
         if not _is_owner(interaction):
             return await _deny(interaction)
         reaction, msg = await asyncio.to_thread(run_totals)
-        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+        await interaction.response.send_message(_slash_text(reaction, msg))
 
     @tree.command(name="list", description="List files in a vault folder")
     @discord.app_commands.describe(dir="The vault folder to list")
@@ -516,7 +515,7 @@ def main() -> int:
         if not _is_owner(interaction):
             return await _deny(interaction)
         reaction, msg = await asyncio.to_thread(run_verb, f"list: {dir}")
-        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+        await interaction.response.send_message(_slash_text(reaction, msg))
 
     @tree.command(name="delete", description="Soft-delete a vault file (recoverable via /undo)")
     @discord.app_commands.describe(path="The vault file path to delete")
@@ -524,29 +523,29 @@ def main() -> int:
         if not _is_owner(interaction):
             return await _deny(interaction)
         reaction, msg = await asyncio.to_thread(run_verb, f"delete: {path}")
-        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+        await interaction.response.send_message(_slash_text(reaction, msg))
 
     @tree.command(name="undo", description="Undo the last vault action")
     async def slash_undo(interaction) -> None:
         if not _is_owner(interaction):
             return await _deny(interaction)
         reaction, msg = await asyncio.to_thread(run_verb, "undo")
-        await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+        await interaction.response.send_message(_slash_text(reaction, msg))
 
     @tree.command(name="habits", description="View today's habit status or check one off manually")
-    @discord.app_commands.describe(check="Part of a pillar name to check off (e.g. 'research', 'lecture')")
+    @discord.app_commands.describe(check="Part of a pillar name to check off (e.g. 'classes', 'sleep', 'budget')")
     async def slash_habits(interaction, check: str = "") -> None:
         if not _is_owner(interaction):
             return await _deny(interaction)
         if check:
             reaction, msg = await asyncio.to_thread(run_habits_check, check)
-            await interaction.response.send_message(_slash_text(reaction, msg), ephemeral=True)
+            await interaction.response.send_message(_slash_text(reaction, msg))
             return
         err, emb = await asyncio.to_thread(run_habits_status)
         if err:
-            await interaction.response.send_message(err, ephemeral=True)
+            await interaction.response.send_message(err)
             return
-        await interaction.response.send_message(embed=emb, ephemeral=True)
+        await interaction.response.send_message(embed=emb)
 
     async def _ensure_help_pinned() -> None:
         help_cid = os.environ.get("DISCORD_HELP_CHANNEL_ID", "").strip() or inbox_channel_id
