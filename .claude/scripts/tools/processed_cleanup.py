@@ -2,8 +2,8 @@
 a corresponding valid summary in lectures/ or projects/.
 
 Run manually:
-    py .claude/scripts/heartbeat/processed_cleanup.py            # dry-run
-    py .claude/scripts/heartbeat/processed_cleanup.py --commit   # actually delete
+    py .claude/scripts/tools/processed_cleanup.py            # dry-run
+    py .claude/scripts/tools/processed_cleanup.py --commit   # actually delete
 
 The matching is lossy: source filename "Lecture_4_-_Iteration.pptx" is
 expected to land as "<date>_Lecture_4_-_Iteration.md" somewhere under
