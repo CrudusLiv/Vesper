@@ -18,7 +18,7 @@ sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts" / "integrations"))
 
 import _env  # noqa: F401, E402
 
-from heartbeat import inbox, notify, snapshot, toast, vault_state_writer  # noqa: E402
+from core import inbox, snapshot, vault_state_writer  # noqa: E402
 
 KL = timezone(timedelta(hours=8))
 

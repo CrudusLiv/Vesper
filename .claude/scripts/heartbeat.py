@@ -29,7 +29,7 @@ sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts" / "integrations"))
 import _env  # noqa: F401, E402 -- side effect: loads .env into os.environ
 
-from heartbeat import deadlines, habits, imminent, inbox, llm, notify, snapshot, toast, gcal_sync, vault_state_writer, dashboard, dashboard_state, thread_chat  # noqa: E402
+from core import deadlines, habits, imminent, inbox, llm, snapshot, gcal_sync, vault_state_writer, dashboard, dashboard_state, thread_chat  # noqa: E402
 # Deadlines are now sourced from inbox classification (project documents
 # mentioning dated milestones), not Gmail/Calendar.
 from security import sanitize  # noqa: E402
@@ -538,7 +538,47 @@ def _main_impl() -> int:
     result = execute(actions)
     _persist(curr)
     print(f"Tick complete: {result['notifications']} notifications.")
+
+    # Agent tasks — run after core tick so failures don't affect main flow
+    _run_agent_tasks()
     return 0
+
+
+def _run_agent_tasks() -> None:
+    """Run study agents as a post-tick step. Failures are logged but not raised."""
+    try:
+        sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
+        from agents import deadline_tracker, progress_monitor, study_planner
+        from agents.state import read_state
+
+        # Deadline tracker: every tick
+        try:
+            deadline_tracker.run()
+        except Exception as exc:
+            print(f"[agents] deadline_tracker failed: {exc}", file=sys.stderr)
+
+        # Daily agents: only once per calendar day (KL time)
+        today_str = datetime.now(tz=KL).strftime("%Y-%m-%d")
+        agent_state = read_state()
+
+        def _ran_today(name: str) -> bool:
+            last = agent_state.get(name, {}).get("last_run")
+            return bool(last and last[:10] == today_str)
+
+        if not _ran_today("progress_monitor"):
+            try:
+                progress_monitor.run()
+            except Exception as exc:
+                print(f"[agents] progress_monitor failed: {exc}", file=sys.stderr)
+
+        if not _ran_today("study_planner"):
+            try:
+                study_planner.run()
+            except Exception as exc:
+                print(f"[agents] study_planner failed: {exc}", file=sys.stderr)
+
+    except ImportError as exc:
+        print(f"[agents] import failed, skipping: {exc}", file=sys.stderr)
 
 
 def main() -> int:

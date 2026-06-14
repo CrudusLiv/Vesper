@@ -157,7 +157,7 @@ def second_check(tool_name: str, tool_input: dict | None, deterministic: dict) -
         import sys
         from pathlib import Path
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-        from heartbeat import llm  # type: ignore
+        from core import llm  # type: ignore
     except ImportError:
         return deterministic
     if not llm.is_available():

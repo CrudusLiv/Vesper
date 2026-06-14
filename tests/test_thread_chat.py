@@ -50,23 +50,23 @@ def _make_db(path: Path, messages: list[dict]) -> Path:
 
 class TestStateHelpers:
     def test_load_missing_returns_defaults(self, tmp_data):
-        from heartbeat.thread_chat import _load_state
+        from core.thread_chat import _load_state
         state = _load_state(tmp_data / "noexist.json")
         assert state == {"last_tick": None, "seen_message_ids": []}
 
     def test_load_corrupt_returns_defaults(self, tmp_data):
-        from heartbeat.thread_chat import _load_state
+        from core.thread_chat import _load_state
         p = tmp_data / "corrupt.json"
         p.write_text("not json", encoding="utf-8")
         assert _load_state(p) == {"last_tick": None, "seen_message_ids": []}
 
     def test_save_writes_file(self, tmp_data):
-        from heartbeat.thread_chat import _save_state
+        from core.thread_chat import _save_state
         _save_state(tmp_data / "state.json", {"seen_message_ids": []}, time.time())
         assert (tmp_data / "state.json").exists()
 
     def test_save_evicts_entries_older_than_ttl(self, tmp_data):
-        from heartbeat.thread_chat import _save_state
+        from core.thread_chat import _save_state
         now = time.time()
         state = {
             "seen_message_ids": [
@@ -81,7 +81,7 @@ class TestStateHelpers:
         assert "new" in ids
 
     def test_save_sets_last_tick(self, tmp_data):
-        from heartbeat.thread_chat import _save_state
+        from core.thread_chat import _save_state
         _save_state(tmp_data / "state.json", {"seen_message_ids": []}, time.time())
         saved = json.loads((tmp_data / "state.json").read_text())
         assert saved["last_tick"] is not None
@@ -94,8 +94,8 @@ class TestScanAndReply:
         return {"deadlines": {k: {"thread_id": v} for k, v in threads.items()}}
 
     def test_no_threads_returns_zero(self, tmp_data):
-        with patch("heartbeat.dashboard_state.load", return_value={}):
-            from heartbeat import thread_chat as mod
+        with patch("core.dashboard_state.load", return_value={}):
+            from core import thread_chat as mod
             importlib.reload(mod)
             db = _make_db(tmp_data, [])
             result = mod.scan_and_reply(db, user_id="u1", state_path=tmp_data / "state.json")
@@ -103,8 +103,8 @@ class TestScanAndReply:
 
     def test_missing_db_returns_zero(self, tmp_data):
         ds = self._ds_state({"lab1": "1000000000000000001"})
-        with patch("heartbeat.dashboard_state.load", return_value=ds):
-            from heartbeat import thread_chat as mod
+        with patch("core.dashboard_state.load", return_value=ds):
+            from core import thread_chat as mod
             importlib.reload(mod)
             result = mod.scan_and_reply(
                 tmp_data / "noexist.db", user_id="u1", state_path=tmp_data / "state.json",
@@ -113,8 +113,8 @@ class TestScanAndReply:
 
     def test_already_seen_message_skipped(self, tmp_data):
         ds = self._ds_state({"lab1": "1000000000000000001"})
-        with patch("heartbeat.dashboard_state.load", return_value=ds):
-            from heartbeat import thread_chat as mod
+        with patch("core.dashboard_state.load", return_value=ds):
+            from core import thread_chat as mod
             importlib.reload(mod)
         db = _make_db(tmp_data, [
             {"id": "m1", "channel_id": "1000000000000000001", "content": "hi", "author_id": "u1",
@@ -125,58 +125,58 @@ class TestScanAndReply:
             json.dumps({"seen_message_ids": [{"id": "m1", "t": time.time()}]}),
             encoding="utf-8",
         )
-        with patch("heartbeat.dashboard_state.load", return_value=ds):
-            with patch("heartbeat.llm.call", return_value="reply"):
-                with patch("heartbeat.dashboard.notify", return_value={"id": "r"}):
+        with patch("core.dashboard_state.load", return_value=ds):
+            with patch("core.llm.call", return_value="reply"):
+                with patch("core.dashboard.notify", return_value={"id": "r"}):
                     result = mod.scan_and_reply(db, user_id="u1", state_path=sp)
         assert result == 0
 
     def test_new_message_generates_and_posts_reply(self, tmp_data):
         ds = self._ds_state({"lab1": "1000000000000000002"})
-        with patch("heartbeat.dashboard_state.load", return_value=ds):
-            from heartbeat import thread_chat as mod
+        with patch("core.dashboard_state.load", return_value=ds):
+            from core import thread_chat as mod
             importlib.reload(mod)
         db = _make_db(tmp_data, [
             {"id": "m2", "channel_id": "1000000000000000002", "content": "can you explain?",
              "author_id": "u1", "created_at": time.time()},
         ])
         sp = tmp_data / "state.json"
-        with patch("heartbeat.dashboard_state.load", return_value=ds):
-            with patch("heartbeat.llm.call", return_value="Sure."):
-                with patch("heartbeat.dashboard.notify", return_value={"id": "r"}) as mock_notify:
+        with patch("core.dashboard_state.load", return_value=ds):
+            with patch("core.llm.call", return_value="Sure."):
+                with patch("core.dashboard.notify", return_value={"id": "r"}) as mock_notify:
                     result = mod.scan_and_reply(db, user_id="u1", state_path=sp, now=time.time())
         assert result == 1
         mock_notify.assert_called_once()
 
     def test_reply_uses_deadline_kind(self, tmp_data):
         ds = self._ds_state({"lab1": "1000000000000000003"})
-        with patch("heartbeat.dashboard_state.load", return_value=ds):
-            from heartbeat import thread_chat as mod
+        with patch("core.dashboard_state.load", return_value=ds):
+            from core import thread_chat as mod
             importlib.reload(mod)
         db = _make_db(tmp_data, [
             {"id": "m3", "channel_id": "1000000000000000003", "content": "when is it due?",
              "author_id": "u1", "created_at": time.time()},
         ])
         notified_kinds = []
-        with patch("heartbeat.dashboard_state.load", return_value=ds):
-            with patch("heartbeat.llm.call", return_value="Friday."):
-                with patch("heartbeat.dashboard.notify",
+        with patch("core.dashboard_state.load", return_value=ds):
+            with patch("core.llm.call", return_value="Friday."):
+                with patch("core.dashboard.notify",
                            side_effect=lambda k, p, **kw: notified_kinds.append(k) or {"id": "r"}):
                     mod.scan_and_reply(db, user_id="u1", state_path=tmp_data / "state.json")
         assert notified_kinds == ["deadline_reply"]
 
     def test_llm_failure_marks_seen_does_not_raise(self, tmp_data):
         ds = self._ds_state({"lab1": "1000000000000000004"})
-        with patch("heartbeat.dashboard_state.load", return_value=ds):
-            from heartbeat import thread_chat as mod
+        with patch("core.dashboard_state.load", return_value=ds):
+            from core import thread_chat as mod
             importlib.reload(mod)
         db = _make_db(tmp_data, [
             {"id": "m4", "channel_id": "1000000000000000004", "content": "hello",
              "author_id": "u1", "created_at": time.time()},
         ])
         sp = tmp_data / "state.json"
-        with patch("heartbeat.dashboard_state.load", return_value=ds):
-            with patch("heartbeat.llm.call", side_effect=RuntimeError("LLM down")):
+        with patch("core.dashboard_state.load", return_value=ds):
+            with patch("core.llm.call", side_effect=RuntimeError("LLM down")):
                 result = mod.scan_and_reply(db, user_id="u1", state_path=sp, now=time.time())
         assert result == 0
         state = json.loads(sp.read_text())
@@ -184,16 +184,16 @@ class TestScanAndReply:
 
     def test_bot_messages_ignored(self, tmp_data):
         ds = self._ds_state({"lab1": "1000000000000000005"})
-        with patch("heartbeat.dashboard_state.load", return_value=ds):
-            from heartbeat import thread_chat as mod
+        with patch("core.dashboard_state.load", return_value=ds):
+            from core import thread_chat as mod
             importlib.reload(mod)
         db = _make_db(tmp_data, [
             {"id": "bot1", "channel_id": "1000000000000000005", "content": "I am a bot",
              "author_id": "u1", "is_bot": 1, "created_at": time.time()},
         ])
-        with patch("heartbeat.dashboard_state.load", return_value=ds):
-            with patch("heartbeat.llm.call", return_value="reply"):
-                with patch("heartbeat.dashboard.notify", return_value={"id": "r"}):
+        with patch("core.dashboard_state.load", return_value=ds):
+            with patch("core.llm.call", return_value="reply"):
+                with patch("core.dashboard.notify", return_value={"id": "r"}):
                     result = mod.scan_and_reply(db, user_id="u1", state_path=tmp_data / "state.json")
         assert result == 0
 
@@ -202,17 +202,17 @@ class TestScanAndReply:
             "deadlines": {},
             "lectures": {"lectures/cs101/week1.md": {"thread_id": "2000000000000000001"}},
         }
-        with patch("heartbeat.dashboard_state.load", return_value=ds):
-            from heartbeat import thread_chat as mod
+        with patch("core.dashboard_state.load", return_value=ds):
+            from core import thread_chat as mod
             importlib.reload(mod)
         db = _make_db(tmp_data, [
             {"id": "lm1", "channel_id": "2000000000000000001", "content": "explain big-O",
              "author_id": "u1", "created_at": time.time()},
         ])
         notified_kinds = []
-        with patch("heartbeat.dashboard_state.load", return_value=ds):
-            with patch("heartbeat.llm.call", return_value="Big-O is..."):
-                with patch("heartbeat.dashboard.notify",
+        with patch("core.dashboard_state.load", return_value=ds):
+            with patch("core.llm.call", return_value="Big-O is..."):
+                with patch("core.dashboard.notify",
                            side_effect=lambda k, p, **kw: notified_kinds.append(k) or {"id": "r"}):
                     mod.scan_and_reply(db, user_id="u1", state_path=tmp_data / "state.json")
         assert notified_kinds == ["lecture_reply"]

@@ -18,7 +18,7 @@ def isolate(tmp_path, monkeypatch):
 
 
 def test_append_returns_record():
-    from heartbeat.feed import append
+    from core.feed import append
     rec = append("deadline_24h", {
         "course": "CS101", "title": "Assignment 3", "due": "2026-06-05", "days": 1,
     })
@@ -32,14 +32,14 @@ def test_append_returns_record():
 
 
 def test_append_caps_at_50():
-    from heartbeat.feed import append, recent
+    from core.feed import append, recent
     for i in range(55):
         append("morning_digest", {"body": f"entry {i}"})
     assert len(recent()) == 50
 
 
 def test_append_newest_first():
-    from heartbeat.feed import append, recent
+    from core.feed import append, recent
     append("morning_digest", {"body": "first"})
     append("error", {"script": "x", "trace": "boom"})
     items = recent()
@@ -48,7 +48,7 @@ def test_append_newest_first():
 
 
 def test_mark_read_sets_flag():
-    from heartbeat.feed import append, mark_read, recent
+    from core.feed import append, mark_read, recent
     rec = append("error", {"script": "heartbeat.py", "trace": "oops"})
     result = mark_read(rec["id"])
     assert result is not None
@@ -57,19 +57,19 @@ def test_mark_read_sets_flag():
 
 
 def test_mark_read_unknown_id_returns_none():
-    from heartbeat.feed import mark_read
+    from core.feed import mark_read
     assert mark_read("does-not-exist") is None
 
 
 def test_recent_respects_limit():
-    from heartbeat.feed import append, recent
+    from core.feed import append, recent
     for i in range(10):
         append("morning_digest", {"body": str(i)})
     assert len(recent(limit=3)) == 3
 
 
 def test_feed_title_body_deadline_24h():
-    from heartbeat.feed import _feed_title_body
+    from core.feed import _feed_title_body
     title, body = _feed_title_body("deadline_24h", {
         "course": "CS101", "title": "Lab 2", "due": "2026-06-05", "days": 1,
     })
@@ -78,7 +78,7 @@ def test_feed_title_body_deadline_24h():
 
 
 def test_feed_title_body_no_course():
-    from heartbeat.feed import _feed_title_body
+    from core.feed import _feed_title_body
     title, body = _feed_title_body("deadline_overdue", {
         "title": "Exam", "due": "2026-06-01", "days": -3,
     })
@@ -87,14 +87,14 @@ def test_feed_title_body_no_course():
 
 
 def test_feed_title_body_error():
-    from heartbeat.feed import _feed_title_body
+    from core.feed import _feed_title_body
     title, body = _feed_title_body("error", {"script": "heartbeat.py", "trace": "Traceback..."})
     assert "heartbeat.py" in title
     assert "Traceback" in body
 
 
 def test_feed_title_body_heartbeat_degraded():
-    from heartbeat.feed import _feed_title_body
+    from core.feed import _feed_title_body
     title, body = _feed_title_body("heartbeat_tick", {
         "status": "degraded", "failing": ["gmail", "gcal"],
     })
@@ -103,12 +103,12 @@ def test_feed_title_body_heartbeat_degraded():
 
 
 def test_feed_priority_urgent():
-    from heartbeat.feed import append
+    from core.feed import append
     rec = append("error", {"script": "x", "trace": ""})
     assert rec["priority"] == "urgent"
 
 
 def test_feed_priority_low():
-    from heartbeat.feed import append
+    from core.feed import append
     rec = append("morning_digest", {"body": "hello"})
     assert rec["priority"] == "low"

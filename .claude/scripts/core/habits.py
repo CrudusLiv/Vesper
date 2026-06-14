@@ -25,7 +25,7 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 from vault import daily  # noqa: E402
-from heartbeat import habits_state  # noqa: E402
+from core import habits_state  # noqa: E402
 
 KL = timezone(timedelta(hours=8))
 NUDGE_HOUR = 18

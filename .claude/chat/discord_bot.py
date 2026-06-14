@@ -61,8 +61,8 @@ import integrations._env  # noqa: F401, E402  -- loads .env
 
 from chat import handler  # noqa: E402
 from finance import tracker as finance_tracker  # noqa: E402
-from heartbeat import discord_dm_capture  # noqa: E402
-from heartbeat import habits  # noqa: E402
+from core import discord_dm_capture  # noqa: E402
+from core import habits  # noqa: E402
 from integrations import discord_int  # noqa: E402
 from vault import actions as vault_actions  # noqa: E402
 import schedule_parser  # noqa: E402
@@ -101,6 +101,13 @@ def build_help_text() -> str:
         "• `/undo` — undo the last vault action\n"
         "• `/habits` — view today's habit status and streak\n"
         "• `/habits check:<pillar>` — manually check off a habit\n"
+        "• `/status` — mission control: all 6 study agents at a glance\n"
+        "• `/deadlines` — scan vault for upcoming deadlines\n"
+        "• `/explain topic:<concept>` — explain a topic from your notes\n"
+        "• `/quiz` — generate flashcard Q&A from your latest lecture\n"
+        "• `/plan` — 7-day study plan from schedule + deadlines\n"
+        "• `/progress` — weekly habit and study progress summary\n"
+        "• `/research topic:<subject>` — synthesise vault notes on a topic\n"
         "• `/help` — show this message\n"
         "\n"
         "You can also:\n"
@@ -546,6 +553,111 @@ def main() -> int:
             await interaction.response.send_message(err)
             return
         await interaction.response.send_message(embed=emb)
+
+    # ── Study agents ──────────────────────────────────────────────────────────
+
+    @tree.command(name="status", description="Mission control — all 6 study agents at a glance")
+    async def slash_status(interaction) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        await interaction.response.defer()
+        from agents.state import read_state
+        from agents.registry import AGENTS
+        from datetime import datetime, timezone, timedelta
+        import discord as _discord
+        state = await asyncio.to_thread(read_state)
+        KL = timezone(timedelta(hours=8))
+
+        def _fmt_entry(name: str) -> str:
+            meta = AGENTS[name]
+            entry = state.get(name, {})
+            last_run = entry.get("last_run")
+            last_result = entry.get("last_result", "Never run")
+            status = entry.get("status", "idle")
+            if status == "error":
+                icon = "❌"
+            elif last_run is None:
+                icon = "⚠️"
+            else:
+                try:
+                    ran_at = datetime.fromisoformat(last_run).replace(tzinfo=timezone.utc)
+                    age_h = (datetime.now(tz=timezone.utc) - ran_at).total_seconds() / 3600
+                    icon = "⚠️" if age_h > 24 else "✅"
+                    ago = f"{int(age_h * 60)} min ago" if age_h < 1 else f"{int(age_h)}h ago"
+                except Exception:
+                    icon = "⚠️"
+                    ago = "?"
+                last_result = f"{ago} — {last_result}"
+            return f"{meta['emoji']} **{meta['label']}** {icon}\n   {last_result}"
+
+        lines = [_fmt_entry(n) for n in AGENTS]
+        now_kl = datetime.now(tz=KL).strftime("%d %b %Y, %H:%M MYT")
+        emb = _discord.Embed(
+            title="🎛️ VESPER MISSION CONTROL",
+            description="\n\n".join(lines),
+            color=0x5865F2,
+        )
+        emb.set_footer(text=f"Last updated: {now_kl}")
+        await interaction.followup.send(embed=emb)
+
+    @tree.command(name="deadlines", description="Scan vault for upcoming deadlines")
+    async def slash_deadlines(interaction) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        await interaction.response.defer()
+        from agents import deadline_tracker
+        result = await asyncio.to_thread(deadline_tracker.run)
+        await interaction.followup.send(result[:2000] or "No deadlines found.")
+
+    @tree.command(name="explain", description="Explain a concept using your lecture notes")
+    @discord.app_commands.describe(topic="The concept or topic to explain")
+    async def slash_explain(interaction, topic: str) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        await interaction.response.defer()
+        from agents import concept_explainer
+        result = await asyncio.to_thread(concept_explainer.run, topic)
+        await interaction.followup.send(result[:2000] or "Could not explain.")
+
+    @tree.command(name="quiz", description="Generate flashcard Q&A from a lecture note")
+    @discord.app_commands.describe(source="Optional: lecture note filename or path")
+    async def slash_quiz(interaction, source: str = "") -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        await interaction.response.defer()
+        from agents import quiz_generator
+        cards = await asyncio.to_thread(quiz_generator.run, source or None)
+        source_name = cards[0].get("_source", "") if cards else ""
+        text = quiz_generator.format_discord(cards, source_name=source_name)
+        await interaction.followup.send(text[:2000] or "No flashcards generated.")
+
+    @tree.command(name="plan", description="Generate a 7-day study plan from your schedule and deadlines")
+    async def slash_plan(interaction) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        await interaction.response.defer()
+        from agents import study_planner
+        result = await asyncio.to_thread(study_planner.run)
+        await interaction.followup.send(result[:2000] or "Could not generate plan.")
+
+    @tree.command(name="progress", description="Weekly study progress and habit summary")
+    async def slash_progress(interaction) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        await interaction.response.defer()
+        from agents import progress_monitor
+        result = await asyncio.to_thread(progress_monitor.run)
+        await interaction.followup.send(result[:2000] or "Could not generate summary.")
+
+    @tree.command(name="research", description="Synthesise all vault notes on a topic")
+    @discord.app_commands.describe(topic="Topic to research across your notes")
+    async def slash_research(interaction, topic: str) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        await interaction.response.defer()
+        from agents import research_synthesizer
+        result = await asyncio.to_thread(research_synthesizer.run, topic)
+        await interaction.followup.send(result[:2000] or "No notes found.")
 
     async def _ensure_help_pinned() -> None:
         help_cid = os.environ.get("DISCORD_HELP_CHANNEL_ID", "").strip() or inbox_channel_id

@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / ".claude" / "scripts"))
 class TestSystemPrompt:
     def test_deadline_kind_includes_rider(self, tmp_vault, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import thread_chat_prompt as mod
+        from core import thread_chat_prompt as mod
         importlib.reload(mod)
         result = mod.system_prompt({"kind": "deadline"})
         assert "deadline" in result.lower()
@@ -20,21 +20,21 @@ class TestSystemPrompt:
 
     def test_lecture_kind_includes_path(self, tmp_vault, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import thread_chat_prompt as mod
+        from core import thread_chat_prompt as mod
         importlib.reload(mod)
         result = mod.system_prompt({"kind": "lecture", "path": "lectures/cs101/week1.md"})
         assert "lectures/cs101/week1.md" in result
 
     def test_lecture_kind_missing_path_uses_default(self, tmp_vault, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import thread_chat_prompt as mod
+        from core import thread_chat_prompt as mod
         importlib.reload(mod)
         result = mod.system_prompt({"kind": "lecture"})
         assert "lectures/" in result
 
     def test_unknown_kind_has_base_but_no_rider(self, tmp_vault, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import thread_chat_prompt as mod
+        from core import thread_chat_prompt as mod
         importlib.reload(mod)
         result = mod.system_prompt({"kind": "other"})
         assert "CrudusLiv" in result
@@ -44,7 +44,7 @@ class TestSystemPrompt:
     def test_soul_md_appended_when_present(self, tmp_vault, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
         (tmp_vault / "SOUL.md").write_text("# Test Soul\nBe chill.", encoding="utf-8")
-        from heartbeat import thread_chat_prompt as mod
+        from core import thread_chat_prompt as mod
         importlib.reload(mod)
         result = mod.system_prompt({"kind": "deadline"})
         assert "Test Soul" in result
@@ -52,7 +52,7 @@ class TestSystemPrompt:
 
     def test_no_soul_md_still_returns_prompt(self, tmp_vault, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import thread_chat_prompt as mod
+        from core import thread_chat_prompt as mod
         importlib.reload(mod)
         result = mod.system_prompt({"kind": "deadline"})
         assert len(result) > 50
@@ -60,7 +60,7 @@ class TestSystemPrompt:
 
 class TestUserPrompt:
     def _mod(self):
-        from heartbeat import thread_chat_prompt as mod
+        from core import thread_chat_prompt as mod
         return mod
 
     def test_no_context_omits_thread_header(self):

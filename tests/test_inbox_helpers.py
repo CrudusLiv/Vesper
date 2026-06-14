@@ -7,7 +7,7 @@ from pathlib import Path
 repo_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root / ".claude" / "scripts"))
 
-from heartbeat.inbox import _extract_study_card_count  # type: ignore  # noqa: E402
+from core.inbox import _extract_study_card_count  # type: ignore  # noqa: E402
 
 
 _SAMPLE_NOTE = """\

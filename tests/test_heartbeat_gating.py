@@ -17,13 +17,15 @@ KL = timezone(timedelta(hours=8))
 # Stub modules that heartbeat.py imports at module level to avoid side effects.
 _STUBS = [
     "_env",
-    "heartbeat.deadlines", "heartbeat.habits", "heartbeat.imminent",
-    "heartbeat.inbox", "heartbeat.llm", "heartbeat.notify", "heartbeat.snapshot",
-    "heartbeat.toast",
-    "heartbeat.gcal_sync", "heartbeat.vault_state_writer", "heartbeat.dashboard",
-    "heartbeat.dashboard_state",
+    "core", "core.deadlines", "core.habits", "core.imminent",
+    "core.inbox", "core.llm", "core.snapshot",
+    "core.gcal_sync", "core.vault_state_writer", "core.dashboard",
+    "core.dashboard_state", "core.thread_chat",
+    "tray", "tray.config",
     "security", "security.sanitize",
     "vault", "vault.daily",
+    "agents", "agents.deadline_tracker", "agents.progress_monitor", "agents.study_planner",
+    "agents.state",
 ]
 _PREV = {}
 for _name in _STUBS:

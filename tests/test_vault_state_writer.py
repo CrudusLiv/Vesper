@@ -23,7 +23,7 @@ SNAP_ERROR = {
 
 
 def test_write_github_counts(tmp_vault):
-    from heartbeat import vault_state_writer
+    from core import vault_state_writer
     vault_state_writer.write_github(SNAP_FULL)
 
     out = tmp_vault / "state" / "github-counts.md"
@@ -32,14 +32,14 @@ def test_write_github_counts(tmp_vault):
 
 
 def test_write_github_skips_on_error(tmp_vault):
-    from heartbeat import vault_state_writer
+    from core import vault_state_writer
     vault_state_writer.write_github(SNAP_ERROR)
 
     assert not (tmp_vault / "state" / "github-counts.md").exists()
 
 
 def test_write_heartbeat_state_always_writes(tmp_vault):
-    from heartbeat import vault_state_writer
+    from core import vault_state_writer
     vault_state_writer.write_heartbeat_state(SNAP_ERROR)
 
     out = tmp_vault / "state" / "heartbeat-state.json"
@@ -49,7 +49,7 @@ def test_write_heartbeat_state_always_writes(tmp_vault):
 
 
 def test_write_all_creates_all_files(tmp_vault):
-    from heartbeat import vault_state_writer
+    from core import vault_state_writer
     vault_state_writer.write_all(SNAP_FULL)
 
     state = tmp_vault / "state"
@@ -71,7 +71,7 @@ def _yesterday_kl_str() -> str:
 
 
 def test_write_gcal_today_filters_to_today(tmp_vault):
-    from heartbeat import vault_state_writer
+    from core import vault_state_writer
     today = _today_kl_str()
     yesterday = _yesterday_kl_str()
     snap = {"gcal": {"events": [
@@ -90,19 +90,19 @@ def test_write_gcal_today_filters_to_today(tmp_vault):
 
 
 def test_write_gcal_today_skips_on_error(tmp_vault):
-    from heartbeat import vault_state_writer
+    from core import vault_state_writer
     vault_state_writer.write_gcal_today({"gcal": {"error": "oauth not configured"}})
     assert not (tmp_vault / "state" / "gcal-today.md").exists()
 
 
 def test_write_gcal_today_skips_when_no_events(tmp_vault):
-    from heartbeat import vault_state_writer
+    from core import vault_state_writer
     vault_state_writer.write_gcal_today({"gcal": {}})
     assert not (tmp_vault / "state" / "gcal-today.md").exists()
 
 
 def test_write_all_creates_gcal_today(tmp_vault):
-    from heartbeat import vault_state_writer
+    from core import vault_state_writer
     today = _today_kl_str()
     snap = {**SNAP_FULL, "gcal": {"events": [
         {"start": f"{today}T10:00:00+08:00", "summary": "Test event"}

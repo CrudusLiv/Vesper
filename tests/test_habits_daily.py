@@ -9,8 +9,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".claude" / "scripts"))
 
-from heartbeat import habits
-import heartbeat.habits_state as hs
+from core import habits
+import core.habits_state as hs
 import vault.daily as daily_mod
 
 HABITS_TEMPLATE = (
@@ -26,6 +26,11 @@ def _patch_habits_paths(tmp_vault, monkeypatch):
     """Redirect module-level path constants so tests never touch the real vault."""
     monkeypatch.setattr(habits, "HABITS", tmp_vault / "HABITS.md")
     monkeypatch.setattr(habits, "LECTURES", tmp_vault / "lectures")
+    monkeypatch.setattr(habits, "_load_config", lambda: {
+        "auto_detect": {"Lecture engagement": "lectures_touched_today"},
+        "categories": {},
+        "category_emoji": {},
+    })
 
 
 def test_auto_check_writes_habit_line_for_newly_ticked(tmp_vault, monkeypatch):
@@ -99,7 +104,7 @@ def test_get_status_data_keys(tmp_vault, monkeypatch):
     (tmp_vault / "HABITS.md").write_text(HABITS_TEMPLATE, encoding="utf-8")
 
     monkeypatch.setattr(hs, "load_state", lambda: {"current_streak": 2, "best_streak": 3, "history": {}})
-    monkeypatch.setattr(hs, "get_weekly_summary", lambda history, week_start: [])
+    monkeypatch.setattr(hs, "get_weekly_summary", lambda history, week_start, total=0: [])
 
     data = habits.get_status_data()
     for key in ("today", "categories", "category_emoji", "checked", "done_count", "total", "current_streak", "best_streak", "weekly"):

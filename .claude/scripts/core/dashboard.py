@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from integrations import discord_webhook  # noqa: E402
 
 # Load .env so DISCORD_HOOK_* keys reach os.environ when this module is
-# invoked directly (e.g. `py -c "from heartbeat.dashboard import notify; ..."`).
+# invoked directly (e.g. `py -c "from core.dashboard import notify; ..."`).
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "integrations"))
 import _env  # noqa: F401, E402
 
@@ -51,14 +51,8 @@ def _maybe_feed_and_toast(kind: str, payload: dict) -> None:
     if kind == "heartbeat_tick" and payload.get("status") == "ok":
         return
     try:
-        from heartbeat import feed as _feed
-        record = _feed.append(kind, payload)
-        if kind in _TOAST_KINDS:
-            try:
-                from heartbeat import toast as _toast
-                _toast.show(record.get("title", ""), record.get("body", ""))
-            except Exception as exc:
-                print(f"[dashboard] toast failed: {exc}", file=sys.stderr)
+        from core import feed as _feed
+        _feed.append(kind, payload)
     except Exception as exc:
         print(f"[dashboard] feed append failed: {exc}", file=sys.stderr)
 
@@ -274,15 +268,21 @@ def _format_deadline(kind: str, p: dict[str, Any]) -> dict[str, Any]:
         )
 
     title_text = f"[{course}] {title}" if course else title
-    return {"embeds": [_vesper_embed(
-        title=title_text,
-        description=when,
-        color=color,
-        channel_label="Deadlines",
-        vault_path="DEADLINES.md",
-        fields=[{"name": "Status", "value": status_value, "inline": True}],
-        ts=p.get("ts"),
-    )]}
+    return {
+        "embeds": [_vesper_embed(
+            title=title_text,
+            description=when,
+            color=color,
+            channel_label="Deadlines",
+            vault_path="DEADLINES.md",
+            fields=[{"name": "Status", "value": status_value, "inline": True}],
+            ts=p.get("ts"),
+        )],
+        # Forum channels require thread_name (new post) or thread_id (reply).
+        # Callers that already have a thread_id pass it to notify(); this
+        # field is the fallback so notify() can also use body.get("thread_name").
+        "thread_name": title_text[:100],
+    }
 
 
 _DAILY_STYLES: dict[str, tuple[str, int, str]] = {

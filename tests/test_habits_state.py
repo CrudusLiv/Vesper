@@ -9,7 +9,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".claude" / "scripts"))
 
-from heartbeat import habits_state
+from core import habits_state
 
 PILLARS = ("Lecture engagement", "Project progress", "Research / learning", "Personal goals")
 
@@ -49,7 +49,7 @@ def test_streak_resets_on_gap(state_file):
 def test_weekly_summary(state_file):
     for p in PILLARS:
         habits_state.record_completion("2026-06-09", p)
-    summary = habits_state.get_weekly_summary(habits_state.load_state()["history"], "2026-06-09")
+    summary = habits_state.get_weekly_summary(habits_state.load_state()["history"], "2026-06-09", total=len(PILLARS))
     day = next(d for d in summary if d["date"] == "2026-06-09")
     assert day["pct"] == 100
 

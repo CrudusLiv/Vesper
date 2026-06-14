@@ -12,13 +12,16 @@ sys.path.insert(0, str(ROOT / ".claude" / "scripts"))
 sys.path.insert(0, str(ROOT / ".claude"))
 
 
+_TEST_PILLARS = ["Lecture engagement", "Project progress", "Research / learning", "Personal goals"]
+
+
 def test_run_habits_check_fuzzy_match(monkeypatch):
     """Partial pillar name matches correctly."""
     import integrations._env  # noqa: F401
-    # Patch the habits module before importing discord_bot helpers
     mock_check = MagicMock(return_value=True)
     with patch.dict(sys.modules, {}):
         import chat.discord_bot as bot
+        monkeypatch.setattr(bot.habits, "get_pillar_names", lambda: _TEST_PILLARS)
         monkeypatch.setattr(bot.habits, "check_pillar", mock_check)
         reaction, msg = bot.run_habits_check("research")
     assert reaction == "✅"
@@ -39,6 +42,7 @@ def test_run_habits_check_already_done(monkeypatch):
     """Returns ✅ with 'Already done' when pillar was already checked."""
     import integrations._env  # noqa: F401
     import chat.discord_bot as bot
+    monkeypatch.setattr(bot.habits, "get_pillar_names", lambda: _TEST_PILLARS)
     monkeypatch.setattr(bot.habits, "check_pillar", MagicMock(return_value=False))
     reaction, msg = bot.run_habits_check("lecture")
     assert reaction == "✅"

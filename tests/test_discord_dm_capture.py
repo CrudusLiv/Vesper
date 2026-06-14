@@ -49,7 +49,7 @@ def _make_db(path: Path, messages: list[dict]) -> Path:
 class TestClassifyRuleBased:
     @pytest.fixture(autouse=True)
     def _import(self):
-        from heartbeat import discord_dm_capture as mod
+        from core import discord_dm_capture as mod
         self.classify = mod.classify_rule_based
 
     def test_empty_is_chitchat(self):
@@ -100,14 +100,14 @@ class TestClassifyRuleBased:
 class TestRoute:
     def test_chitchat_discarded(self, tmp_vault, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import discord_dm_capture as mod
+        from core import discord_dm_capture as mod
         importlib.reload(mod)
         label = mod.route({"id": "1", "content": "hey", "created_at": time.time()})
         assert label == "chit-chat"
 
     def test_finance_creates_file(self, tmp_vault, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import discord_dm_capture as mod
+        from core import discord_dm_capture as mod
         importlib.reload(mod)
         label = mod.route({"id": "2", "content": "spent rm15 on coffee", "created_at": time.time()})
         assert label == "finance"
@@ -118,7 +118,7 @@ class TestRoute:
 
     def test_note_written_to_notes_md(self, tmp_vault, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import discord_dm_capture as mod
+        from core import discord_dm_capture as mod
         importlib.reload(mod)
         label = mod.route({"id": "3", "content": "note: check assignment spec", "created_at": time.time()})
         assert label == "note"
@@ -132,7 +132,7 @@ class TestRoute:
 class TestScanAndRoute:
     def test_missing_db_returns_zeros(self, tmp_vault, tmp_data, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import discord_dm_capture as mod
+        from core import discord_dm_capture as mod
         importlib.reload(mod)
         counts = mod.scan_and_route(
             tmp_data / "noexist.db",
@@ -143,7 +143,7 @@ class TestScanAndRoute:
 
     def test_routes_self_dm_note(self, tmp_vault, tmp_data, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import discord_dm_capture as mod
+        from core import discord_dm_capture as mod
         importlib.reload(mod)
         db = _make_db(tmp_data, [
             {"id": "n1", "content": "note: study chapter 5", "created_at": time.time(),
@@ -154,7 +154,7 @@ class TestScanAndRoute:
 
     def test_routes_self_dm_finance(self, tmp_vault, tmp_data, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import discord_dm_capture as mod
+        from core import discord_dm_capture as mod
         importlib.reload(mod)
         db = _make_db(tmp_data, [
             {"id": "f1", "content": "spent rm40 on textbook", "created_at": time.time(),
@@ -165,7 +165,7 @@ class TestScanAndRoute:
 
     def test_non_dm_ignored(self, tmp_vault, tmp_data, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import discord_dm_capture as mod
+        from core import discord_dm_capture as mod
         importlib.reload(mod)
         db = _make_db(tmp_data, [
             {"id": "nd1", "content": "note: server message", "created_at": time.time(),
@@ -177,7 +177,7 @@ class TestScanAndRoute:
     def test_already_seen_skipped(self, tmp_vault, tmp_data, monkeypatch):
         import json
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import discord_dm_capture as mod
+        from core import discord_dm_capture as mod
         importlib.reload(mod)
         db = _make_db(tmp_data, [
             {"id": "seen1", "content": "note: old note", "created_at": time.time(),
@@ -193,7 +193,7 @@ class TestScanAndRoute:
 
     def test_old_messages_outside_ttl_ignored(self, tmp_vault, tmp_data, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import discord_dm_capture as mod
+        from core import discord_dm_capture as mod
         importlib.reload(mod)
         old_ts = time.time() - 25 * 3600
         db = _make_db(tmp_data, [
@@ -206,7 +206,7 @@ class TestScanAndRoute:
 
     def test_bot_dm_channel_id_restricts_scan(self, tmp_vault, tmp_data, monkeypatch):
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_vault.parent.parent))
-        from heartbeat import discord_dm_capture as mod
+        from core import discord_dm_capture as mod
         importlib.reload(mod)
         db = _make_db(tmp_data, [
             {"id": "c1", "channel_id": "ch_target", "content": "note: right channel",

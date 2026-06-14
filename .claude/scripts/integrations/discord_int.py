@@ -132,7 +132,7 @@ def run_bot() -> int:
             try:
                 import sys as _sys
                 _sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
-                from heartbeat import discord_dm_capture
+                from core import discord_dm_capture
                 created_ts = message.created_at.replace(tzinfo=timezone.utc).timestamp()
                 discord_dm_capture.route_and_mark({
                     "id": str(message.id),

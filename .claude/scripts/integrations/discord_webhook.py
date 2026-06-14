@@ -18,6 +18,15 @@ USER_AGENT = "DiscordBot (https://github.com/CrudusLiv/Vesper, 1.0)"
 TIMEOUT = 10
 
 
+def _safe_id(value: Any) -> str:
+    """Convert a Discord snowflake to a clean digit string.
+
+    Handles int, str, and float-as-str (e.g. '1.23e18' from SQLite REAL columns).
+    Returns the integer portion; raises ValueError for non-numeric inputs."""
+    s = str(value).split(".")[0]
+    return str(int(s))
+
+
 def post(
     url: str,
     *,
@@ -41,8 +50,13 @@ def post(
         body["applied_tags"] = applied_tags
 
     query = "?wait=true"
-    if thread_id and str(thread_id).isdigit():
-        query += f"&thread_id={thread_id}"
+    if thread_id:
+        try:
+            tid = int(_safe_id(thread_id))
+            if tid > 0:
+                query += f"&thread_id={tid}"
+        except (ValueError, TypeError):
+            pass
     return _request(f"{url}{query}", method="POST", body=body)
 
 
@@ -62,13 +76,13 @@ def edit(
     if embeds is not None:
         body["embeds"] = embeds
     path = f"{url}/messages/{message_id}"
-    query = f"?thread_id={thread_id}" if thread_id else ""
+    query = f"?thread_id={_safe_id(thread_id)}" if thread_id else ""
     return _request(f"{path}{query}", method="PATCH", body=body)
 
 
 def delete(url: str, message_id: str, *, thread_id: str | None = None) -> None:
     path = f"{url}/messages/{message_id}"
-    query = f"?thread_id={thread_id}" if thread_id else ""
+    query = f"?thread_id={_safe_id(thread_id)}" if thread_id else ""
     _request(f"{path}{query}", method="DELETE", body=None, expect_json=False)
 
 

@@ -17,7 +17,7 @@ PROJECT_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 
 from memory_reflect import MEMORY, DAILY, REFLECT_SYSTEM, _insert_into_section
-from heartbeat import llm
+from core import llm
 
 KL = timezone(timedelta(hours=8))
 

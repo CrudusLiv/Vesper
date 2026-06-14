@@ -7,7 +7,7 @@ import re
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from heartbeat import llm
+from core import llm
 
 _PARSE_PROMPT = """\
 Extract EVERY class/lecture/tutorial entry from this timetable as JSON.

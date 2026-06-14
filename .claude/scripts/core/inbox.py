@@ -25,7 +25,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from heartbeat import llm
+from core import llm
 
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
 

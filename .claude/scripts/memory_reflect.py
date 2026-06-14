@@ -18,7 +18,7 @@ from pathlib import Path
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2])
 
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
-from heartbeat import llm  # noqa: E402
+from core import llm  # noqa: E402
 
 VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 DAILY = VAULT / "daily"
@@ -214,7 +214,7 @@ def curate_about() -> int:
 def _post_morning_digest() -> None:
     try:
         import schedule_parser
-        from heartbeat import habits, dashboard
+        from core import habits, dashboard
     except ImportError as exc:
         print(f"morning digest skipped (import error): {exc}", file=sys.stderr)
         return

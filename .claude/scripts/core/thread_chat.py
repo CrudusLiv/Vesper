@@ -25,7 +25,7 @@ from typing import Optional
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
 
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
-from heartbeat import dashboard, dashboard_state, llm, thread_chat_prompt  # noqa: E402
+from core import dashboard, dashboard_state, llm, thread_chat_prompt  # noqa: E402
 
 SEEN_TTL_SEC = 24 * 3600
 CONTEXT_DEPTH = 20  # last N messages in the thread to feed the LLM

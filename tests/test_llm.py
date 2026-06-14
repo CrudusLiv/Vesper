@@ -14,7 +14,7 @@ sys.path.insert(0, str(repo_root / ".claude" / "scripts"))
 
 
 def _reload():
-    import heartbeat.llm as m
+    import core.llm as m
     importlib.reload(m)
     m._config_cache = None
     return m
