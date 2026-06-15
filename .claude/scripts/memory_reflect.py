@@ -112,6 +112,32 @@ def append_to_memory(items: dict) -> int:
 
 # ---------- Habits reset ----------
 
+def _add_archive_nav(archive: Path, prev_date: str | None) -> None:
+    """Append a prev-link + back-to-HABITS nav footer to a habits archive file."""
+    text = archive.read_text(encoding="utf-8")
+    if "[[HABITS|all days]]" in text:
+        return
+    if prev_date:
+        footer = f"\n← [[goals/habits-history/{prev_date}|{prev_date}]] · [[HABITS|all days]]\n"
+    else:
+        footer = "\n[[HABITS|all days]]\n"
+    archive.write_text(text.rstrip() + "\n" + footer, encoding="utf-8")
+
+
+def _prepend_history_link(date: str) -> None:
+    """Prepend a wikilink for `date` into the ## History section of HABITS.md."""
+    if not HABITS.exists():
+        return
+    text = HABITS.read_text(encoding="utf-8")
+    marker = "_(Filled by the heartbeat. Newest at top.)_"
+    if marker not in text:
+        return
+    link = f"- [[goals/habits-history/{date}|{date}]]"
+    text = text.replace("\n- _(empty — no history yet)_", "")
+    text = text.replace(marker, marker + "\n" + link)
+    HABITS.write_text(text, encoding="utf-8")
+
+
 def reset_habits() -> str:
     if not HABITS.exists():
         return "no HABITS.md"
@@ -124,6 +150,10 @@ def reset_habits() -> str:
     archive = HABITS_HISTORY / f"{yesterday}.md"
     if not archive.exists():
         archive.write_text(text, encoding="utf-8")
+        all_archives = sorted(p.stem for p in HABITS_HISTORY.glob("*.md") if p.stem != yesterday)
+        prev_date = all_archives[-1] if all_archives else None
+        _add_archive_nav(archive, prev_date)
+        _prepend_history_link(yesterday)
 
     text = re.sub(
         r"## Today — \d{4}-\d{2}-\d{2}",
