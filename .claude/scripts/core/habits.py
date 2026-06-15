@@ -54,6 +54,10 @@ def _today_kl() -> str:
     return datetime.now(KL).strftime("%Y-%m-%d")
 
 
+def _now_kl() -> datetime:
+    return datetime.now(KL)
+
+
 def _pillar_line_re(pillar: str) -> re.Pattern[str]:
     return re.compile(
         r"^(- \[)([ xX])(\] \*\*" + re.escape(pillar) + r"\*\*)",
@@ -120,10 +124,52 @@ def _no_classes_today() -> bool:
     return len(classes_today()) == 0
 
 
+def _classes_done_today() -> bool:
+    """Free day → True. School day → True after last class ends or lecture notes touched."""
+    today_classes = classes_today()
+    if not today_classes:
+        return True
+    if _lectures_touched_today():
+        return True
+    now = _now_kl()
+    now_min = now.hour * 60 + now.minute
+    ends = []
+    for e in today_classes:
+        end = e.get("end", "")
+        if end and ":" in end:
+            try:
+                h, m = end.split(":", 1)
+                ends.append(int(h) * 60 + int(m))
+            except ValueError:
+                continue
+    return bool(ends) and now_min >= max(ends)
+
+
+def _sleep_morning_check() -> bool:
+    """True from 07:00 KL — auto-fires on the first morning heartbeat."""
+    return _now_kl().hour >= 7
+
+
+def _finance_entry_today() -> bool:
+    """True if this month's finance log was modified today."""
+    today = _today_kl()
+    finance_file = VAULT / "finance" / f"{today[:7]}.md"
+    if not finance_file.exists():
+        return False
+    try:
+        mtime = datetime.fromtimestamp(finance_file.stat().st_mtime, tz=KL).strftime("%Y-%m-%d")
+        return mtime == today
+    except OSError:
+        return False
+
+
 _AUTO_DETECT_FNS: dict[str, str] = {
     "lectures_touched_today": "_lectures_touched_today",
     "commits_today": "_commits_today",
     "no_classes_today": "_no_classes_today",
+    "classes_done_today": "_classes_done_today",
+    "sleep_morning_check": "_sleep_morning_check",
+    "finance_entry_today": "_finance_entry_today",
 }
 
 
@@ -144,6 +190,12 @@ def auto_check(snapshot: dict) -> list[str]:
             triggered = _commits_today(snapshot)
         elif fn_key == "no_classes_today":
             triggered = _no_classes_today()
+        elif fn_key == "classes_done_today":
+            triggered = _classes_done_today()
+        elif fn_key == "sleep_morning_check":
+            triggered = _sleep_morning_check()
+        elif fn_key == "finance_entry_today":
+            triggered = _finance_entry_today()
         else:
             continue
         if triggered:
