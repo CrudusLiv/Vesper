@@ -16,6 +16,8 @@ services:
       - ./.claude/chat:/workspace/.claude/chat:ro
       - ./.claude/data:/workspace/.claude/data
       - ./.env:/workspace/.env:ro
+      - ./scripts:/workspace/scripts:ro
+      - easyocr-models:/root/.EasyOCR
     restart: unless-stopped
 
   scheduler:
@@ -35,4 +37,9 @@ services:
       - ./.claude/chat:/workspace/.claude/chat:ro
       - ./.claude/data:/workspace/.claude/data
       - ./.env:/workspace/.env:ro
+      - ./scripts:/workspace/scripts:ro
+      - easyocr-models:/root/.EasyOCR
     restart: unless-stopped
+
+volumes:
+  easyocr-models:

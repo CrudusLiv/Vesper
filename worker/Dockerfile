@@ -5,7 +5,7 @@ FROM python:3.14-slim
 # wall clock (slim has none — without it reflect@08:00 / KL active-hours run on
 # UTC); curl/gnupg to add NodeSource for the claude CLI.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates gnupg libgomp1 tzdata \
+    && apt-get install -y --no-install-recommends curl ca-certificates gnupg libgomp1 tzdata poppler-utils libgl1 libglib2.0-0 \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
