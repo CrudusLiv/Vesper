@@ -4,8 +4,29 @@ from pathlib import Path
 from typing import Any, List, Optional, Tuple
 from PIL import Image
 import logging
+import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# Global OCR reader cache
+_ocr_reader = None
+
+
+def _get_ocr_reader():
+    """Get or initialize cached EasyOCR reader.
+
+    Returns:
+        easyocr.Reader instance or None if import fails
+    """
+    global _ocr_reader
+    if _ocr_reader is None:
+        try:
+            import easyocr
+            _ocr_reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+        except ImportError:
+            logger.error("easyocr not installed. Install with: pip install easyocr")
+            return None
+    return _ocr_reader
 
 
 def extract_slide_images(
@@ -105,20 +126,14 @@ def run_ocr_on_image(image: Optional[Image.Image]) -> Tuple[str, float, Optional
     if image is None:
         return "", 0.0, "Image is None"
 
-    try:
-        import easyocr
-    except ImportError:
-        logger.error("easyocr not installed. Install with: pip install easyocr")
+    # Get cached reader instance
+    reader = _get_ocr_reader()
+    if reader is None:
         return "", 0.0, "easyocr not installed"
 
     try:
-        # Initialize reader (caches model after first run)
-        # gpu_device='cpu' avoids CUDA issues; silent=True suppresses progress bars
-        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
-
-        # Convert PIL Image to numpy array (easyocr expects BGR or RGB numpy array)
-        import numpy as np
-        image_array = np.array(image)
+        # Convert PIL Image to numpy array for easyocr
+        image_array = np.asarray(image)
 
         # Run OCR
         results = reader.readtext(image_array, detail=1)
@@ -136,6 +151,6 @@ def run_ocr_on_image(image: Optional[Image.Image]) -> Tuple[str, float, Optional
 
         return extracted_text, avg_confidence, None
 
-    except Exception as e:
+    except (ValueError, RuntimeError, TypeError, OSError) as e:
         logger.error(f"OCR processing failed: {e}")
         return "", 0.0, str(e)

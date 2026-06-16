@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from scripts.ocr_processor import extract_slide_images, run_ocr_on_image
 
 
@@ -104,7 +104,14 @@ def test_run_ocr_on_image_success():
     # Create a simple test image with text
     test_image = Image.new('RGB', (200, 100), color='white')
     draw = ImageDraw.Draw(test_image)
-    draw.text((10, 10), "Sample Text", fill='black')
+
+    # Use explicit font to avoid CI failures with default font
+    try:
+        font = ImageFont.truetype("arial.ttf", 20)
+    except (IOError, OSError):
+        font = ImageFont.load_default()
+
+    draw.text((10, 10), "Sample Text", fill='black', font=font)
 
     text, confidence, error = run_ocr_on_image(test_image)
 
