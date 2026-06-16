@@ -27,6 +27,7 @@ PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolv
 
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts" / "integrations"))
+sys.path.insert(0, str(PROJECT_DIR / "scripts"))
 import _env  # noqa: F401, E402 -- side effect: loads .env into os.environ
 
 from core import deadlines, habits, imminent, inbox, llm, snapshot, gcal_sync, vault_state_writer, dashboard, dashboard_state, thread_chat  # noqa: E402
@@ -34,6 +35,7 @@ from core import deadlines, habits, imminent, inbox, llm, snapshot, gcal_sync, v
 # mentioning dated milestones), not Gmail/Calendar.
 from security import sanitize  # noqa: E402
 from vault import daily  # noqa: E402
+from ambient_notifier import scan_vault_state, collect_notifications, post_notification_to_discord  # noqa: E402
 
 try:
     from tray import config as _tray_config
@@ -488,6 +490,26 @@ def _main_impl() -> int:
                 print(f"GCal sync: created {new_events} event(s)")
         except Exception as exc:
             print(f"gcal_sync failed: {exc}", file=sys.stderr)
+
+    # Slice 8: ambient notifier - scan vault state and surface proactive notifications.
+    if _features.get("ambient_notifier", True):
+        try:
+            vault_state = scan_vault_state(VAULT)
+            notifications = collect_notifications(vault_state)
+
+            for notification in notifications:
+                try:
+                    post_notification_to_discord(
+                        notification=notification,
+                        webhook_url=os.getenv("DISCORD_HOOK_FEED")
+                    )
+                except Exception as e:
+                    print(f"Failed to post ambient notification: {e}", file=sys.stderr)
+
+            if notifications:
+                print(f"ambient_notifier: posted {len(notifications)} notification(s)")
+        except Exception as exc:
+            print(f"ambient_notifier failed: {exc}", file=sys.stderr)
 
     curr = snapshot.build_snapshot()
     curr["heartbeat_ran_at"] = time.time()
