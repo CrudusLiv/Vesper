@@ -34,6 +34,8 @@ sys.path.insert(0, str(PROJECT_DIR))
 from integrations import vault_fs  # noqa: E402
 from memory import wikilinks  # noqa: E402
 from scripts.concept_linker import process_lecture_concepts  # noqa: E402
+from scripts.roadmap_generator import generate_roadmap_file  # noqa: E402
+from integrations.discord_webhook import post  # noqa: E402
 
 VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 LECTURES = VAULT / "lectures"
@@ -279,6 +281,14 @@ def _process_one(src: Path) -> dict | None:
             process_lecture_concepts(lecture_file=note_path, vault_dir=VAULT)
         except Exception as exc:
             print(f"inbox: concept linker failed for {note_path.name}: {exc}", file=sys.stderr)
+
+        # Wire roadmap generator for lectures
+        try:
+            lecture_data = _extract_lecture_data(note_md)
+            roadmap_file = generate_roadmap_file(note_path, lecture_data)
+            _post_roadmap_embed(lecture_data, roadmap_file)
+        except Exception as exc:
+            print(f"inbox: roadmap generator failed for {note_path.name}: {exc}", file=sys.stderr)
     # Section 4: move src into _processed/ first so the carve-out applies,
     # then delete iff the written note passes the success check.
     processed_dir = src.parent / "_processed"
@@ -486,6 +496,103 @@ def _extract_study_card_count(note_md: str) -> int:
         if stripped.startswith(("- Q:", "* Q:", "Q:")):
             count += 1
     return count
+
+
+def _extract_lecture_data(note_md: str) -> dict:
+    """Extract structured data from a lecture markdown for roadmap generation.
+
+    Extracts: title, objectives, problems, prior_lectures.
+    Returns a dict suitable for passing to generate_roadmap_file()."""
+    title = _extract_title(note_md) or "Untitled"
+
+    # Extract objectives from ## heading or learning goals section
+    objectives = []
+    in_objectives = False
+    for line in note_md.splitlines():
+        if line.startswith("## "):
+            in_objectives = line.strip() in ("## Objectives", "## Learning Objectives", "## Key concepts")
+            if in_objectives and "## Key concepts" in line:
+                # Key concepts as fallback objectives
+                objectives = _extract_tldr(note_md, n=10)
+                break
+            continue
+        if in_objectives:
+            stripped = line.lstrip()
+            if stripped.startswith(("- ", "* ")):
+                objectives.append(stripped[2:].strip())
+            elif line.startswith("## "):
+                break
+
+    # Extract problems from practice or problems section
+    problems = []
+    in_problems = False
+    for line in note_md.splitlines():
+        if line.startswith("## "):
+            in_problems = line.strip() in ("## Practice Problems", "## Problems", "## Exercises")
+            continue
+        if in_problems:
+            stripped = line.lstrip()
+            if stripped.startswith(("- ", "* ")):
+                problem_text = stripped[2:].strip()
+                # Parse difficulty if present (e.g., "- **Easy** - problem text")
+                difficulty = "Medium"
+                if "**" in problem_text:
+                    parts = problem_text.split("**")
+                    if len(parts) >= 2:
+                        difficulty = parts[1]
+                        problem_text = "**".join(parts[2:]).lstrip(" - ").strip()
+                problems.append({
+                    "difficulty": difficulty,
+                    "statement": problem_text
+                })
+            elif line.startswith("## "):
+                break
+
+    # Extract prior lectures from Open questions or prerequisites
+    prior_lectures = []
+    in_prior = False
+    for line in note_md.splitlines():
+        if line.startswith("## "):
+            in_prior = line.strip() in ("## Open questions", "## Prerequisites", "## Prior knowledge")
+            continue
+        if in_prior:
+            stripped = line.lstrip()
+            if stripped.startswith(("- ", "* ")):
+                prior_lectures.append(stripped[2:].strip())
+            elif line.startswith("## "):
+                break
+
+    return {
+        "title": title,
+        "objectives": objectives,
+        "problems": problems,
+        "prior_lectures": prior_lectures
+    }
+
+
+def _post_roadmap_embed(lecture_data: dict, roadmap_file: Path) -> None:
+    """Post a study roadmap embed to Discord #feed channel.
+
+    Requires DISCORD_HOOK_FEED env var to be set with the webhook URL."""
+    hook_url = os.environ.get("DISCORD_HOOK_FEED")
+    if not hook_url:
+        return  # Silently skip if webhook not configured
+
+    title = lecture_data.get("title", "Study Roadmap")
+    problems_count = len(lecture_data.get("problems", []))
+    roadmap_stem = roadmap_file.stem
+
+    embed = {
+        "title": f"Study Roadmap: {title}",
+        "description": f"{problems_count} practice problems | Review + Study + Synthesis",
+        "url": f"vault://{roadmap_stem}",
+        "color": 0x6A5ACD,  # Slate blue
+        "footer": {
+            "text": "Generated from lecture"
+        }
+    }
+
+    post(hook_url, embeds=[embed])
 
 
 DAILY = VAULT / "daily"
