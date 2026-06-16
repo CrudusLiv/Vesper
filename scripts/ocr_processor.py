@@ -154,3 +154,31 @@ def run_ocr_on_image(image: Optional[Image.Image]) -> Tuple[str, float, Optional
     except (ValueError, RuntimeError, TypeError, OSError) as e:
         logger.error(f"OCR processing failed: {e}")
         return "", 0.0, str(e)
+
+
+def merge_text(original_text: str, ocr_text: str) -> Tuple[str, bool]:
+    """
+    Compare original extracted text with OCR'd text.
+    Use OCR if it extracts 20%+ more text than original.
+
+    Args:
+        original_text: Text extracted by standard PDF/PPTX extraction
+        ocr_text: Text extracted by OCR
+
+    Returns:
+        Tuple of (final_text, ocr_was_used)
+        - final_text: The chosen text (either original or ocr)
+        - ocr_was_used: Boolean indicating which source was used
+    """
+    original_len = len(original_text.strip())
+    ocr_len = len(ocr_text.strip())
+
+    # 20% threshold: use OCR if it extracts significantly more
+    threshold = original_len * 1.2
+
+    if ocr_len > threshold:
+        logger.debug(f"Using OCR text ({ocr_len} chars vs {original_len} original)")
+        return ocr_text, True
+    else:
+        logger.debug(f"Keeping original text ({original_len} chars vs {ocr_len} OCR)")
+        return original_text, False

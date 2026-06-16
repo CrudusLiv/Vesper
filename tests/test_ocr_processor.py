@@ -140,3 +140,42 @@ def test_run_ocr_on_image_failure():
     assert text == ""
     assert confidence == 0.0
     assert error is not None
+
+
+def test_merge_text_prefers_longer_ocr():
+    """Test that merge prefers OCR if it's 20%+ longer."""
+    from scripts.ocr_processor import merge_text
+
+    original = "Short text"
+    ocr = "This is a much longer piece of text extracted by OCR"
+
+    merged, ocr_used = merge_text(original, ocr)
+
+    assert merged == ocr
+    assert ocr_used is True
+
+
+def test_merge_text_keeps_original_if_longer():
+    """Test that merge keeps original if it's longer."""
+    from scripts.ocr_processor import merge_text
+
+    original = "This is the longer original text that was extracted"
+    ocr = "Short OCR"
+
+    merged, ocr_used = merge_text(original, ocr)
+
+    assert merged == original
+    assert ocr_used is False
+
+
+def test_merge_text_within_threshold():
+    """Test that merge keeps original if texts are within 20% threshold."""
+    from scripts.ocr_processor import merge_text
+
+    original = "Original text with some content"
+    ocr = "Original text with much content"  # Similar length, ~10% difference
+
+    merged, ocr_used = merge_text(original, ocr)
+
+    assert merged == original
+    assert ocr_used is False
