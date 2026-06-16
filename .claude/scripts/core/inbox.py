@@ -36,6 +36,9 @@ from memory import wikilinks  # noqa: E402
 from scripts.concept_linker import process_lecture_concepts  # noqa: E402
 from scripts.roadmap_generator import generate_roadmap_file  # noqa: E402
 from integrations.discord_webhook import post  # noqa: E402
+from scripts.ocr_processor import (  # noqa: E402
+    extract_slide_images, run_ocr_on_image, merge_text, format_ocr_summary
+)
 
 VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 LECTURES = VAULT / "lectures"
@@ -236,7 +239,8 @@ def _process_one(src: Path) -> dict | None:
         print(f"inbox: extract failed for {src.name}: {msg}", file=sys.stderr)
         return None
 
-    flat_text = _flatten_extract(extract)
+    augmented_extract, ocr_results = _run_ocr_augment(src, extract)
+    flat_text = _flatten_extract(augmented_extract)
     if not flat_text.strip():
         print(f"inbox: {src.name} extracted to empty text; skipping", file=sys.stderr)
         return None
@@ -272,6 +276,9 @@ def _process_one(src: Path) -> dict | None:
     if not note_md:
         print(f"inbox: LLM returned nothing for {src.name}; leaving source in inbox", file=sys.stderr)
         return None
+
+    if ocr_results:
+        note_md += f"\n\n_OCR Processing: {format_ocr_summary(ocr_results)}_"
 
     note_path = _write_note(src, doc_type, name, subcategory, date, note_md)
     wikilinks.add_sibling_wikilinks(note_path)
@@ -385,6 +392,78 @@ def _run_extract(src: Path) -> dict | None:
         return json.loads(stdout)
     except json.JSONDecodeError:
         return {"error": "extract.py emitted non-JSON output"}
+
+
+def _run_ocr_augment(src: Path, extract: dict) -> tuple[dict, list[dict]]:
+    """Run OCR on src and merge results into extract JSON.
+
+    Returns (augmented_extract, ocr_results). On any failure, returns the
+    original extract unchanged with an empty ocr_results list so the caller
+    can continue without OCR.
+    """
+    import copy
+
+    augmented = copy.deepcopy(extract)
+    ocr_results: list[dict] = []
+
+    ext = src.suffix.lower()
+    try:
+        images = extract_slide_images(
+            pdf_path=src if ext == ".pdf" else None,
+            pptx_path=src if ext == ".pptx" else None,
+        )
+    except Exception as exc:
+        print(f"inbox: OCR image extraction failed for {src.name}: {exc}", file=sys.stderr)
+        return augmented, []
+
+    if not images:
+        return augmented, []
+
+    if extract.get("type") == "pptx":
+        for slide_dict in augmented.get("slides", []):
+            idx = slide_dict.get("slide_num", 1) - 1  # 0-based
+            result: dict = {"slide": idx + 1}
+            if idx < len(images):
+                original = (slide_dict.get("title") or "") + "\n" + "\n".join(slide_dict.get("bullets") or [])
+                ocr_text, confidence, error = run_ocr_on_image(images[idx])
+                if error:
+                    result["status"] = "failed"
+                    result["error"] = error
+                else:
+                    result["status"] = "success"
+                    result["confidence"] = confidence
+                    merged, used = merge_text(original, ocr_text)
+                    result["ocr_used"] = used
+                    if used:
+                        lines = [l.strip() for l in merged.splitlines() if l.strip()]
+                        slide_dict["title"] = lines[0] if lines else slide_dict.get("title", "")
+                        slide_dict["bullets"] = lines[1:] if len(lines) > 1 else []
+            else:
+                result["status"] = "skipped"
+            ocr_results.append(result)
+
+    elif extract.get("type") == "pdf":
+        for page_dict in augmented.get("pages", []):
+            idx = page_dict.get("page_num", 1) - 1  # 0-based
+            result = {"slide": idx + 1}
+            if idx < len(images):
+                original = (page_dict.get("text") or "").strip()
+                ocr_text, confidence, error = run_ocr_on_image(images[idx])
+                if error:
+                    result["status"] = "failed"
+                    result["error"] = error
+                else:
+                    result["status"] = "success"
+                    result["confidence"] = confidence
+                    merged, used = merge_text(original, ocr_text)
+                    result["ocr_used"] = used
+                    if used:
+                        page_dict["text"] = merged
+            else:
+                result["status"] = "skipped"
+            ocr_results.append(result)
+
+    return augmented, ocr_results
 
 
 def _flatten_extract(extract: dict) -> str:
