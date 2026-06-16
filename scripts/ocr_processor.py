@@ -159,16 +159,28 @@ def run_ocr_on_image(image: Optional[Image.Image]) -> Tuple[str, float, Optional
 def merge_text(original_text: str, ocr_text: str) -> Tuple[str, bool]:
     """
     Compare original extracted text with OCR'd text.
-    Use OCR if it extracts 20%+ more text than original.
+    Use OCR if it extracts strictly more than 20% additional text.
 
     Args:
-        original_text: Text extracted by standard PDF/PPTX extraction
-        ocr_text: Text extracted by OCR
+        original_text: Text extracted by standard PDF/PPTX extraction (must be string, not None)
+        ocr_text: Text extracted by OCR (must be string, not None)
 
     Returns:
         Tuple of (final_text, ocr_was_used)
-        - final_text: The chosen text (either original or ocr)
-        - ocr_was_used: Boolean indicating which source was used
+        - final_text: The chosen text (either original or ocr, never modified)
+        - ocr_was_used: Boolean indicating if OCR text was chosen
+
+    Logic:
+        - Compares character lengths after stripping whitespace
+        - OCR is preferred only if len(ocr_text.strip()) > len(original_text.strip()) * 1.2
+        - If both texts are empty, returns original_text and False
+        - Returns the chosen text unchanged (no modification or concatenation)
+
+    Example:
+        original = "10 chars text"  # 10 chars (after strip)
+        ocr = "This is much longer text from OCR"  # 33 chars (after strip)
+        >>> merge_text(original, ocr)
+        ('This is much longer text from OCR', True)  # 33 > 12, so OCR used
     """
     original_len = len(original_text.strip())
     ocr_len = len(ocr_text.strip())

@@ -179,3 +179,17 @@ def test_merge_text_within_threshold():
 
     assert merged == original
     assert ocr_used is False
+
+
+def test_merge_text_empty_strings():
+    """Test that merge returns original when both texts are empty."""
+    from scripts.ocr_processor import merge_text
+
+    original = ""
+    ocr = ""
+
+    merged, ocr_used = merge_text(original, ocr)
+
+    assert merged == original
+    assert merged == ""
+    assert ocr_used is False
