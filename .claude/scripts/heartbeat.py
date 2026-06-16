@@ -14,6 +14,7 @@ One tick:
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import socket
@@ -497,17 +498,34 @@ def _main_impl() -> int:
             vault_state = scan_vault_state(VAULT)
             notifications = collect_notifications(vault_state)
 
+            amb_state = dashboard_state.load()
+            ambient_section = amb_state.setdefault("ambient_notifier", {})
+            seen_list: list[str] = ambient_section.get("seen_ids") or []
+            seen: set[str] = set(seen_list)
+
+            posted = 0
             for notification in notifications:
+                nid = hashlib.md5(
+                    f"{notification.get('rule', '')}:{notification.get('content', '')}".encode()
+                ).hexdigest()
+                if nid in seen:
+                    continue
                 try:
                     post_notification_to_discord(
                         notification=notification,
                         webhook_url=os.getenv("DISCORD_HOOK_FEED")
                     )
+                    seen.add(nid)
+                    seen_list.append(nid)
+                    posted += 1
                 except Exception as e:
                     print(f"Failed to post ambient notification: {e}", file=sys.stderr)
 
-            if notifications:
-                print(f"ambient_notifier: posted {len(notifications)} notification(s)")
+            if posted:
+                ambient_section["seen_ids"] = seen_list[-200:]
+                amb_state["ambient_notifier"] = ambient_section
+                dashboard_state.save(amb_state)
+                print(f"ambient_notifier: posted {posted} notification(s)")
         except Exception as exc:
             print(f"ambient_notifier failed: {exc}", file=sys.stderr)
 
