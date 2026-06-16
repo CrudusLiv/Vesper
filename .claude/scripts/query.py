@@ -14,10 +14,6 @@ Usage:
 
     py query.py vault inbox
 
-    py query.py outlook auth             Authenticate (first time)
-    py query.py outlook mail [25]        List unread emails
-    py query.py outlook events [14]      List upcoming calendar events
-
 Add --json to most subcommands for machine-readable output.
 
 """
@@ -34,7 +30,6 @@ from integrations import (  # noqa: E402
     gcal_int,
     github_int,
     gmail_int,
-    outlook_int,
     registry,
     vault_fs,
 )
@@ -43,7 +38,6 @@ DISPATCH = {
     "github": github_int.handle_query,
     "gcal": gcal_int.handle_query,
     "gmail": gmail_int.handle_query,
-    "outlook": outlook_int.handle_query,
     "vault": vault_fs.handle_query,
 }
 

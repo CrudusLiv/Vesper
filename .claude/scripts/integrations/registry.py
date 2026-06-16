@@ -66,12 +66,6 @@ INTEGRATIONS: list[Integration] = [
         description="Local vault filesystem -- inbox watcher for new .pptx and .pdf",
         notes="No auth needed.",
     ),
-    Integration(
-        name="outlook",
-        description="Microsoft Outlook — university email and calendar (Graph API)",
-        requires_env=["OUTLOOK_TENANT_ID", "OUTLOOK_CLIENT_ID"],
-        notes="Run 'py query.py outlook auth' once to complete device-code flow.",
-    ),
 ]
 
 
