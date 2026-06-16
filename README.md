@@ -1,6 +1,6 @@
 # Vesper
 
-A personal second brain running as a web application. React + FastAPI dashboard sits on top of a Claude Code agent layer: deadline tracking, lecture summarisation, hybrid-RAG note search, and GCal sync.
+A personal second brain built on Claude Code agent layer: Discord UI for chat and inbox, auto-enriching lectures with concepts and study roadmaps, deadline tracking, hybrid-RAG note search, and GCal sync.
 
 The personal vault (notes, schedules, finances) lives locally at `Dynamous/Memory/` — gitignored. Each machine keeps its own vault.
 
@@ -8,11 +8,14 @@ Agent operates in **Advisor mode**: it drafts replies and writes into the vault,
 
 ## What it does
 
-- **Web dashboard** — React frontend served at http://localhost; panels for chat, feed, memory search, finance, notes, schedule, and vault browsing. Resizable sidebar with localStorage persistence.
+- **Discord UI** — `#vesper` chat channel, `#inbox` for notes, `#finance` for expenses, and slash commands for schedules, habits, deadlines, and admin.
+- **Lecture enrichment** — drop a `.pptx` or `.pdf` into `Dynamous/Memory/inbox/`, get a structured Obsidian note with learning objectives, worked examples, and practice problems extracted and auto-formatted.
+- **Concept linking** — lectures are auto-scanned for concepts; concept stub files are created/updated, and wikilinks are auto-added to connect related lectures and concepts.
+- **Study roadmaps** — after each lecture, a personalized roadmap is generated with review queue, practice problems, and synthesis tasks, then posted to Discord.
+- **Ambient notifications** — heartbeat surfaces meaningful connections (dependency gaps, synthesis readiness, prerequisite alerts) without asking, keeping you aware of what to focus on next.
 - **Deadline tracking** — project documents dropped into `inbox/` are classified, dated milestones get promoted into `DEADLINES.md` and mirrored to Google Calendar, with 72h / 24h / overdue threshold tracking.
-- **Lecture summarisation** — drop a `.pptx` or `.pdf` into `Dynamous/Memory/inbox/`, get a structured Obsidian note under `lectures/<course>/`.
 - **Hybrid-RAG note search** — 70% vector + 30% BM25 over the whole vault. Embeddings are local (FastEmbed / ONNX, no API calls).
-- **Heartbeat reasoning** — every 30 min during active hours, Python builds a snapshot diff and an LLM decides what (if anything) is worth notifying you about. Feature slices can be toggled via the web UI Settings panel.
+- **Heartbeat reasoning** — every 30 min during active hours, Python builds a snapshot diff and an LLM decides what notifications to surface. Feature slices can be toggled via `tray_settings.json`.
 - **Daily reflection** — at 08:00 KL, promotes durable items from yesterday's `daily/` log into `MEMORY.md`; rolls `HABITS.md`.
 - **Vault guardrails** — path validator, append-only JSONL transaction log, and typo-recovery layer protect the vault from accidental writes.
 
@@ -45,10 +48,9 @@ Open `.env` and fill in `API_SECRET` at minimum (required for frontend → API a
 py -m pip install -r .claude/requirements.txt
 ```
 
-## 3. Start with Docker
+## 3. Start Discord bot with Docker
 
 ```powershell
-cd vesper
 docker compose up -d
 ```
 
@@ -57,23 +59,23 @@ Verify:
 docker compose ps
 ```
 
-Expected: `backend` and `web` both "Up". Open http://localhost.
+Expected: `discord-bot` and `scheduler` both "Up".
 
-**Optional workers** (heartbeat scheduler):
+**Heartbeat scheduler** (runs automated tasks every 30 min):
 
 ```powershell
-docker compose --profile workers up -d
+docker compose up -d scheduler
 ```
 
-## 4. Configure Settings (optional)
+## 4. Configure settings (optional)
 
-The web UI includes a **Settings** panel (floating window on the Dashboard) to adjust:
+Settings are stored in `.claude/data/tray_settings.json` and read by the scheduler:
 
 - **Active Hours**: when the heartbeat runs (default 09:00–22:00 KL)
 - **Heartbeat Interval**: schedule frequency (default 30 min, min 5, max 120)
-- **Features**: enable/disable per-feature processing (inbox, reflection, calendar sync, etc.)
+- **Features**: enable/disable per-feature processing (inbox, reflection, calendar sync, ambient notifications, etc.)
 
-Settings persist to `.claude/data/tray_settings.json` and take effect on the next heartbeat tick.
+Edit the file directly and settings take effect on the next heartbeat tick.
 
 ---
 
@@ -112,16 +114,14 @@ Recommended folders:
 
 | Path | Purpose |
 |------|---------|
-| `vesper/frontend/` | React dashboard (Vite + nginx) |
-| `vesper/backend/` | FastAPI layer wrapping the Vesper scripts |
-| `vesper/worker/` | Docker worker base image (heartbeat scheduler) |
-| `vesper/nginx/` | nginx reverse proxy config |
-| `vesper/docker-compose.yml` | Service wiring |
+| `worker/` | Docker worker base image (discord-bot + heartbeat scheduler) |
+| `docker-compose.yml` | Service wiring (discord-bot, scheduler) |
+| `chat/` | Discord bot implementation (`discord_bot.py`) |
 | `.claude/hooks/` | SessionStart, PreCompact, SessionEnd, PreToolUse, UserPromptSubmit |
-| `.claude/scripts/` | `query.py` CLI dispatcher, `heartbeat.py`, `memory_reflect.py`, integrations, memory (RAG) |
-| `.claude/scripts/heartbeat/` | Tick sub-modules — `deadlines.py`, `inbox.py`, `gcal_sync.py`, `llm.py`, etc. |
+| `.claude/scripts/` | Core modules: `query.py` CLI, `heartbeat.py`, `inbox.py`, `ambient_notifier.py`, `concept_linker.py`, `roadmap_generator.py`, integrations, memory (RAG) |
+| `.claude/scripts/integrations/` | Service integrations — `github_int.py`, `gcal_int.py`, `gmail_int.py`, `discord_int.py`, etc. |
 | `.claude/scripts/vault/` | Vault guardrails — `paths.py`, `transactions.py`, `actions.py` |
-| `.claude/skills/` | Skills the agent invokes — `deadline-tracker`, `lecture-summarizer`, `note-search`, `vault-structure` |
+| `.claude/skills/` | Skills the agent invokes — `lecture-summarizer`, `note-search`, `vault-structure`, `concept-wiki`, `deadline-tracker` |
 | `.claude/settings.json` | Wires hooks into Claude Code |
 | `.claude/data/` | Runtime artefacts — OAuth tokens, SQLite memory DB, FastEmbed cache, logs (gitignored) |
 | `tests/` | pytest suite |
@@ -131,10 +131,8 @@ Recommended folders:
 
 ```powershell
 # Docker
-cd vesper
-docker compose up -d
-docker compose --profile workers up -d   # add heartbeat scheduler
-docker compose logs -f backend
+docker compose up -d                     # start discord-bot + scheduler
+docker compose logs -f discord-bot
 docker compose logs -f scheduler
 
 # Integration status
@@ -144,6 +142,7 @@ py .claude\scripts\query.py status
 py .claude\scripts\query.py gcal upcoming --days 14
 py .claude\scripts\query.py github pr-list <owner/repo>
 py .claude\scripts\query.py vault inbox
+py .claude\scripts\query.py gmail recent
 
 # Memory / RAG
 py .claude\scripts\memory\memory_index.py                       # rebuild index
@@ -158,4 +157,4 @@ pytest
 
 Most subcommands accept `--json` for machine-readable output.
 
-See `CLAUDE.md` for full architecture notes, hook lifecycle, and the integration-template walkthrough.
+See `CLAUDE.md` for full architecture notes, hook lifecycle, and integration details.
