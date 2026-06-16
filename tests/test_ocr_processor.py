@@ -210,3 +210,21 @@ def test_format_ocr_summary():
     assert isinstance(summary, str)
     assert "2/3" in summary  # 2 successful out of 3
     assert "0.87" in summary or "0.88" in summary  # avg confidence ~0.875
+
+
+def test_format_ocr_summary_skips_failed_slides():
+    """Test that confidence is calculated only from successful slides."""
+    from scripts.ocr_processor import format_ocr_summary
+
+    # One failed slide (no confidence), one successful with confidence 0.5
+    ocr_results = [
+        {"slide": 1, "status": "failed", "error": "timeout"},
+        {"slide": 2, "status": "success", "ocr_used": False, "confidence": 0.5},
+    ]
+
+    summary = format_ocr_summary(ocr_results)
+
+    # Confidence should be 0.50 (only from the successful slide), not averaged with failed
+    assert isinstance(summary, str)
+    assert "0.50" in summary
+    assert "1/2" in summary
