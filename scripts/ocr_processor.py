@@ -1,7 +1,7 @@
 """OCR processing for image-only slides in lectures."""
 
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 from PIL import Image
 import logging
 
@@ -20,7 +20,8 @@ def extract_slide_images(
         pptx_path: Path to PPTX file (mutually exclusive with pdf_path)
 
     Returns:
-        List of PIL Images, one per slide, in order
+        List of PIL Images, one per slide, in order. Returns empty list if neither
+        path is provided or if extraction fails.
     """
     if not pdf_path and not pptx_path:
         return []
@@ -70,16 +71,19 @@ def _extract_from_pptx(pptx_path: Path) -> List[Image.Image]:
         return []
 
 
-def _render_slide_to_image(slide, slide_idx: int) -> Optional[Image.Image]:
-    """Render a PPTX slide to a PIL Image."""
-    try:
-        from PIL import Image
-    except ImportError:
-        return None
+def _render_slide_to_image(slide: Any, slide_idx: int) -> Optional[Image.Image]:
+    """Render a PPTX slide to a PIL Image.
 
+    Args:
+        slide: pptx.util.Slide object to render
+        slide_idx: Index of the slide (1-based)
+
+    Returns:
+        PIL Image or None if rendering fails
+    """
+    # TODO: implement actual slide rendering (extract shapes, text, images from slide)
     # Create a blank image for the slide (standard 16:9 aspect ratio)
     width, height = 1280, 720
     image = Image.new('RGB', (width, height), color='white')
 
-    # Placeholder: full implementation would render shapes, text, etc.
     return image
