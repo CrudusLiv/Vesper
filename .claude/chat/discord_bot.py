@@ -96,6 +96,7 @@ def build_help_text() -> str:
         "• `/note text:<note>` — save a quick note to NOTES.md\n"
         "• `/finance text:<e.g. 12.50 food lunch>` — log an expense\n"
         "• `/totals` — this month's spending summary\n"
+        "• `/inbox` — check inbox processing status (pending + processed today)\n"
         "• `/list dir:<folder>` — list files in a vault folder\n"
         "• `/delete path:<file>` — soft-delete a vault file (recoverable via /undo)\n"
         "• `/undo` — undo the last vault action\n"
@@ -228,6 +229,49 @@ def run_finance(content: str) -> tuple[str | None, str | None]:
     except Exception as exc:
         print(f"run_finance failed: {exc}", file=sys.stderr)
         return None, f"[finance log error: {type(exc).__name__}]"
+
+
+def run_inbox_status() -> tuple[str | None, str | None]:
+    """Check inbox processing status. Returns (reaction, text). Blocking I/O."""
+    try:
+        vault = PROJECT_DIR / "Dynamous" / "Memory"
+        inbox = vault / "inbox"
+
+        # Count pending files
+        pending = []
+        if inbox.exists():
+            for p in inbox.iterdir():
+                if p.is_file() and p.suffix.lower() in {".pptx", ".pdf", ".ppt"}:
+                    pending.append(p)
+
+        # Count processed lectures from today
+        today = datetime.now(tz=KL).strftime("%Y-%m-%d")
+        processed = []
+        lectures = vault / "lectures"
+        if lectures.exists():
+            for p in lectures.rglob("*.md"):
+                if today in p.name and p.is_file():
+                    processed.append(p)
+
+        # Build report
+        lines = ["**Inbox Status**"]
+        lines.append(f"\n⏳ Pending: {len(pending)} file(s)")
+        if pending:
+            for p in pending:
+                lines.append(f"  • {p.name}")
+        lines.append(f"\n✅ Processed today: {len(processed)} note(s)")
+        if processed:
+            for p in sorted(processed):
+                rel = p.relative_to(vault).as_posix()
+                lines.append(f"  • {rel}")
+
+        if not pending and not processed:
+            lines = ["No activity in inbox today."]
+
+        return None, "\n".join(lines)
+    except Exception as exc:
+        print(f"run_inbox_status failed: {exc}", file=sys.stderr)
+        return "❌", f"[inbox] status error: {type(exc).__name__}"
 
 
 def run_verb(content: str) -> tuple[str | None, str | None]:
@@ -514,6 +558,13 @@ def main() -> int:
         if not _is_owner(interaction):
             return await _deny(interaction)
         reaction, msg = await asyncio.to_thread(run_totals)
+        await interaction.response.send_message(_slash_text(reaction, msg))
+
+    @tree.command(name="inbox", description="Check inbox processing status (pending vs processed)")
+    async def slash_inbox(interaction) -> None:
+        if not _is_owner(interaction):
+            return await _deny(interaction)
+        reaction, msg = await asyncio.to_thread(run_inbox_status)
         await interaction.response.send_message(_slash_text(reaction, msg))
 
     @tree.command(name="list", description="List files in a vault folder")
