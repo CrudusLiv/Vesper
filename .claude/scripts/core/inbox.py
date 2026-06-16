@@ -30,8 +30,10 @@ from core import llm
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
 
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
+sys.path.insert(0, str(PROJECT_DIR))
 from integrations import vault_fs  # noqa: E402
 from memory import wikilinks  # noqa: E402
+from scripts.concept_linker import process_lecture_concepts  # noqa: E402
 
 VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 LECTURES = VAULT / "lectures"
@@ -271,6 +273,12 @@ def _process_one(src: Path) -> dict | None:
 
     note_path = _write_note(src, doc_type, name, subcategory, date, note_md)
     wikilinks.add_sibling_wikilinks(note_path)
+    # Wire concept linker for lectures to extract concepts and create stubs
+    if doc_type == "lecture":
+        try:
+            process_lecture_concepts(lecture_file=note_path, vault_dir=VAULT)
+        except Exception as exc:
+            print(f"inbox: concept linker failed for {note_path.name}: {exc}", file=sys.stderr)
     # Section 4: move src into _processed/ first so the carve-out applies,
     # then delete iff the written note passes the success check.
     processed_dir = src.parent / "_processed"
