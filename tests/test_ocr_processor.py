@@ -193,3 +193,20 @@ def test_merge_text_empty_strings():
     assert merged == original
     assert merged == ""
     assert ocr_used is False
+
+
+def test_format_ocr_summary():
+    """Test formatting OCR results into a summary line."""
+    from scripts.ocr_processor import format_ocr_summary
+
+    ocr_results = [
+        {"slide": 1, "status": "success", "ocr_used": True, "confidence": 0.9},
+        {"slide": 2, "status": "success", "ocr_used": False, "confidence": 0.85},
+        {"slide": 3, "status": "failed", "error": "timeout"},
+    ]
+
+    summary = format_ocr_summary(ocr_results)
+
+    assert isinstance(summary, str)
+    assert "2/3" in summary  # 2 successful out of 3
+    assert "0.87" in summary or "0.88" in summary  # avg confidence ~0.875

@@ -194,3 +194,31 @@ def merge_text(original_text: str, ocr_text: str) -> Tuple[str, bool]:
     else:
         logger.debug(f"Keeping original text ({original_len} chars vs {ocr_len} OCR)")
         return original_text, False
+
+
+def format_ocr_summary(ocr_results: List[dict]) -> str:
+    """
+    Format OCR results into a summary line for the lecture note.
+
+    Args:
+        ocr_results: List of OCR result dicts, each with:
+            - slide: slide number (int)
+            - status: "success", "failed", or "skipped" (str)
+            - ocr_used: boolean if OCR text was used (only if status=="success")
+            - confidence: float 0-1 confidence score (only if status=="success")
+            - error: error message string (only if status=="failed")
+
+    Returns:
+        Summary string like "OCR'd 2/3 slides; 2/3 successful; avg confidence 0.87"
+    """
+    total = len(ocr_results)
+    successful = sum(1 for r in ocr_results if r["status"] == "success")
+    ocr_used = sum(1 for r in ocr_results if r.get("ocr_used", False))
+
+    confidences = [
+        r["confidence"] for r in ocr_results
+        if r["status"] == "success" and "confidence" in r
+    ]
+    avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+
+    return f"OCR'd {ocr_used}/{total} slides; {successful}/{total} successful; avg confidence {avg_confidence:.2f}"
