@@ -37,7 +37,7 @@ from scripts.concept_linker import process_lecture_concepts  # noqa: E402
 from scripts.roadmap_generator import generate_roadmap_file  # noqa: E402
 from integrations.discord_webhook import post  # noqa: E402
 from scripts.ocr_processor import (  # noqa: E402
-    extract_slide_images, run_ocr_on_image, merge_text, format_ocr_summary
+    alert_ocr_failures, extract_slide_images, format_ocr_summary, merge_text, run_ocr_on_image
 )
 
 VAULT = PROJECT_DIR / "Dynamous" / "Memory"
@@ -250,7 +250,8 @@ def _process_one(src: Path) -> dict | None:
         print(f"inbox: classification failed for {src.name}; defaulting to lecture", file=sys.stderr)
         classification = {"type": "lecture", "name": _guess_course(src.name), "title": src.stem, "deadlines": []}
 
-    doc_type = classification.get("type") if classification.get("type") in ("lecture", "project") else "lecture"
+    raw_type = classification.get("type")
+    doc_type: str = raw_type if raw_type in ("lecture", "project") else "lecture"
     name = _safe_name(classification.get("name") or "")
     subcategory = _safe_name(classification.get("subcategory") or "") if doc_type == "project" else ""
     if doc_type == "lecture" and not name:
@@ -279,6 +280,11 @@ def _process_one(src: Path) -> dict | None:
 
     if ocr_results:
         note_md += f"\n\n_OCR Processing: {format_ocr_summary(ocr_results)}_"
+        title = classification.get("title") or src.stem
+        try:
+            alert_ocr_failures(ocr_results, lecture_title=title)
+        except Exception as exc:
+            print(f"inbox: OCR alert failed for {src.name}: {exc}", file=sys.stderr)
 
     note_path = _write_note(src, doc_type, name, subcategory, date, note_md)
     wikilinks.add_sibling_wikilinks(note_path)

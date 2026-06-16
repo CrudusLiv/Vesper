@@ -196,6 +196,58 @@ def merge_text(original_text: str, ocr_text: str) -> Tuple[str, bool]:
         return original_text, False
 
 
+def alert_ocr_failures(ocr_results: List[dict], lecture_title: str, webhook_url: Optional[str] = None) -> None:
+    """Post Discord alert for OCR failures or low-confidence slides.
+
+    Args:
+        ocr_results: List of OCR result dicts from the pipeline.
+        lecture_title: Title of the lecture for the alert header.
+        webhook_url: Discord webhook URL. If None, reads DISCORD_HOOK_FEED from env.
+    """
+    failures = [r for r in ocr_results if r["status"] == "failed"]
+    low_confidence = [
+        r for r in ocr_results
+        if r["status"] == "success" and r.get("confidence", 1.0) < 0.3
+    ]
+
+    if not failures and not low_confidence:
+        return
+
+    import os
+    import json
+    import urllib.request
+    import urllib.error
+
+    url = webhook_url or os.getenv("DISCORD_HOOK_FEED")
+    if not url:
+        logger.warning("No DISCORD_HOOK_FEED env var set; skipping OCR alert")
+        return
+
+    lines: List[str] = []
+    for r in failures:
+        lines.append(f"❌ Slide {r['slide']}: {r.get('error', 'unknown error')}")
+    for r in low_confidence:
+        lines.append(f"⚠️ Slide {r['slide']}: low confidence ({r['confidence']:.2f}) — verify manually")
+
+    embed = {
+        "title": f"OCR Alert: {lecture_title}",
+        "description": "\n".join(lines),
+        "color": 0xFF6B6B,
+    }
+    body = json.dumps({"embeds": [embed]}).encode()
+    req = urllib.request.Request(
+        f"{url}?wait=true",
+        method="POST",
+        data=body,
+        headers={"Content-Type": "application/json", "User-Agent": "DiscordBot"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+    except (urllib.error.HTTPError, urllib.error.URLError, OSError) as exc:
+        logger.error(f"Failed to post OCR alert: {exc}")
+
+
 def format_ocr_summary(ocr_results: List[dict]) -> str:
     """
     Format OCR results into a summary line for the lecture note.
