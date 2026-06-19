@@ -8,14 +8,15 @@ import signal
 import sys
 
 from kernel.runtime import KernelRuntime
+from kernel.apps.inbox_app import InboxApp
 
 TICK_INTERVAL = 1800  # 30 minutes
 
 
 def _build_apps(runtime: KernelRuntime) -> list:
-    # Apps are registered explicitly here.
-    # Add new app instances as they are created in later tasks.
-    return []
+    return [
+        InboxApp(runtime),
+    ]
 
 
 def main() -> None:
