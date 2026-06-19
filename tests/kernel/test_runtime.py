@@ -98,3 +98,28 @@ def test_multiple_subscribers_for_same_event():
     rt.load_apps([_A(rt), _B(rt)])
     rt._dispatch(Tick(interval=30))
     assert sorted(log) == ["a", "b"]
+
+
+def test_tick_fires_via_queue():
+    """Tick thread puts Tick into the queue within the interval."""
+    rt = KernelRuntime(tick_interval=1)  # 1-second interval for test speed
+    received = []
+
+    class _TickApp(VesperApp):
+        name = "ticker"
+        subscribes = [Tick]
+        def on_tick(self, e: Tick):
+            received.append(e)
+
+    rt.load_apps([_TickApp(rt)])
+
+    def _run():
+        rt.start()
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    time.sleep(2.5)
+    rt.stop()
+
+    assert len(received) >= 1
+    assert received[0].interval == 1
