@@ -66,6 +66,12 @@ INTEGRATIONS: list[Integration] = [
         description="Local vault filesystem -- inbox watcher for new .pptx and .pdf",
         notes="No auth needed.",
     ),
+    Integration(
+        name="discord",
+        description="Discord message cache (read-only) -- recent DMs and server messages",
+        requires_env=["DISCORD_BOT_TOKEN"],
+        notes="Cache lives at .claude/data/discord_cache.db. Run `py query.py discord bot` to populate.",
+    ),
 ]
 
 
