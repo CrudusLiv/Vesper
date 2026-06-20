@@ -67,7 +67,10 @@ class DiscordShellApp(VesperApp):
             for chunk in _split(text):
                 await event.message_obj.channel.send(chunk)
 
-        asyncio.run_coroutine_threadsafe(_do_send(), self._bot_loop)
+        fut = asyncio.run_coroutine_threadsafe(_do_send(), self._bot_loop)
+        fut.add_done_callback(
+            lambda f: self.log(f"reply send error: {f.exception()}") if f.exception() else None
+        )
 
 
 def _split(text: str, limit: int = 2000) -> list[str]:

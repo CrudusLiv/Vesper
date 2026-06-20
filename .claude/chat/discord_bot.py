@@ -81,7 +81,7 @@ INBOX_EXTS = {".pdf", ".pptx"}
 HELP_TITLE = "**Vesper — Quick Reference**"
 
 _kernel_shell = None
-client = None  # set by main(); used by run_bot()
+client = None  # set by main()
 
 
 def set_kernel_shell(shell) -> None:
@@ -788,6 +788,9 @@ def main() -> int:
         except Exception as exc:
             print(f"slash sync failed: {exc}", file=sys.stderr)
         await _ensure_help_pinned()
+        if _kernel_shell is not None:
+            import asyncio
+            _kernel_shell.set_bot_loop(asyncio.get_event_loop())
 
     async def _handle_inbox(message) -> None:
         content = (message.content or "").strip()
@@ -910,15 +913,6 @@ def main() -> int:
 
     client.run(token)
     return 0
-
-
-async def run_bot() -> None:
-    """Async entry point for kernel/__main__.py."""
-    token = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
-    if not token:
-        print("[discord-bot] DISCORD_BOT_TOKEN not set — bot not started", file=sys.stderr)
-        return
-    await client.start(token)
 
 
 if __name__ == "__main__":

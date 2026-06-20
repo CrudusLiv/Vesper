@@ -1,7 +1,7 @@
 # tests/kernel/test_discord_shell_app.py
 from unittest.mock import MagicMock, patch
 from kernel.apps.discord_shell_app import DiscordShellApp
-from kernel.events import DiscordMessage, Notify
+from kernel.events import DiscordMessage
 
 
 def _make_app():

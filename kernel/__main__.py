@@ -39,13 +39,9 @@ def main() -> None:
     shell_app = next(a for a in apps if isinstance(a, DiscordShellApp))
 
     def _start_discord():
-        import asyncio
         from chat import discord_bot
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        shell_app.set_bot_loop(loop)
         discord_bot.set_kernel_shell(shell_app)
-        loop.run_until_complete(discord_bot.run_bot())
+        discord_bot.main()
 
     discord_thread = threading.Thread(target=_start_discord, daemon=True, name="discord-bot")
     discord_thread.start()
