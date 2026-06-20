@@ -24,7 +24,7 @@ services:
     build:
       context: .
       dockerfile: worker/Dockerfile
-    command: ["python", "worker/scheduler.py"]
+    command: ["python", "-m", "kernel"]
     env_file:
       - .env
     environment:
