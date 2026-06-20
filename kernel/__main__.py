@@ -14,7 +14,6 @@ sys.path.insert(0, str(_CLAUDE))
 sys.path.insert(0, str(_CLAUDE / "scripts"))
 
 from kernel.runtime import KernelRuntime
-from kernel.apps.inbox_app import InboxApp
 from kernel.apps.heartbeat_app import HeartbeatApp
 from kernel.apps.dashboard_app import DashboardApp
 from kernel.apps.discord_shell_app import DiscordShellApp
@@ -23,8 +22,11 @@ TICK_INTERVAL = 1800  # 30 minutes
 
 
 def _build_apps(runtime: KernelRuntime) -> list:
+    # InboxApp is not registered here yet: its on_tick calls process_new_files()
+    # which conflicts with heartbeat.tick() doing the same (destructively). Until
+    # InboxApp fully replicates heartbeat's inbox-processing path (including
+    # deadlines.promote), HeartbeatApp owns inbox processing exclusively.
     return [
-        InboxApp(runtime),
         HeartbeatApp(runtime),
         DashboardApp(runtime),
         DiscordShellApp(runtime),
