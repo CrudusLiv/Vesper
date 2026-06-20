@@ -9,6 +9,7 @@ import sys
 
 from kernel.runtime import KernelRuntime
 from kernel.apps.inbox_app import InboxApp
+from kernel.apps.heartbeat_app import HeartbeatApp
 
 TICK_INTERVAL = 1800  # 30 minutes
 
@@ -16,6 +17,7 @@ TICK_INTERVAL = 1800  # 30 minutes
 def _build_apps(runtime: KernelRuntime) -> list:
     return [
         InboxApp(runtime),
+        HeartbeatApp(runtime),
     ]
 
 

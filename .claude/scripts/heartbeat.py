@@ -396,7 +396,7 @@ def _too_soon() -> bool:
     return (time.time() - float(last_ts)) < MIN_INTERVAL_SECONDS
 
 
-def _main_impl() -> int:
+def tick() -> int:
     if not in_active_hours():
         print("Outside active hours (09:00-22:00 KL). Exiting.")
         return 0
@@ -622,10 +622,10 @@ def _run_agent_tasks() -> None:
 
 
 def main() -> int:
-    """Wrap _main_impl in a try/except so any uncaught exception is routed
+    """Wrap tick in a try/except so any uncaught exception is routed
     to the feed before re-raising."""
     try:
-        return _main_impl()
+        return tick()
     except Exception:
         try:
             dashboard.notify("error", {
