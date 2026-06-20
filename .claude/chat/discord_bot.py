@@ -790,7 +790,7 @@ def main() -> int:
         await _ensure_help_pinned()
         if _kernel_shell is not None:
             import asyncio
-            _kernel_shell.set_bot_loop(asyncio.get_event_loop())
+            _kernel_shell.set_bot_loop(asyncio.get_running_loop())
 
     async def _handle_inbox(message) -> None:
         content = (message.content or "").strip()

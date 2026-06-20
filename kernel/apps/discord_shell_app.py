@@ -68,9 +68,17 @@ class DiscordShellApp(VesperApp):
                 await event.message_obj.channel.send(chunk)
 
         fut = asyncio.run_coroutine_threadsafe(_do_send(), self._bot_loop)
-        fut.add_done_callback(
-            lambda f: self.log(f"reply send error: {f.exception()}") if f.exception() else None
-        )
+
+        def _on_done(f):
+            try:
+                exc = f.exception()
+            except Exception as e:
+                self.log(f"reply send cancelled or errored: {e}")
+                return
+            if exc:
+                self.log(f"reply send error: {exc}")
+
+        fut.add_done_callback(_on_done)
 
 
 def _split(text: str, limit: int = 2000) -> list[str]:
