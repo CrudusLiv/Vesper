@@ -6,11 +6,18 @@ when new kernel/apps/*.py files are created."""
 from __future__ import annotations
 import signal
 import sys
+import threading
+from pathlib import Path
+
+_CLAUDE = Path(__file__).resolve().parents[1] / ".claude"
+sys.path.insert(0, str(_CLAUDE))
+sys.path.insert(0, str(_CLAUDE / "scripts"))
 
 from kernel.runtime import KernelRuntime
 from kernel.apps.inbox_app import InboxApp
 from kernel.apps.heartbeat_app import HeartbeatApp
 from kernel.apps.dashboard_app import DashboardApp
+from kernel.apps.discord_shell_app import DiscordShellApp
 
 TICK_INTERVAL = 1800  # 30 minutes
 
@@ -20,6 +27,7 @@ def _build_apps(runtime: KernelRuntime) -> list:
         InboxApp(runtime),
         HeartbeatApp(runtime),
         DashboardApp(runtime),
+        DiscordShellApp(runtime),
     ]
 
 
@@ -27,6 +35,20 @@ def main() -> None:
     runtime = KernelRuntime(tick_interval=TICK_INTERVAL)
     apps = _build_apps(runtime)
     runtime.load_apps(apps)
+
+    shell_app = next(a for a in apps if isinstance(a, DiscordShellApp))
+
+    def _start_discord():
+        import asyncio
+        from chat import discord_bot
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        shell_app.set_bot_loop(loop)
+        discord_bot.set_kernel_shell(shell_app)
+        loop.run_until_complete(discord_bot.run_bot())
+
+    discord_thread = threading.Thread(target=_start_discord, daemon=True, name="discord-bot")
+    discord_thread.start()
 
     def _shutdown(sig, frame):
         print("\n[kernel] shutting down…", flush=True)

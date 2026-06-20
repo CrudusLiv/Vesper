@@ -80,6 +80,14 @@ INBOX_EXTS = {".pdf", ".pptx"}
 
 HELP_TITLE = "**Vesper — Quick Reference**"
 
+_kernel_shell = None
+client = None  # set by main(); used by run_bot()
+
+
+def set_kernel_shell(shell) -> None:
+    global _kernel_shell
+    _kernel_shell = shell
+
 
 def build_help_text() -> str:
     """The preset reference text. Used by /help and the pinned message.
@@ -488,6 +496,7 @@ def main() -> int:
     intents.dm_messages = True
     intents.guilds = True
 
+    global client
     client = discord.Client(intents=intents)
     tree = discord.app_commands.CommandTree(client)
 
@@ -835,22 +844,30 @@ def main() -> int:
         await _emit(message, reaction, text)
 
     async def _handle_vesper(message) -> None:
-        try:
-            async with message.channel.typing():
-                reply = await asyncio.to_thread(
-                    handler.process_message,
-                    str(message.author.id),
-                    str(message.channel.id),
-                    message.content,
-                )
-            for chunk in _split_for_discord(reply):
-                await message.channel.send(chunk)
-        except Exception as exc:
-            print(f"vesper reply failed: {exc}", file=sys.stderr)
+        if _kernel_shell is not None:
+            _kernel_shell.post_from_discord(
+                channel_id=str(message.channel.id),
+                user_id=str(message.author.id),
+                content=message.content,
+                message_obj=message,
+            )
+        else:
             try:
-                await message.channel.send(f"[error generating reply: {type(exc).__name__}]")
-            except Exception:
-                pass
+                async with message.channel.typing():
+                    reply = await asyncio.to_thread(
+                        handler.process_message,
+                        str(message.author.id),
+                        str(message.channel.id),
+                        message.content,
+                    )
+                for chunk in _split_for_discord(reply):
+                    await message.channel.send(chunk)
+            except Exception as exc:
+                print(f"vesper reply failed: {exc}", file=sys.stderr)
+                try:
+                    await message.channel.send(f"[error generating reply: {type(exc).__name__}]")
+                except Exception:
+                    pass
 
     async def _route_message(message) -> bool:
         """Dispatch by channel.id. Returns True if a handler ran."""
@@ -893,6 +910,15 @@ def main() -> int:
 
     client.run(token)
     return 0
+
+
+async def run_bot() -> None:
+    """Async entry point for kernel/__main__.py."""
+    token = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
+    if not token:
+        print("[discord-bot] DISCORD_BOT_TOKEN not set — bot not started", file=sys.stderr)
+        return
+    await client.start(token)
 
 
 if __name__ == "__main__":
