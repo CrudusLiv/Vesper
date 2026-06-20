@@ -639,4 +639,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # Legacy direct-run: still works for manual testing / Task Scheduler fallback.
+    # When running under the kernel (python -m kernel), HeartbeatApp calls tick() directly.
     sys.exit(main())
