@@ -32,6 +32,9 @@ __pycache__/
 # Heartbeat state files
 .claude/data/gcal_synced.json
 
+# Runtime data directory (databases, caches, personal docs, SSH keys)
+data/
+
 # Local-only state (do not commit)
 .claude/settings.local.json
 .claude/chat/*
