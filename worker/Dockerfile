@@ -20,6 +20,7 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Worker source. The .claude tree (scripts + chat) is bind-mounted at runtime.
 COPY worker /workspace/worker
+COPY kernel /workspace/kernel
 
 ENV CLAUDE_PROJECT_DIR=/workspace \
     PYTHONUNBUFFERED=1
