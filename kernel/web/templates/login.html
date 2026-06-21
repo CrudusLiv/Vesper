@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Vesper — Login</title>
+</head>
+<body>
+    <h1>Vesper Dashboard</h1>
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% endif %}
+    <form method="post" action="/login">
+        <label>Password: <input type="password" name="password"></label>
+        <button type="submit">Login</button>
+    </form>
+</body>
+</html>

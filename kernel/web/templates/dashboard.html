@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Vesper Dashboard</title>
+</head>
+<body>
+    <h1>Vesper Dashboard</h1>
+    <nav><a href="/logout">Logout</a></nav>
+
+    <section id="heartbeat">
+        <h2>Heartbeat</h2>
+        <p>Status: <strong>{{ heartbeat.health }}</strong></p>
+        <p>Last tick: {{ heartbeat.last_tick or "never" }}</p>
+        <p>Next tick ETA: {{ heartbeat.next_tick_eta or "unknown" }}</p>
+        {% if heartbeat.errors %}
+        <ul>{% for e in heartbeat.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+    </section>
+
+    <section id="deadlines">
+        <h2>Deadlines</h2>
+        {% if deadlines %}
+        <ul>{% for d in deadlines %}<li>{{ d.title }} — {{ d.due }}</li>{% endfor %}</ul>
+        {% else %}
+        <p>No deadlines.</p>
+        {% endif %}
+    </section>
+
+    <section id="budget">
+        <h2>Budget</h2>
+        {% if budget %}
+        <ul>{% for b in budget %}<li>{{ b }}</li>{% endfor %}</ul>
+        {% else %}
+        <p>No budget data.</p>
+        {% endif %}
+    </section>
+
+    <section id="schedule">
+        <h2>Today's Schedule</h2>
+        <pre>{{ schedule or "No schedule for today." }}</pre>
+    </section>
+</body>
+</html>
