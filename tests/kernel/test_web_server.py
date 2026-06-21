@@ -85,3 +85,36 @@ def test_read_heartbeat_status_green(tmp_path):
     status = read_heartbeat_status(tmp_path)
     assert status["health"] == "green"
     assert status["errors"] == []
+
+
+def test_web_app_skips_start_if_no_password(monkeypatch):
+    from unittest.mock import MagicMock, patch
+    from kernel.apps.web_app import WebApp
+
+    monkeypatch.delenv("DASHBOARD_PASSWORD", raising=False)
+    runtime = MagicMock()
+    app = WebApp(runtime)
+
+    with patch("kernel.apps.web_app.uvicorn") as mock_uvicorn:
+        app.on_start()
+        mock_uvicorn.Server.assert_not_called()
+
+
+def test_web_app_starts_server_with_password(monkeypatch):
+    from unittest.mock import MagicMock, patch
+    from kernel.apps.web_app import WebApp
+
+    monkeypatch.setenv("DASHBOARD_PASSWORD", "secret")
+    runtime = MagicMock()
+    app = WebApp(runtime)
+
+    started = []
+    def fake_thread(**kwargs):
+        t = MagicMock()
+        t.start = lambda: started.append(True)
+        return t
+
+    with patch("kernel.apps.web_app.threading.Thread", side_effect=fake_thread):
+        app.on_start()
+
+    assert started
