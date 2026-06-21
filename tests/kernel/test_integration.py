@@ -19,3 +19,13 @@ def test_single_tick_processes_inbox_once():
             "Inbox must be processed exactly once per Tick — "
             "multiple apps calling process_new_files() causes data loss"
         )
+
+
+def test_web_app_is_registered_in_build_apps():
+    from unittest.mock import MagicMock
+    from kernel.__main__ import _build_apps
+    from kernel.apps.web_app import WebApp
+
+    runtime = MagicMock()
+    apps = _build_apps(runtime)
+    assert any(isinstance(a, WebApp) for a in apps)

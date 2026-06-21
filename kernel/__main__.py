@@ -17,6 +17,7 @@ from kernel.runtime import KernelRuntime
 from kernel.apps.heartbeat_app import HeartbeatApp
 from kernel.apps.dashboard_app import DashboardApp
 from kernel.apps.discord_shell_app import DiscordShellApp
+from kernel.apps.web_app import WebApp
 
 TICK_INTERVAL = 1800  # 30 minutes
 
@@ -30,6 +31,7 @@ def _build_apps(runtime: KernelRuntime) -> list:
         HeartbeatApp(runtime),
         DashboardApp(runtime),
         DiscordShellApp(runtime),
+        WebApp(runtime),
     ]
 
 
