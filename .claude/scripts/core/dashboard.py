@@ -129,12 +129,8 @@ ROUTES: dict[str, str] = {
     "morning_digest":   "DISCORD_HOOK_DAILY",
     "evening_nudge":    "DISCORD_HOOK_DAILY",
     "daily_digest":     "DISCORD_HOOK_DAILY",
-    "inbox_text":       "DISCORD_HOOK_INBOX",
-    "inbox_attachment": "DISCORD_HOOK_INBOX",
-    "idea":             "DISCORD_HOOK_IDEAS",
     "email_uni":        "DISCORD_HOOK_EMAIL_UNI",
     "email_personal":   "DISCORD_HOOK_EMAIL_PERSONAL",
-    "vesper_reply":     "DISCORD_HOOK_VESPER",
     # Slice 7: in-thread chat replies. Routed by the thread's origin
     # channel (a reply in a deadline thread goes back via the deadlines
     # webhook with thread_id=...; same for lectures).
