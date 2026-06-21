@@ -1,5 +1,5 @@
 services:
-  scheduler:
+  vesper:
     build:
       context: .
       dockerfile: worker/Dockerfile
@@ -9,6 +9,8 @@ services:
     environment:
       - CLAUDE_PROJECT_DIR=/workspace
       - TZ=Asia/Kuala_Lumpur
+    ports:
+      - "8080:8080"
     volumes:
       - ./Dynamous/Memory:/workspace/Dynamous/Memory
       - ./.claude/scripts:/workspace/.claude/scripts:ro
