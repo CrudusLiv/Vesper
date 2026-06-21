@@ -1,17 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Vesper — Login</title>
-</head>
-<body>
-    <h1>Vesper Dashboard</h1>
-    {% if error %}
-    <p class="error">{{ error }}</p>
-    {% endif %}
+{% extends "base.html" %}
+{% block body %}
+<div class="login-wrap">
+  <div class="login-box">
+    <div class="login-title">Vesper</div>
+    {% if error %}<div class="login-error">{{ error }}</div>{% endif %}
     <form method="post" action="/login">
-        <label>Password: <input type="password" name="password"></label>
-        <button type="submit">Login</button>
+      <input type="password" name="password" placeholder="Password" autofocus>
+      <button type="submit">Enter</button>
     </form>
-</body>
-</html>
+  </div>
+</div>
+{% endblock %}
