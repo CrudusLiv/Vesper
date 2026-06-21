@@ -1,18 +1,8 @@
 """Subprocess wrapper around `claude -p` so the heartbeat reasons over data.
 
-Auth: we inject CLAUDE_CODE_OAUTH_TOKEN from a long-lived token tied to the
-Max subscription (no per-token billing). `--bare` cannot be used here -- it
-strictly accepts ANTHROPIC_API_KEY-style API keys, but setup-token issues
-oat-prefixed OAuth tokens that the API rejects via the API-key header.
-Setup:
-
-    1. Run `claude setup-token` interactively.
-    2. Save the token to `.claude/data/claude-token.txt` (one line, no quotes).
-       That path is gitignored.
-
-To still avoid booting hooks/skills/MCP on every call we pass
-`--setting-sources user` (skip project settings.json, where the heartbeat's
-own session-end-flush hook lives) and `--disable-slash-commands`."""
+Auth: set CLAUDE_CODE_OAUTH_TOKEN in .env (Max subscription OAuth token —
+no per-token billing). To avoid booting hooks/skills/MCP on every call we
+pass `--setting-sources user` and `--disable-slash-commands`."""
 from __future__ import annotations
 
 import json
@@ -26,7 +16,6 @@ from typing import Optional
 CLAUDE_BIN = shutil.which("claude") or "claude"
 DEFAULT_MODEL = "haiku"
 DEFAULT_TIMEOUT = 120
-TOKEN_FILE = Path(__file__).resolve().parents[2] / "data" / "claude-token.txt"
 
 _CONFIG_PATH = Path(__file__).resolve().parents[2] / "data" / "llm-config.json"
 _DEFAULTS: dict = {
@@ -55,18 +44,10 @@ def _load_config() -> dict:
 
 
 def _build_env() -> dict[str, str]:
-    """Return a copy of os.environ with CLAUDE_CODE_OAUTH_TOKEN set from the
-    token file. The file wins over any pre-existing env value. We also clear
-    ANTHROPIC_API_KEY so a stray paid key in the parent env doesn't override
-    Max-plan billing."""
+    """Return a copy of os.environ with CLAUDE_CODE_OAUTH_TOKEN forwarded.
+    We clear ANTHROPIC_API_KEY so a stray paid key doesn't override Max-plan billing."""
     env = os.environ.copy()
     env.pop("ANTHROPIC_API_KEY", None)
-    try:
-        token = TOKEN_FILE.read_text(encoding="utf-8").strip()
-    except (FileNotFoundError, OSError):
-        token = ""
-    if token:
-        env["CLAUDE_CODE_OAUTH_TOKEN"] = token
     return env
 
 
