@@ -58,11 +58,14 @@ def test_read_deadlines_empty(tmp_path):
 
 def test_read_deadlines_parses_file(tmp_path):
     from kernel.web.server import read_deadlines
-    data = [{"title": "Assignment 1", "due": "2026-07-01", "overdue": False, "days_remaining": 10}]
-    (tmp_path / "deadlines.json").write_text(json.dumps(data))
+    (tmp_path / "DEADLINES.md").write_text(
+        "# DEADLINES\n\n## Active\n\n- 2026-07-01 — CS101 — Assignment 1\n",
+        encoding="utf-8",
+    )
     result = read_deadlines(tmp_path)
     assert len(result) == 1
     assert result[0]["title"] == "Assignment 1"
+    assert result[0]["due"] == "2026-07-01"
 
 
 def test_read_heartbeat_status_missing(tmp_path):

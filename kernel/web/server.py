@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone, timedelta
+import re
+from datetime import datetime, date, timezone, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Form
@@ -31,14 +32,44 @@ def _is_authed(request: Request, password: str) -> bool:
         return False
 
 
-def read_deadlines(data_dir: Path) -> list[dict]:
-    path = data_dir / "deadlines.json"
+_DEADLINE_RE = re.compile(r"^-\s+(\d{4}-\d{2}-\d{2})\s+—\s+(.+?)\s+—\s+(.+)$")
+_ACTIVE_SECTION = "## Active"
+
+
+def read_deadlines(vault_dir: Path) -> list[dict]:
+    path = vault_dir / "DEADLINES.md"
     if not path.exists():
         return []
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+        text = path.read_text(encoding="utf-8")
+    except OSError:
         return []
+    if _ACTIVE_SECTION not in text:
+        return []
+    section = text[text.index(_ACTIVE_SECTION) + len(_ACTIVE_SECTION):]
+    next_h2 = re.search(r"\n## ", section)
+    if next_h2:
+        section = section[: next_h2.start()]
+    today = date.today()
+    result = []
+    for line in section.splitlines():
+        m = _DEADLINE_RE.match(line.strip())
+        if not m:
+            continue
+        due_str, _course, title = m.group(1), m.group(2), m.group(3)
+        try:
+            due_date = date.fromisoformat(due_str)
+        except ValueError:
+            continue
+        days_remaining = (due_date - today).days
+        result.append({
+            "title": title.strip(),
+            "due": due_str,
+            "overdue": days_remaining < 0,
+            "days_remaining": days_remaining,
+        })
+    result.sort(key=lambda d: d["due"])
+    return result
 
 
 def read_heartbeat_status(data_dir: Path) -> dict:
@@ -79,14 +110,39 @@ def read_heartbeat_status(data_dir: Path) -> dict:
     }
 
 
-def read_budget(data_dir: Path) -> list[dict]:
-    path = data_dir / "finance.json"
+_TABLE_ROW_RE = re.compile(r"^\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|")
+
+
+def read_budget(vault_dir: Path) -> list[dict]:
+    month = datetime.now(_KL).strftime("%Y-%m")
+    path = vault_dir / "finance" / f"{month}.md"
     if not path.exists():
         return []
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+        text = path.read_text(encoding="utf-8")
+    except OSError:
         return []
+    in_entries = False
+    result = []
+    for line in text.splitlines():
+        if line.strip() == "## Entries":
+            in_entries = True
+            continue
+        if in_entries and line.startswith("## "):
+            break
+        if not in_entries:
+            continue
+        m = _TABLE_ROW_RE.match(line)
+        if not m:
+            continue
+        date_val, amount, category = m.group(1), m.group(2), m.group(3)
+        # skip header and separator rows
+        if not date_val or date_val in ("-", "Date") or set(date_val) <= {"-", " "}:
+            continue
+        if not amount.strip() or amount.strip() in ("-", "Amount"):
+            continue
+        result.append({"date": date_val.strip(), "amount": amount.strip(), "category": category.strip()})
+    return result
 
 
 def read_schedule(vault_dir: Path) -> str:
@@ -133,9 +189,9 @@ def create_app(data_dir: Path, vault_dir: Path, password: str) -> FastAPI:
         if not _is_authed(request, password):
             return RedirectResponse("/login", status_code=302)
         return templates.TemplateResponse(request, "dashboard.html", {
-            "deadlines": read_deadlines(data_dir),
+            "deadlines": read_deadlines(vault_dir),
             "heartbeat": read_heartbeat_status(data_dir),
-            "budget": read_budget(data_dir),
+            "budget": read_budget(vault_dir),
             "schedule": read_schedule(vault_dir),
         })
 

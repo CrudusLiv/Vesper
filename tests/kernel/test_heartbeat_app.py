@@ -14,9 +14,11 @@ def test_tick_is_subscribed():
     assert Tick in app.subscribes
 
 
-def test_on_tick_calls_heartbeat_run(monkeypatch):
+def test_on_tick_calls_heartbeat_run(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
     app, runtime = _make_app()
-    with patch("kernel.apps.heartbeat_app._run_heartbeat_tick") as mock_run:
+    with patch("kernel.apps.heartbeat_app.in_active_hours", return_value=True), \
+         patch("kernel.apps.heartbeat_app._run_heartbeat_tick") as mock_run:
         mock_run.return_value = None
         app.on_tick(Tick(interval=1800))
         mock_run.assert_called_once()
