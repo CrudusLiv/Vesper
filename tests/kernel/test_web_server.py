@@ -80,10 +80,29 @@ def test_read_heartbeat_status_green(tmp_path):
         "last_tick": now.isoformat(),
         "next_tick_eta": (now + timedelta(seconds=1800)).isoformat(),
         "errors": [],
+        "standby": False,
     }
     (tmp_path / "heartbeat-status.json").write_text(json.dumps(data))
     status = read_heartbeat_status(tmp_path)
     assert status["health"] == "green"
+    assert status["errors"] == []
+    assert status["standby"] is False
+
+
+def test_read_heartbeat_status_standby(tmp_path):
+    from kernel.web.server import read_heartbeat_status
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone(timedelta(hours=8)))
+    data = {
+        "last_tick": now.isoformat(),
+        "next_tick_eta": (now + timedelta(seconds=1800)).isoformat(),
+        "errors": [],
+        "standby": True,
+    }
+    (tmp_path / "heartbeat-status.json").write_text(json.dumps(data))
+    status = read_heartbeat_status(tmp_path)
+    assert status["health"] == "standby"
+    assert status["standby"] is True
     assert status["errors"] == []
 
 

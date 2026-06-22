@@ -53,7 +53,9 @@ def read_heartbeat_status(data_dir: Path) -> dict:
     last_tick_str = raw.get("last_tick")
     errors = raw.get("errors", [])
     health = "unknown"
-    if last_tick_str:
+    if raw.get("standby"):
+        health = "standby"
+    elif last_tick_str:
         try:
             last_tick = datetime.fromisoformat(last_tick_str)
             minutes_ago = (datetime.now(_KL) - last_tick).total_seconds() / 60
@@ -73,6 +75,7 @@ def read_heartbeat_status(data_dir: Path) -> dict:
         "next_tick_eta": raw.get("next_tick_eta"),
         "errors": errors,
         "health": health,
+        "standby": raw.get("standby", False),
     }
 
 

@@ -36,6 +36,7 @@ class HeartbeatApp(VesperApp):
 
     def on_tick(self, event: Tick) -> None:
         if not in_active_hours():
+            self._write_standby_status()
             self.log("outside active hours — skipping tick")
             return
         errors: list[str] = []
@@ -47,6 +48,29 @@ class HeartbeatApp(VesperApp):
             traceback.print_exc()
         finally:
             self._write_status(event.interval, errors)
+
+    def _write_standby_status(self) -> None:
+        status_path = self.data / "heartbeat-status.json"
+        prev_last_tick = None
+        prev_next_tick = None
+        if status_path.exists():
+            try:
+                prev = json.loads(status_path.read_text(encoding="utf-8"))
+                prev_last_tick = prev.get("last_tick")
+                prev_next_tick = prev.get("next_tick_eta")
+            except (json.JSONDecodeError, OSError):
+                pass
+        status = {
+            "last_tick": prev_last_tick,
+            "next_tick_eta": prev_next_tick,
+            "errors": [],
+            "standby": True,
+        }
+        try:
+            status_path.parent.mkdir(parents=True, exist_ok=True)
+            status_path.write_text(json.dumps(status, indent=2), encoding="utf-8")
+        except OSError as exc:
+            self.log(f"failed to write standby status: {exc}")
 
     def _write_status(self, interval: int, errors: list[str]) -> None:
         now = datetime.now(_KL)

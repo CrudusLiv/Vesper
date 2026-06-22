@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block head %}<meta http-equiv="refresh" content="60">{% endblock %}
 {% block body %}
 <nav>
   <span class="nav-title">Vesper</span>
@@ -37,6 +38,7 @@
         {% if heartbeat.health == "green" %}Running
         {% elif heartbeat.health == "yellow" %}Delayed
         {% elif heartbeat.health == "red" %}Error / Stale
+        {% elif heartbeat.health == "standby" %}Standby
         {% else %}Unknown{% endif %}
       </span>
       {% if heartbeat.last_tick %}

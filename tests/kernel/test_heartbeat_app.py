@@ -22,7 +22,8 @@ def test_on_tick_calls_heartbeat_run(monkeypatch):
         mock_run.assert_called_once()
 
 
-def test_on_tick_outside_active_hours_skips(monkeypatch):
+def test_on_tick_outside_active_hours_skips(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
     app, runtime = _make_app()
     with patch("kernel.apps.heartbeat_app._run_heartbeat_tick") as mock_run, \
          patch("kernel.apps.heartbeat_app.in_active_hours", return_value=False):
@@ -36,16 +37,16 @@ def test_on_tick_writes_status_file(tmp_path, monkeypatch):
     from kernel.events import Tick
     from unittest.mock import MagicMock, patch
 
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
     runtime = MagicMock()
     app = HeartbeatApp(runtime)
-    # Monkeypatch the data property by patching the instance method
-    monkeypatch.setattr(type(app), "data", property(lambda self: tmp_path))
 
     with patch("kernel.apps.heartbeat_app.in_active_hours", return_value=True), \
          patch("kernel.apps.heartbeat_app._run_heartbeat_tick"):
         app.on_tick(Tick(interval=1800))
 
-    status_file = tmp_path / "heartbeat-status.json"
+    # data property returns <project_dir>/.claude/data
+    status_file = tmp_path / ".claude" / "data" / "heartbeat-status.json"
     assert status_file.exists()
     data = json.loads(status_file.read_text())
     assert "last_tick" in data

@@ -83,6 +83,7 @@ nav {
 .hb-yellow { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
 .hb-red { background: var(--red); box-shadow: 0 0 6px var(--red); }
 .hb-unknown { background: var(--muted); }
+.hb-standby { background: var(--muted); }
 .hb-label { font-size: 0.9rem; font-weight: 500; vertical-align: middle; }
 .hb-detail { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); margin-top: 0.6rem; }
 .hb-error { color: var(--red); font-family: var(--font-mono); font-size: 0.8rem; margin-top: 0.4rem; }
