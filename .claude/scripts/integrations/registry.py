@@ -14,7 +14,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 import _env  # noqa: F401, E402  -- side effect: loads .env
 
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
-GOOGLE_CREDS = PROJECT_DIR / ".claude" / "data" / "google_credentials.json"
 
 
 @dataclass
@@ -52,25 +51,19 @@ INTEGRATIONS: list[Integration] = [
     Integration(
         name="gcal",
         description="Google Calendar (read-only) -- upcoming events",
-        requires_files=[GOOGLE_CREDS],
-        notes="Shares OAuth token with Gmail.",
+        requires_env=["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+        notes="Shares OAuth token with Gmail. First run opens browser for consent.",
     ),
     Integration(
         name="gmail",
         description="Gmail inbox (read-only) -- recent messages",
-        requires_files=[GOOGLE_CREDS],
-        notes="Shares OAuth token with Google Calendar.",
+        requires_env=["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+        notes="Shares OAuth token with Google Calendar. First run opens browser for consent.",
     ),
     Integration(
         name="vault",
         description="Local vault filesystem -- inbox watcher for new .pptx and .pdf",
         notes="No auth needed.",
-    ),
-    Integration(
-        name="discord",
-        description="Discord message cache (read-only) -- recent DMs and server messages",
-        requires_env=["DISCORD_BOT_TOKEN"],
-        notes="Cache lives at .claude/data/discord_cache.db. Run `py query.py discord bot` to populate.",
     ),
 ]
 

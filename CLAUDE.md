@@ -6,8 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Vesper is a personal second brain. Two layers live here:
 
-1. **Discord UI** — the primary interface. A discord.py bot (`chat/discord_bot.py`) handles `#vesper` chat, `#inbox`, `#finance`, and slash commands. The heartbeat posts embeds to channel webhooks (`DISCORD_HOOK_*`). Both run as Docker services in `docker-compose.yml`.
+1. **Voice app** — the primary interface (`voice/`). Three.js orb UI, push-to-talk or wake-word audio, Deepgram STT, edge-tts TTS, multi-turn brain via `claude -p` subprocess. Run with `py -m voice --wakeword`.
 2. **Claude Code agent system** — `.claude/scripts/`, `.claude/hooks/`, and `.claude/settings.json` are the running agent layer (heartbeat, memory, integrations).
+
+The Discord bot (`chat/discord_bot.py`) is retired — kept for history, not running.
 
 The personal vault (notes, schedules, finances) lives locally at `Dynamous/Memory/` — gitignored. Each machine keeps its own vault.
 
@@ -21,17 +23,15 @@ py -m pip install -r .claude/requirements.txt
 
 Credentials and secrets go in `.env` at the project root — never committed. The `_env.py` loader reads it on import; existing shell env vars take precedence.
 
-## Running the bot
+## Running Vesper
 
 ```powershell
-docker compose up -d --build   # discord-bot + scheduler
-docker compose ps              # verify
+py -m voice              # text mode
+py -m voice --voice      # push-to-talk
+py -m voice --wakeword   # always-on wake word (say "alexa")
 ```
 
-Or locally without Docker:
-```powershell
-py .claude/chat/discord_bot.py
-```
+Open `http://localhost:7070` in Edge `--app` mode for the orb UI (requires `ui_enabled: true` in `voice/config.json`).
 
 ## Running integrations (CLI)
 
@@ -64,14 +64,17 @@ The DB lives at `.claude/data/memory.db` (gitignored). Embeddings use `fast-all-
 
 ## Architecture
 
-### Docker services
+### Voice app (`voice/`)
 
 | Path | Purpose |
 |------|---------|
-| `worker/` | Shared Docker image for bot + scheduler |
-| `docker-compose.yml` | Two services: `discord-bot`, `scheduler` (root of repo) |
-
-`discord-bot` runs `.claude/chat/discord_bot.py`. `scheduler` runs the heartbeat on a 30-min tick.
+| `voice/main.py` | Entry point — PTT or wake-word loop |
+| `voice/brain.py` | Multi-turn LLM via `claude -p`, ReAct tool loop |
+| `voice/ui_server.py` | FastAPI server, WebSocket broadcast, sidebar endpoints |
+| `voice/static/orb.html` | Three.js orb UI |
+| `voice/heartbeat.py` | Daemon thread — calendar, email, deadlines checks |
+| `voice/tray.py` | System tray icon + toast notifications |
+| `voice/wakeword.py` | Always-on openwakeword listener |
 
 ### Memory layer (`Dynamous/Memory/`)
 

@@ -5,8 +5,10 @@ refresh token at .claude/data/google_token.json.
 
 Setup:
 1. Google Cloud Console -> enable Gmail API + Calendar API.
-2. Credentials -> OAuth client ID -> Desktop app.
-3. Download the JSON, save as .claude/data/google_credentials.json.
+2. Credentials -> OAuth client ID -> Desktop app -> download JSON.
+3. Add to .env:
+       GOOGLE_CLIENT_ID=<client_id from the JSON>
+       GOOGLE_CLIENT_SECRET=<client_secret from the JSON>
 
 Both Gmail and Calendar scopes are requested up front so the user only
 consents once. Read-only -- no compose, no event create/delete."""
@@ -16,8 +18,9 @@ import os
 import sys
 from pathlib import Path
 
+from integrations._env import load_env  # ensures .env is loaded  # noqa: F401
+
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[3])
-CREDS_PATH = PROJECT_DIR / ".claude" / "data" / "google_credentials.json"
 TOKEN_PATH = PROJECT_DIR / ".claude" / "data" / "google_token.json"
 
 SCOPES = [
@@ -37,13 +40,25 @@ def get_credentials():
         print("Google libs missing: py -m pip install -r .claude/requirements.txt", file=sys.stderr)
         return None
 
-    if not CREDS_PATH.exists():
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+    if not client_id or not client_secret:
         print(
-            f"OAuth client secret not found at {CREDS_PATH}.\n"
-            "Download it from Google Cloud Console -> Credentials -> OAuth Desktop client.",
+            "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set in .env.\n"
+            "Get them from Google Cloud Console -> Credentials -> OAuth Desktop client.",
             file=sys.stderr,
         )
         return None
+
+    client_config = {
+        "installed": {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uris": ["http://localhost"],
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
+    }
 
     creds = None
     if TOKEN_PATH.exists():
@@ -52,7 +67,7 @@ def get_credentials():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(str(CREDS_PATH), SCOPES)
+            flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
             creds = flow.run_local_server(port=0)
         TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
         TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")

@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vesper</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 100vw; height: 100vh; overflow: hidden;
+    background: radial-gradient(ellipse at center, #09091e 0%, #020208 100%);
+    font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  canvas { display: block; position: fixed; inset: 0; }
+
+  /* ── HUD labels ───────────────────────────────────── */
+  #name {
+    position: fixed; top: 28px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; letter-spacing: 7px; color: #7264b8;
+    text-transform: uppercase; pointer-events: none;
+    font-weight: 500;
+  }
+
+  @keyframes idle-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%       { opacity: 1; }
+  }
+  #status {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    color: #7070a8; pointer-events: none;
+    transition: color 0.6s ease;
+    animation: idle-pulse 3s ease-in-out infinite;
+  }
+  #status.listening { color: #aaee33; animation: none; }
+  #status.thinking  { color: #bb66ff; animation: none; }
+  #status.speaking  { color: #c8c4f0; animation: none; }
+
+  #last-msg {
+    position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%);
+    font-size: 13px; color: #9090c4; max-width: 480px;
+    text-align: center; pointer-events: none;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ── Text input bar ───────────────────────────────── */
+  #input-bar {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: min(520px, 90vw); padding: 10px 0 18px 0;
+    display: flex; gap: 8px; align-items: center;
+  }
+  #input-text {
+    flex: 1; background: rgba(10, 10, 26, 0.92); border: 1px solid #30306a;
+    border-radius: 22px; padding: 10px 18px;
+    color: #c8c8ec; font-family: inherit;
+    font-size: 14px; letter-spacing: 0.2px; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  #input-text:focus {
+    border-color: #7755cc;
+    box-shadow: 0 0 0 3px rgba(119,85,204,0.12);
+  }
+  #input-text::placeholder { color: #464666; }
+  #send-btn {
+    background: rgba(16, 16, 44, 0.92); border: 1px solid #30306a;
+    border-radius: 50%; width: 38px; height: 38px; flex-shrink: 0;
+    cursor: pointer; color: #7878b8; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.2s, color 0.2s, background 0.2s, box-shadow 0.2s;
+  }
+  #send-btn:hover {
+    border-color: #7755cc; color: #bb99ff;
+    background: rgba(119,85,204,0.18);
+    box-shadow: 0 0 12px rgba(119,85,204,0.2);
+  }
+
+  /* ── Edge tab trigger (replaces hamburger) ────────── */
+  #panel-edge {
+    position: fixed; top: 50%; right: 0;
+    transform: translateY(-50%);
+    width: 22px; height: 64px;
+    background: rgba(16,14,44,0.88); border: 1px solid #2e2e68;
+    border-right: none; border-radius: 8px 0 0 8px;
+    cursor: pointer; z-index: 15;
+    display: flex; align-items: center; justify-content: center;
+    color: #5858a0; font-size: 13px;
+    transition: color 0.2s, background 0.2s, border-color 0.2s;
+  }
+  #panel-edge:hover { color: #aa88ff; background: rgba(100,60,200,0.2); border-color: #5544aa; }
+  #panel-edge.hidden { opacity: 0; pointer-events: none; }
+
+  /* ── Side panel (drawer) ──────────────────────────── */
+  #side-panel {
+    position: fixed; top: 0; right: -400px; width: 380px; height: 100vh;
+    background: rgba(8, 8, 22, 0.97); border-left: 1px solid #24244e;
+    transition: right 0.28s cubic-bezier(0.4,0,0.2,1); z-index: 20;
+    display: flex; flex-direction: column;
+    backdrop-filter: blur(20px);
+  }
+  #side-panel.open { right: 0; }
+
+  /* ── Panel header ─────────────────────────────────── */
+  #panel-header {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 52px 14px 0 14px;
+    flex-shrink: 0;
+  }
+
+  /* ── Tab rail ─────────────────────────────────────── */
+  #tab-rail {
+    display: flex; gap: 3px; flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px; padding: 4px;
+  }
+  .ptab {
+    flex: 1; padding: 7px 0; background: none; border: 1px solid transparent;
+    border-radius: 9px;
+    color: #5a5a92; font-family: inherit;
+    font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+    cursor: pointer; transition: color 0.18s, background 0.18s, border-color 0.18s;
+    font-weight: 500;
+  }
+  .ptab.active {
+    color: #c4b4ff;
+    background: rgba(110,70,210,0.22);
+    border-color: rgba(130,90,230,0.38);
+  }
+  .ptab:hover:not(.active) { color: #9090cc; background: rgba(255,255,255,0.05); }
+
+  /* ── Close button ─────────────────────────────────── */
+  #panel-close {
+    width: 30px; height: 30px; background: none; border: none; flex-shrink: 0;
+    color: #5858a0; cursor: pointer; font-size: 20px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; transition: color 0.2s, background 0.2s;
+    margin-left: 8px; margin-bottom: 1px;
+  }
+  #panel-close:hover { color: #d0c8ff; background: rgba(255,255,255,0.08); }
+
+  /* Divider below tabs */
+  #tab-divider { height: 1px; background: #1c1c42; margin: 12px 0 0; flex-shrink: 0; }
+
+  .ptab-content {
+    display: none; flex: 1; overflow-y: auto; padding: 16px 16px 20px;
+    flex-direction: column; gap: 12px;
+    scrollbar-width: thin; scrollbar-color: #2e2e60 transparent;
+  }
+  .ptab-content.active { display: flex; }
+
+  /* ── Search bar (Finance + Study) ────────────────── */
+  .search-bar {
+    display: flex; align-items: center;
+    background: rgba(14,14,34,0.9); border: 1px solid #28285a;
+    border-radius: 24px; overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .search-bar:focus-within {
+    border-color: #7755cc;
+    box-shadow: 0 0 0 3px rgba(119,85,204,0.1);
+  }
+  .search-bar input {
+    flex: 1; background: none; border: none; outline: none;
+    padding: 10px 16px; color: #c0c0e8;
+    font-family: inherit; font-size: 13px;
+  }
+  .search-bar input::placeholder { color: #464666; }
+  .search-bar-btn {
+    background: none; border: none; border-left: 1px solid #28285a;
+    padding: 0 16px; height: 40px; cursor: pointer; white-space: nowrap;
+    color: #9090c8; font-family: inherit;
+    font-size: 12px; letter-spacing: 0.3px; font-weight: 500;
+    transition: color 0.2s, background 0.2s;
+  }
+  .search-bar-btn:hover { color: #c8b4ff; background: rgba(119,85,204,0.14); }
+
+  /* Pill button */
+  .pill-btn {
+    padding: 7px 16px; background: rgba(18,18,48,0.9);
+    border: 1px solid #2c2c60; border-radius: 20px;
+    color: #8888c4; font-family: inherit;
+    font-size: 12px; letter-spacing: 0.3px; white-space: nowrap; font-weight: 500;
+    cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s, box-shadow 0.2s;
+  }
+  .pill-btn:hover {
+    border-color: #7755cc; color: #c8b4ff;
+    background: rgba(119,85,204,0.14);
+    box-shadow: 0 0 10px rgba(119,85,204,0.15);
+  }
+  .pill-btn:active { background: rgba(119,85,204,0.24); }
+
+  .panel-output {
+    font-size: 13px; color: #a4a4cc; line-height: 1.75;
+    white-space: pre-wrap; word-break: break-word; margin-top: 4px;
+  }
+
+  /* ── Habits list ──────────────────────────────────── */
+  .habit-row {
+    display: flex; align-items: center; gap: 11px;
+    padding: 9px 8px; border-bottom: 1px solid #141438; cursor: pointer;
+    transition: background 0.15s; border-radius: 8px;
+  }
+  .habit-row:hover:not(.done) { background: rgba(100,60,200,0.1); }
+  .habit-row.done { cursor: default; }
+  .habit-check {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 1px solid #36367a; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: transparent;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .habit-row.done .habit-check { border-color: #99cc33; color: #99cc33; }
+  .habit-name { font-size: 13px; color: #9898cc; letter-spacing: 0.2px; transition: color 0.2s; }
+  .habit-row.done .habit-name { color: #aadd44; }
+  .habits-meta {
+    font-size: 11px; color: #606098; letter-spacing: 0.5px;
+    padding-top: 10px; border-top: 1px solid #141438;
+  }
+
+  /* ── Study panel ──────────────────────────────────── */
+  .study-row {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 14px 0; border-bottom: 1px solid #141438;
+  }
+  .study-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .study-row-header {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .study-row-label {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: #6868a4; font-weight: 600;
+  }
+  .study-output {
+    font-size: 13px; color: #a4a4cc; line-height: 1.75;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .quiz-card {
+    background: rgba(14,14,36,0.88); border: 1px solid #222256;
+    border-radius: 12px; padding: 13px 15px; margin-bottom: 6px; cursor: pointer;
+    transition: border-color 0.18s, background 0.18s;
+  }
+  .quiz-card:hover { border-color: #444488; background: rgba(22,22,52,0.95); }
+  .quiz-q { font-size: 13px; color: #aaaadd; line-height: 1.65; }
+  .quiz-a {
+    font-size: 13px; color: #aadd44; margin-top: 9px; display: none;
+    line-height: 1.65; border-top: 1px solid #1e1e48; padding-top: 9px;
+  }
+  .quiz-card.revealed .quiz-a { display: block; }
+  .quiz-lvl {
+    font-size: 9px; color: #404070; letter-spacing: 1.5px; margin-top: 5px;
+    text-transform: uppercase;
+  }
+
+  /* ── Drop overlay ─────────────────────────────────── */
+  /* ── Notice badge on edge tab ─────────────────── */
+  #notice-badge {
+    position: absolute; top: 5px; right: 3px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #cc3355; pointer-events: none; display: none;
+  }
+  #notice-badge.visible { display: block; }
+
+  /* ── Chat history ──────────────────────────────── */
+  #chat-history { display: flex; flex-direction: column; gap: 8px; }
+  .chat-bubble {
+    max-width: 88%; padding: 9px 13px; border-radius: 14px;
+    font-size: 13px; line-height: 1.6; word-break: break-word;
+  }
+  .chat-bubble.user {
+    background: rgba(110,70,210,0.22); align-self: flex-end;
+    color: #c4b4ff; border: 1px solid rgba(130,90,230,0.2);
+  }
+  .chat-bubble.assistant {
+    background: rgba(255,255,255,0.05); align-self: flex-start;
+    color: #b0b0d4; border: 1px solid rgba(255,255,255,0.07);
+  }
+  .bubble-time { font-size: 10px; color: #40406a; margin-top: 4px; display: block; }
+  .chat-empty, .notices-empty {
+    font-size: 12px; color: #404068; text-align: center;
+    letter-spacing: 1px; margin-top: 24px;
+  }
+
+  /* ── Notices feed ──────────────────────────────── */
+  .notice-entry {
+    padding: 10px 12px; border-radius: 10px; border-left: 3px solid #28285a;
+    background: rgba(255,255,255,0.03);
+    font-size: 12px; color: #8888c0; line-height: 1.65; word-break: break-word;
+    margin-bottom: 2px;
+  }
+  .notice-entry.unread { border-left-color: #7755cc; color: #b0b0d4; }
+  .notice-entry.urgent { border-left-color: #cc3355; }
+  .notice-time { font-size: 10px; color: #404068; display: block; margin-bottom: 4px; }
+
+  /* ── Spinner ───────────────────────────────────── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin-inline {
+    display: inline-block; width: 10px; height: 10px;
+    border: 2px solid rgba(119,85,204,0.25); border-top-color: #9977dd;
+    border-radius: 50%; animation: spin 0.65s linear infinite;
+    vertical-align: middle; margin-left: 4px;
+  }
+
+  #drop-overlay {
+    position: fixed; inset: 0;
+    background: rgba(80,40,200,0.1);
+    border: 2px dashed #5544cc;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 30; opacity: 0; pointer-events: none;
+    transition: opacity 0.18s;
+  }
+  #drop-overlay.active { opacity: 1; pointer-events: all; }
+  #drop-overlay span {
+    font-size: 12px; letter-spacing: 4px; color: #9988ee;
+    text-transform: uppercase; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="name">V E S P E R</div>
+<div id="status">idle</div>
+<div id="last-msg">—</div>
+
+<!-- Text input bar -->
+<div id="input-bar">
+  <input id="input-text" type="text" placeholder="say something…" autocomplete="off" spellcheck="false" />
+  <button id="send-btn">&#10148;</button>
+</div>
+
+<!-- Edge tab (panel open trigger — replaces hamburger) -->
+<button id="panel-edge" title="Open panel">&#8250;<span id="notice-badge"></span></button>
+
+<!-- Side panel -->
+<div id="side-panel">
+  <div id="panel-header">
+    <div id="tab-rail">
+      <button class="ptab active" data-tab="chat">Chat</button>
+      <button class="ptab" data-tab="notices">Notices</button>
+      <button class="ptab" data-tab="finance">Finance</button>
+      <button class="ptab" data-tab="habits">Habits</button>
+      <button class="ptab" data-tab="study">Study</button>
+    </div>
+    <button id="panel-close" title="Close panel">&#215;</button>
+  </div>
+  <div id="tab-divider"></div>
+
+  <div id="ptab-chat" class="ptab-content active">
+    <div id="chat-history"><div class="chat-empty">no messages yet</div></div>
+  </div>
+
+  <div id="ptab-notices" class="ptab-content">
+    <div id="notices-list"><div class="notices-empty">no notices</div></div>
+  </div>
+
+  <div id="ptab-finance" class="ptab-content">
+    <form id="finance-form">
+      <div class="search-bar">
+        <input id="fin-entry" type="text" placeholder="50 food lunch" autocomplete="off" spellcheck="false" />
+        <button type="submit" class="search-bar-btn">Log</button>
+      </div>
+      <div style="display:flex; justify-content:flex-end; margin-top:9px;">
+        <button type="button" id="fin-summary-btn" class="pill-btn">Summary</button>
+      </div>
+    </form>
+    <div id="finance-output" class="panel-output"></div>
+  </div>
+
+  <div id="ptab-habits" class="ptab-content">
+    <div id="habits-list"></div>
+    <div id="habits-meta" class="habits-meta"></div>
+    <div id="habits-output" class="panel-output"></div>
+  </div>
+
+  <div id="ptab-study" class="ptab-content">
+
+    <div class="study-row">
+      <div class="study-row-label">Explain concept</div>
+      <div class="search-bar">
+        <input id="study-explain-input" type="text" placeholder="e.g. dynamic programming" autocomplete="off" />
+        <button class="search-bar-btn" id="study-explain-btn">Explain</button>
+      </div>
+      <div class="study-output" id="study-explain-out"></div>
+    </div>
+
+    <div class="study-row">
+      <div class="study-row-header">
+        <div class="study-row-label">Quiz</div>
+        <button class="pill-btn" id="study-quiz-btn">from latest lecture</button>
+      </div>
+      <div id="study-quiz-cards"></div>
+    </div>
+
+    <div class="study-row">
+      <div class="study-row-header">
+        <div class="study-row-label">Study plan</div>
+        <button class="pill-btn" id="study-plan-btn">generate</button>
+      </div>
+      <div class="study-output" id="study-plan-out"></div>
+    </div>
+
+    <div class="study-row">
+      <div class="study-row-label">Research topic</div>
+      <div class="search-bar">
+        <input id="study-research-input" type="text" placeholder="e.g. reinforcement learning" autocomplete="off" />
+        <button class="search-bar-btn" id="study-research-btn">Research</button>
+      </div>
+      <div class="study-output" id="study-research-out"></div>
+    </div>
+
+    <div class="study-row">
+      <div class="study-row-header">
+        <div class="study-row-label">Weekly progress</div>
+        <button class="pill-btn" id="study-progress-btn">view</button>
+      </div>
+      <div class="study-output" id="study-progress-out"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Drop overlay -->
+<div id="drop-overlay"><span>drop .pdf or .pptx</span></div>
+
+<script src="/static/three.min.js"></script>
+<script>
+// ── Renderer ───────────────────────────────────────────────────────────────
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 100);
+camera.position.z = 3.2;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ── Particles ──────────────────────────────────────────────────────────────
+const N    = 4000;
+const home = new Float32Array(N * 3);
+const cur  = new Float32Array(N * 3);
+const ph   = new Float32Array(N);
+
+for (let i = 0; i < N; i++) {
+  const theta = Math.random() * Math.PI * 2;
+  const phi   = Math.acos(2 * Math.random() - 1);
+  const x = Math.sin(phi) * Math.cos(theta);
+  const y = Math.sin(phi) * Math.sin(theta);
+  const z = Math.cos(phi);
+  home[i*3] = cur[i*3] = x;
+  home[i*3+1] = cur[i*3+1] = y;
+  home[i*3+2] = cur[i*3+2] = z;
+  ph[i] = Math.random() * Math.PI * 2;
+}
+
+const geo = new THREE.BufferGeometry();
+geo.setAttribute('position', new THREE.BufferAttribute(cur, 3));
+
+const mat = new THREE.PointsMaterial({
+  color: 0x4422aa, size: 0.018,
+  blending: THREE.AdditiveBlending,
+  transparent: true, opacity: 0.85, depthWrite: false,
+});
+const cloud = new THREE.Points(geo, mat);
+scene.add(cloud);
+
+// ── Glow shells ────────────────────────────────────────────────────────────
+[
+  [1.18, 0.05, 0x3311aa],
+  [1.5,  0.02, 0x080830],
+].forEach(([r, op, col]) => {
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(r, 32, 32),
+    new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide })
+  ));
+});
+
+// ── Orbital rings ──────────────────────────────────────────────────────────
+const rings = [
+  [1.32, Math.PI/3,   0,          0.30, 0x4433bb],
+  [1.52, Math.PI/5,   Math.PI/7,  0.18, 0x221166],
+  [1.10, Math.PI/2.3, Math.PI/4,  0.22, 0x3322aa],
+].map(([r, tx, tz, op, col]) => {
+  const m = new THREE.Mesh(
+    new THREE.TorusGeometry(r, 0.002, 8, 120),
+    new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  m.rotation.x = tx; m.rotation.z = tz;
+  scene.add(m); return m;
+});
+
+// ── Mic volume ring ────────────────────────────────────────────────────────
+const volRingMat = new THREE.MeshBasicMaterial({
+  color: 0x88cc22, transparent: true, opacity: 0,
+  blending: THREE.AdditiveBlending, depthWrite: false,
+});
+const volRing = new THREE.Mesh(new THREE.TorusGeometry(1.28, 0.004, 8, 100), volRingMat);
+scene.add(volRing);
+let volTarget = 0;
+let volAmp    = 0;
+
+// ── State parameters — SOUL palette ───────────────────────────────────────
+const STATES = {
+  idle:      { r:1.0,  sc:0.015, rot:0.003, pa:0.025, pf:0.7,  col: new THREE.Color(0x4422aa) },
+  listening: { r:0.87, sc:0.006, rot:0.007, pa:0.055, pf:2.5,  col: new THREE.Color(0x88cc22) },
+  thinking:  { r:1.12, sc:0.22,  rot:0.025, pa:0.14,  pf:3.8,  col: new THREE.Color(0x8833cc) },
+  speaking:  { r:1.0,  sc:0.10,  rot:0.012, pa:0.24,  pf:5.2,  col: new THREE.Color(0x9988cc) },
+};
+
+let state = 'idle';
+let p = { r:1.0, sc:0.015, rot:0.003, pa:0.025, pf:0.7 };
+
+const statusEl = document.getElementById('status');
+const msgEl    = document.getElementById('last-msg');
+
+function setState(s) {
+  if (!STATES[s]) return;
+  state = s;
+  statusEl.className = s;
+  statusEl.textContent = s;
+}
+
+// ── Render loop ────────────────────────────────────────────────────────────
+let t = 0;
+(function animate() {
+  requestAnimationFrame(animate);
+  t += 0.016;
+  const tgt = STATES[state];
+  const lf  = 0.04;
+  p.r  += (tgt.r  - p.r)  * lf;
+  p.sc += (tgt.sc - p.sc) * lf;
+  p.rot+= (tgt.rot- p.rot)* lf;
+  p.pa += (tgt.pa - p.pa) * lf;
+  p.pf += (tgt.pf - p.pf) * lf;
+  mat.color.lerp(tgt.col, 0.04);
+
+  cloud.rotation.y += p.rot;
+  cloud.rotation.x += p.rot * 0.22;
+  rings[0].rotation.z += 0.0010;
+  rings[1].rotation.z -= 0.0007;
+  rings[2].rotation.y += 0.0006;
+
+  const pa = geo.attributes.position.array;
+  for (let i = 0; i < N; i++) {
+    const pulse = 1 + Math.sin(t * p.pf + ph[i]) * p.pa;
+    const rad   = p.r * pulse;
+    const sx = (Math.random() - 0.5) * p.sc;
+    const sy = (Math.random() - 0.5) * p.sc;
+    const sz = (Math.random() - 0.5) * p.sc;
+    pa[i*3]   += (home[i*3]   * rad + sx - pa[i*3])   * 0.08;
+    pa[i*3+1] += (home[i*3+1] * rad + sy - pa[i*3+1]) * 0.08;
+    pa[i*3+2] += (home[i*3+2] * rad + sz - pa[i*3+2]) * 0.08;
+  }
+  geo.attributes.position.needsUpdate = true;
+
+  volAmp += (volTarget - volAmp) * 0.18;
+  volTarget *= 0.82;
+  const showRing = state === 'listening';
+  volRingMat.opacity = showRing ? volAmp * 0.9 : 0;
+  volRing.scale.setScalar(showRing ? 1 + volAmp * 0.12 : 1);
+
+  renderer.render(scene, camera);
+})();
+
+// ── Text input bar ─────────────────────────────────────────────────────────
+(function initInput() {
+  const inp = document.getElementById('input-text');
+  const btn = document.getElementById('send-btn');
+  function send() {
+    const text = inp.value.trim();
+    if (!text) return;
+    addChatBubble('user', text);
+    inp.value = '';
+    setState('thinking');
+    fetch('/input', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text}),
+    }).catch(() => setState('idle'));
+  }
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); send(); }
+  });
+  btn.addEventListener('click', send);
+})();
+
+// ── Side panel ─────────────────────────────────────────────────────────────
+(function initPanel() {
+  const edge  = document.getElementById('panel-edge');
+  const close = document.getElementById('panel-close');
+  const panel = document.getElementById('side-panel');
+  const tabs  = document.querySelectorAll('.ptab');
+  const panes = document.querySelectorAll('.ptab-content');
+
+  function openPanel() {
+    panel.classList.add('open');
+    edge.classList.add('hidden');
+    const activeTab = document.querySelector('.ptab.active');
+    if (activeTab) {
+      const t = activeTab.dataset.tab;
+      if (t === 'habits') loadHabits();
+      if (t === 'notices') loadNotices();
+      if (t === 'chat') scrollChatToBottom();
+    }
+  }
+
+  function closePanel() {
+    panel.classList.remove('open');
+    edge.classList.remove('hidden');
+  }
+
+  edge.addEventListener('click', openPanel);
+  close.addEventListener('click', closePanel);
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      panes.forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      const pane = document.getElementById('ptab-' + tab.dataset.tab);
+      if (pane) pane.classList.add('active');
+      if (tab.dataset.tab === 'habits') loadHabits();
+      if (tab.dataset.tab === 'notices') loadNotices();
+      if (tab.dataset.tab === 'chat') scrollChatToBottom();
+    });
+  });
+
+  // Finance: log expense
+  document.getElementById('finance-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const entry = document.getElementById('fin-entry').value.trim();
+    if (!entry) return;
+    const out = document.getElementById('finance-output');
+    out.textContent = '…';
+    try {
+      const r = await fetch('/cmd/finance', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({entry}),
+      });
+      const d = await r.json();
+      out.textContent = d.message || d.error || '?';
+      if (d.message) document.getElementById('fin-entry').value = '';
+    } catch (err) {
+      out.textContent = 'error: ' + err.message;
+    }
+  });
+
+  // Finance: summary
+  document.getElementById('fin-summary-btn').addEventListener('click', async () => {
+    const out = document.getElementById('finance-output');
+    out.textContent = '…';
+    try {
+      const r = await fetch('/cmd/finance');
+      const d = await r.json();
+      out.textContent = d.summary || d.error || 'no data';
+    } catch (err) {
+      out.textContent = 'error: ' + err.message;
+    }
+  });
+
+  // Habits: load + render
+  async function loadHabits() {
+    const list = document.getElementById('habits-list');
+    const meta = document.getElementById('habits-meta');
+    const out  = document.getElementById('habits-output');
+    try {
+      const r = await fetch('/cmd/habits');
+      const d = await r.json();
+      if (d.error) { out.textContent = d.error; list.innerHTML = ''; return; }
+      out.textContent = '';
+      list.innerHTML = '';
+      const checked = d.checked || {};
+      Object.entries(checked).forEach(([name, done]) => {
+        const row = document.createElement('div');
+        row.className = 'habit-row' + (done ? ' done' : '');
+        row.innerHTML = `<div class="habit-check">${done ? '✓' : ''}</div><div class="habit-name">${name}</div>`;
+        if (!done) {
+          row.addEventListener('click', async () => {
+            const res = await fetch('/cmd/habits/check', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({pillar: name}),
+            });
+            const rd = await res.json();
+            if (rd.checked) loadHabits();
+          });
+        }
+        list.appendChild(row);
+      });
+      const dc  = d.done_count || 0;
+      const tot = d.total || 0;
+      const str = d.current_streak || 0;
+      meta.textContent = `${dc}/${tot} done today · ${str} day streak`;
+    } catch (err) {
+      out.textContent = 'habits unavailable';
+    }
+  }
+})();
+
+// ── Study panel ────────────────────────────────────────────────────────────
+(function initStudy() {
+  function setOut(id, text) {
+    document.getElementById(id).textContent = text;
+  }
+
+  function withLoading(btn, label, fn) {
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = label + '<span class="spin-inline"></span>';
+    return fn().finally(() => { btn.disabled = false; btn.innerHTML = orig; });
+  }
+
+  // Explain
+  async function doExplain() {
+    const topic = document.getElementById('study-explain-input').value.trim();
+    if (!topic) return;
+    const btn = document.getElementById('study-explain-btn');
+    await withLoading(btn, 'Explain', async () => {
+      setOut('study-explain-out', '');
+      try {
+        const r = await fetch('/cmd/study/explain', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({topic}),
+        });
+        const d = await r.json();
+        setOut('study-explain-out', d.result || d.error || '?');
+      } catch (e) { setOut('study-explain-out', 'error: ' + e.message); }
+    });
+  }
+  document.getElementById('study-explain-btn').addEventListener('click', doExplain);
+  document.getElementById('study-explain-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); doExplain(); }
+  });
+
+  // Quiz
+  document.getElementById('study-quiz-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('study-quiz-btn');
+    const wrap = document.getElementById('study-quiz-cards');
+    await withLoading(btn, 'from latest lecture', async () => {
+      wrap.innerHTML = '';
+      try {
+        const r = await fetch('/cmd/study/quiz');
+        const d = await r.json();
+        if (d.error) { wrap.textContent = d.error; return; }
+        (d.cards || []).forEach(card => {
+          const el = document.createElement('div');
+          el.className = 'quiz-card';
+          el.innerHTML =
+            `<div class="quiz-q">${escHtml(card.q)}</div>` +
+            `<div class="quiz-lvl">${escHtml(card.level || '')}</div>` +
+            `<div class="quiz-a">${escHtml(card.a)}</div>`;
+          el.addEventListener('click', () => el.classList.toggle('revealed'));
+          wrap.appendChild(el);
+        });
+        if (!d.cards || !d.cards.length) wrap.textContent = 'no cards';
+      } catch (e) { wrap.textContent = 'error: ' + e.message; }
+    });
+  });
+
+  // Plan
+  document.getElementById('study-plan-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('study-plan-btn');
+    await withLoading(btn, 'generate', async () => {
+      setOut('study-plan-out', '');
+      try {
+        const r = await fetch('/cmd/study/plan');
+        const d = await r.json();
+        setOut('study-plan-out', d.result || d.error || '?');
+      } catch (e) { setOut('study-plan-out', 'error: ' + e.message); }
+    });
+  });
+
+  // Research
+  async function doResearch() {
+    const topic = document.getElementById('study-research-input').value.trim();
+    if (!topic) return;
+    const btn = document.getElementById('study-research-btn');
+    await withLoading(btn, 'Research', async () => {
+      setOut('study-research-out', '');
+      try {
+        const r = await fetch('/cmd/study/research', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({topic}),
+        });
+        const d = await r.json();
+        setOut('study-research-out', d.result || d.error || '?');
+      } catch (e) { setOut('study-research-out', 'error: ' + e.message); }
+    });
+  }
+  document.getElementById('study-research-btn').addEventListener('click', doResearch);
+  document.getElementById('study-research-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); doResearch(); }
+  });
+
+  // Progress
+  document.getElementById('study-progress-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('study-progress-btn');
+    await withLoading(btn, 'view', async () => {
+      setOut('study-progress-out', '');
+      try {
+        const r = await fetch('/cmd/study/progress');
+        const d = await r.json();
+        setOut('study-progress-out', d.result || d.error || '?');
+      } catch (e) { setOut('study-progress-out', 'error: ' + e.message); }
+    });
+  });
+})();
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Chat history ────────────────────────────────────────────────────────────
+const chatHistory = [];
+
+function addChatBubble(role, content) {
+  chatHistory.push({ role, content, ts: Date.now() });
+  const hist = document.getElementById('chat-history');
+  if (!hist) return;
+  hist.innerHTML = '';
+  chatHistory.forEach(({ role, content, ts }) => {
+    const div = document.createElement('div');
+    div.className = 'chat-bubble ' + role;
+    const time = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    div.innerHTML = `<span>${escHtml(content)}</span><span class="bubble-time">${time}</span>`;
+    hist.appendChild(div);
+  });
+  scrollChatToBottom();
+}
+
+function scrollChatToBottom() {
+  const hist = document.getElementById('chat-history');
+  const pane = document.getElementById('ptab-chat');
+  if (pane) pane.scrollTop = pane.scrollHeight;
+  if (hist) hist.scrollTop = hist.scrollHeight;
+}
+
+// ── Notices feed ────────────────────────────────────────────────────────────
+async function loadNotices() {
+  const list = document.getElementById('notices-list');
+  if (!list) return;
+  list.innerHTML = '<div class="notices-empty">loading…</div>';
+  try {
+    const r = await fetch('/cmd/notices');
+    const d = await r.json();
+    const notices = d.notices || [];
+    list.innerHTML = '';
+    if (!notices.length) {
+      list.innerHTML = '<div class="notices-empty">no notices yet</div>';
+      return;
+    }
+    notices.forEach(n => {
+      const div = document.createElement('div');
+      div.className = 'notice-entry'
+        + (n.read ? '' : ' unread')
+        + (n.level === 'URGENT' ? ' urgent' : '');
+      const ts = new Date(n.ts).toLocaleString([], {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+      div.innerHTML = `<span class="notice-time">${ts}</span>${escHtml(n.text || '')}`;
+      list.appendChild(div);
+    });
+  } catch (e) {
+    list.innerHTML = `<div class="notices-empty">error: ${escHtml(e.message)}</div>`;
+  }
+}
+
+async function updateNoticeBadge() {
+  try {
+    const r = await fetch('/cmd/notices');
+    const d = await r.json();
+    const unread = (d.notices || []).filter(n => !n.read).length;
+    const badge = document.getElementById('notice-badge');
+    if (badge) badge.classList.toggle('visible', unread > 0);
+  } catch (_) {}
+}
+updateNoticeBadge();
+setInterval(updateNoticeBadge, 60000);
+
+// ── File drop zone ─────────────────────────────────────────────────────────
+(function initDrop() {
+  const overlay = document.getElementById('drop-overlay');
+  let count = 0;
+  document.addEventListener('dragenter', e => {
+    if (e.dataTransfer && e.dataTransfer.types.includes('Files')) {
+      count++; overlay.classList.add('active');
+    }
+  });
+  document.addEventListener('dragleave', () => {
+    if (--count <= 0) { count = 0; overlay.classList.remove('active'); }
+  });
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop', async e => {
+    e.preventDefault();
+    count = 0; overlay.classList.remove('active');
+    const files = Array.from(e.dataTransfer.files)
+      .filter(f => /\.(pdf|pptx)$/i.test(f.name));
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append('file', file);
+      await fetch('/upload', {method: 'POST', body: fd});
+    }
+    if (files.length) setState('thinking');
+  });
+})();
+
+// ── WebSocket ──────────────────────────────────────────────────────────────
+(function connect() {
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onmessage = ({ data }) => {
+    const ev = JSON.parse(data);
+    if (ev.type === 'state') {
+      setState(ev.value);
+    } else if (ev.type === 'message' && ev.role === 'assistant') {
+      const content = ev.content ?? '';
+      msgEl.textContent = content.slice(0, 120);
+      addChatBubble('assistant', content);
+      setState('idle');
+    } else if (ev.type === 'amplitude') {
+      volTarget = Math.min((ev.value || 0) * 10, 1.0);
+    }
+  };
+  const ping = setInterval(() => ws.readyState === 1 && ws.send('ping'), 20000);
+  ws.onclose = () => { clearInterval(ping); setTimeout(connect, 2000); };
+})();
+</script>
+</body>
+</html>

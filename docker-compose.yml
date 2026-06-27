@@ -1,3 +1,5 @@
+# discord-bot retired (Phase E) — superseded by voice/ exe.
+# discord_bot.py kept in .claude/chat/ for history.
 services:
   vesper:
     build:

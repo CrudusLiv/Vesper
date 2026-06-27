@@ -40,7 +40,7 @@ if (-not $isAdmin) {
 $ProjectDir   = (Resolve-Path "$PSScriptRoot\..\..\..").Path
 $ScriptsDir   = Join-Path $ProjectDir '.claude\scripts'
 $LogsDir      = Join-Path $ProjectDir '.claude\data\logs'
-$DiscordLaunch = Join-Path $PSScriptRoot 'start_discord_bot.vbs'
+$VoiceLaunch   = Join-Path $PSScriptRoot 'start_voice.vbs'
 
 New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
 
@@ -153,13 +153,13 @@ Register-Task `
     -Settings (New-CommonSettings) `
     -Description 'Second Brain vector indexer. Re-embeds vault files whose hash changed since last run.'
 
-# ----- secondbrain-discord: at logon, long-running, restart on failure -----
-$discTrigger = New-ScheduledTaskTrigger -AtLogOn -User $User
-$discAction = New-ScheduledTaskAction `
+# ----- secondbrain-voice: at logon, long-running, restart on failure -----
+$voiceTrigger = New-ScheduledTaskTrigger -AtLogOn -User $User
+$voiceAction = New-ScheduledTaskAction `
     -Execute 'wscript.exe' `
-    -Argument "`"$DiscordLaunch`"" `
+    -Argument "`"$VoiceLaunch`"" `
     -WorkingDirectory $ProjectDir
-$discSettings = New-ScheduledTaskSettingsSet `
+$voiceSettings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
     -StartWhenAvailable `
@@ -167,16 +167,12 @@ $discSettings = New-ScheduledTaskSettingsSet `
     -RestartCount 999 `
     -RestartInterval (New-TimeSpan -Minutes 1) `
     -ExecutionTimeLimit (New-TimeSpan -Days 365)
-# PS quirk: -ExecutionTimeLimit ([TimeSpan]::Zero) is documented as "no limit"
-# but is sometimes serialised as PT0S and treated as "kill after grace period".
-# 365 days is effectively forever for an AtLogOn task -- the next logon
-# restarts it long before the limit is hit.
 Register-Task `
-    -Name 'secondbrain-discord' `
-    -Trigger $discTrigger `
-    -Action $discAction `
-    -Settings $discSettings `
-    -Description 'Second Brain Discord bot. Long-running cache writer + Phase 7 DM chat. Wrapper auto-restarts on crashes.'
+    -Name 'secondbrain-voice' `
+    -Trigger $voiceTrigger `
+    -Action $voiceAction `
+    -Settings $voiceSettings `
+    -Description 'Vesper voice assistant. Starts orb UI + wakeword listener at logon. Wrapper auto-restarts on crashes.'
 
 Write-Host ""
 Write-Host "Installed. Inspect with:"

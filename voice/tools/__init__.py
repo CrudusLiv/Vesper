@@ -1,0 +1,70 @@
+"""Tool registry for Vesper voice assistant.
+
+Tools are registered with _register(name, description, fn).
+brain.py reads REGISTRY for the tool protocol and calls dispatch() on hits.
+"""
+from __future__ import annotations
+import json
+from typing import Any
+import voice  # noqa: F401
+
+REGISTRY: list[dict] = []
+_TOOLS: dict[str, Any] = {}
+_DESCRIPTIONS: list[str] = []
+
+
+def _register(name: str, description: str, fn: Any) -> None:
+    REGISTRY.append({"name": name, "description": description})
+    _TOOLS[name] = fn
+    _DESCRIPTIONS.append(f"- {name}: {description}")
+
+
+def _tool_descriptions() -> str:
+    return "\n".join(_DESCRIPTIONS)
+
+
+def dispatch(name: str, inputs: dict) -> str:
+    fn = _TOOLS.get(name)
+    if fn is None:
+        return json.dumps({"error": f"unknown tool: {name!r}"})
+    try:
+        result = fn(**inputs)
+        return result if isinstance(result, str) else json.dumps(result)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
+# ── Register tools ─────────────────────────────────────────────────────────────
+from voice.tools.email import triage_inbox, filter_subscriptions
+from voice.tools.search import search_vault
+from voice.tools.vault import read_note, append_note, create_note
+from voice.tools.calendar import upcoming_events
+from voice.memory import remember, forget
+
+_register("triage_inbox",
+    "Check email inbox for urgent messages. Use when asked about email, inbox, or messages. Args: days(int, default 3).",
+    triage_inbox)
+_register("filter_subscriptions",
+    "Identify newsletter/subscription emails. Args: days(int, default 3).",
+    filter_subscriptions)
+_register("search_vault",
+    "Search notes and lectures by meaning. Use for any question about saved notes. Args: query(str), top_k(int, default 5).",
+    search_vault)
+_register("read_note",
+    "Read a specific vault note by relative path. Args: path(str).",
+    read_note)
+_register("append_note",
+    "Append text to an existing vault note. REQUIRES CONFIRMATION. Args: path(str), text(str).",
+    append_note)
+_register("create_note",
+    "Create a new vault note. REQUIRES CONFIRMATION. Args: path(str), text(str).",
+    create_note)
+_register("upcoming_events",
+    "Fetch upcoming Google Calendar events. Args: days(int, default 7).",
+    upcoming_events)
+_register("remember_fact",
+    "Remember a fact about CrudusLiv across sessions. Args: key(str), value(str).",
+    remember)
+_register("forget_fact",
+    "Remove a remembered fact. REQUIRES CONFIRMATION. Args: key(str).",
+    forget)

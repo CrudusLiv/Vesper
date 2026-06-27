@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vesper</title>
+<script src="/static/vis-network.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0b0b14;
+    color: #8888aa;
+    font-family: 'Segoe UI', 'Consolas', monospace;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  #bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    border-bottom: 1px solid #16162a;
+    background: #0d0d1a;
+    flex-shrink: 0;
+  }
+
+  #ring {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #2a2a40;
+    flex-shrink: 0;
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+
+  #ring.idle      { background: #2a2a40; box-shadow: none; }
+  #ring.listening { background: #7ee7c2; box-shadow: 0 0 10px #7ee7c280; animation: blink 1s ease-in-out infinite; }
+  #ring.thinking  { background: #b48ead; box-shadow: 0 0 10px #b48ead80; animation: glow 1.2s ease-in-out infinite; }
+  #ring.speaking  { background: #88c0d0; box-shadow: 0 0 12px #88c0d080; animation: blink 0.5s ease-in-out infinite; }
+
+  @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+  @keyframes glow  { 0%,100% { box-shadow: 0 0 6px #b48ead80; } 50% { box-shadow: 0 0 18px #b48eadcc; } }
+
+  #state-label { font-size: 11px; color: #44445a; text-transform: uppercase; letter-spacing: 1.5px; }
+  #vesper-name { margin-left: auto; font-size: 11px; color: #2a2a40; letter-spacing: 3px; text-transform: uppercase; }
+
+  #network {
+    flex: 1;
+    width: 100%;
+    position: relative;
+    min-height: 0;      /* allow flex child to shrink */
+  }
+
+  #canvas-wrap {
+    position: absolute;
+    inset: 0;           /* fill #network exactly */
+  }
+
+  #empty {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: #44445a;
+    font-size: 13px;
+    pointer-events: none;
+  }
+
+  #debug {
+    position: absolute;
+    bottom: 4px; left: 8px;
+    font-size: 10px; color: #44445a;
+    pointer-events: none;
+  }
+
+  #strip {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 7px 18px;
+    border-top: 1px solid #16162a;
+    background: #0d0d1a;
+    flex-shrink: 0;
+    min-height: 34px;
+    overflow: hidden;
+  }
+
+  #tool-label { font-size: 11px; color: #4a3a5e; flex-shrink: 0; }
+  #msg-label  { font-size: 11px; color: #3a4a40; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <div id="ring" class="idle"></div>
+  <span id="state-label">idle</span>
+  <span id="vesper-name">Vesper</span>
+</div>
+
+<div id="network">
+  <div id="canvas-wrap"></div>
+  <div id="empty">no concepts yet</div>
+  <div id="debug"></div>
+</div>
+
+<div id="strip">
+  <span id="tool-label">—</span>
+  <span id="msg-label">—</span>
+</div>
+
+<script>
+const NODE_DEFAULT = {
+  color: { background: '#2a2a50', border: '#7a6aaa', highlight: { background: '#3a3a70', border: '#b48ead' } },
+  font:  { color: '#9090b0', size: 12, face: 'Segoe UI' },
+  borderWidth: 1, shape: 'dot', size: 10,
+};
+const EDGE_DEFAULT = {
+  color:  { color: '#3a3a6a', highlight: '#7a6aaa' },
+  width: 1,
+  arrows: { to: { enabled: false } },
+  smooth: { type: 'continuous' },
+};
+const NET_OPTIONS = {
+  nodes: NODE_DEFAULT,
+  edges: EDGE_DEFAULT,
+  physics: {
+    stabilization: { iterations: 200, fit: true },
+    barnesHut: { gravitationalConstant: -10000, springLength: 130, damping: 0.55 },
+  },
+  interaction: { tooltipDelay: 300, hideEdgesOnDrag: true, zoomView: true },
+};
+
+let network, nodeSet, edgeSet;
+
+const dbg = document.getElementById('debug');
+
+fetch('/graph')
+  .then(r => r.json())
+  .then(data => {
+    dbg.textContent = `${data.nodes.length} nodes, ${data.edges.length} edges`;
+    if (!data.nodes.length) return;
+    document.getElementById('empty').style.display = 'none';
+    nodeSet = new vis.DataSet(data.nodes);
+    edgeSet = new vis.DataSet(data.edges);
+    const container = document.getElementById('canvas-wrap');
+    dbg.textContent += ` | container ${container.offsetWidth}×${container.offsetHeight}`;
+    network = new vis.Network(container, { nodes: nodeSet, edges: edgeSet }, NET_OPTIONS);
+  })
+  .catch(e => { dbg.textContent = 'fetch error: ' + e; dbg.style.color = '#e06c75'; });
+
+function pulseNode(name) {
+  if (!nodeSet) return;
+  const node = nodeSet.get(name);
+  if (!node) {
+    nodeSet.add({ id: name, label: name, title: name, color: { background: '#1e0e2e', border: '#b48ead' }, size: 10 });
+    setTimeout(() => nodeSet.remove(name), 2000);
+    return;
+  }
+  nodeSet.update({ id: name, color: { background: '#1e0e2e', border: '#b48ead' }, size: 12 });
+  setTimeout(() => nodeSet.update({ id: name, color: NODE_DEFAULT.color, size: 7 }), 1800);
+}
+
+const ring  = document.getElementById('ring');
+const label = document.getElementById('state-label');
+const tool  = document.getElementById('tool-label');
+const msg   = document.getElementById('msg-label');
+
+function setState(s) { ring.className = s; label.textContent = s; }
+
+function connect() {
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onmessage = ({ data }) => {
+    const ev = JSON.parse(data);
+    if (ev.type === 'state') {
+      setState(ev.value);
+    } else if (ev.type === 'tool') {
+      tool.textContent = `tool: ${ev.name}`;
+      pulseNode(ev.name);
+    } else if (ev.type === 'message' && ev.role === 'assistant') {
+      msg.textContent = (ev.content ?? '').slice(0, 160);
+      setState('idle');
+    }
+  };
+  const ping = setInterval(() => ws.readyState === 1 && ws.send('ping'), 20000);
+  ws.onclose = () => { clearInterval(ping); setTimeout(connect, 2000); };
+}
+connect();
+</script>
+</body>
+</html>
