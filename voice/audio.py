@@ -90,15 +90,22 @@ def record_ptt(key: str = "space", on_press=None) -> Optional[bytes]:
     return buf.getvalue()
 
 
-def record_vad(
-    max_duration_s: float = 12.0,
-    silence_threshold: float = 0.008,
-    silence_duration_s: float = 0.9,
-) -> Optional[bytes]:
+def record_vad() -> Optional[bytes]:
     """Record immediately; stop when silence detected. Used after wake-word trigger.
+
+    Timing controlled by config: vad_silence_s (default 0.6), vad_max_s (default 8),
+    vad_silence_threshold (default 0.01).
 
     Returns WAV bytes or None if the clip is too short.
     """
+    try:
+        from voice import config as _cfg
+        _conf = _cfg.load()
+        max_duration_s     = float(_conf.get("vad_max_s", 8.0))
+        silence_threshold  = float(_conf.get("vad_silence_threshold", 0.01))
+        silence_duration_s = float(_conf.get("vad_silence_s", 0.6))
+    except Exception:
+        max_duration_s, silence_threshold, silence_duration_s = 8.0, 0.01, 0.6
     try:
         import numpy as np
         import sounddevice as sd

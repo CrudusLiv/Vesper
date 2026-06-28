@@ -76,6 +76,7 @@ def _call_claude(
         CLAUDE_BIN, "-p",
         "--setting-sources", "user",
         "--disable-slash-commands",
+        "--allowedTools", "",   # block native CC tools so model uses our text protocol
         "--model", model,
         "--output-format", "json",
     ]

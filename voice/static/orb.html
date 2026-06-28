@@ -33,7 +33,7 @@
   }
   #status.listening { color: #aaee33; animation: none; }
   #status.thinking  { color: #bb66ff; animation: none; }
-  #status.speaking  { color: #c8c4f0; animation: none; }
+  #status.speaking  { color: #22ddcc; animation: none; }
 
   #last-msg {
     position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%);
@@ -506,7 +506,7 @@ const STATES = {
   idle:      { r:1.0,  sc:0.015, rot:0.003, pa:0.025, pf:0.7,  col: new THREE.Color(0x4422aa) },
   listening: { r:0.87, sc:0.006, rot:0.007, pa:0.055, pf:2.5,  col: new THREE.Color(0x88cc22) },
   thinking:  { r:1.12, sc:0.22,  rot:0.025, pa:0.14,  pf:3.8,  col: new THREE.Color(0x8833cc) },
-  speaking:  { r:1.0,  sc:0.10,  rot:0.012, pa:0.24,  pf:5.2,  col: new THREE.Color(0x9988cc) },
+  speaking:  { r:0.90, sc:0.008, rot:0.010, pa:0.15,  pf:4.2,  col: new THREE.Color(0x22ccbb) },
 };
 
 let state = 'idle';
@@ -557,9 +557,19 @@ let t = 0;
 
   volAmp += (volTarget - volAmp) * 0.18;
   volTarget *= 0.82;
-  const showRing = state === 'listening';
-  volRingMat.opacity = showRing ? volAmp * 0.9 : 0;
-  volRing.scale.setScalar(showRing ? 1 + volAmp * 0.12 : 1);
+  if (state === 'speaking') {
+    const spk = 0.5 + 0.5 * Math.sin(t * 4.2);
+    volRingMat.color.set(0x22ccbb);
+    volRingMat.opacity = spk * 0.85;
+    volRing.scale.setScalar(1 + spk * 0.18);
+  } else if (state === 'listening') {
+    volRingMat.color.set(0x88cc22);
+    volRingMat.opacity = volAmp * 0.9;
+    volRing.scale.setScalar(1 + volAmp * 0.12);
+  } else {
+    volRingMat.opacity = 0;
+    volRing.scale.setScalar(1);
+  }
 
   renderer.render(scene, camera);
 })();
@@ -919,7 +929,6 @@ setInterval(updateNoticeBadge, 60000);
       const content = ev.content ?? '';
       msgEl.textContent = content.slice(0, 120);
       addChatBubble('assistant', content);
-      setState('idle');
     } else if (ev.type === 'amplitude') {
       volTarget = Math.min((ev.value || 0) * 10, 1.0);
     }

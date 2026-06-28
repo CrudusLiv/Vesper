@@ -12,7 +12,10 @@ DEFAULTS: dict[str, Any] = {
     "model": "claude-sonnet-4-6",
     "fast_model": "claude-haiku-4-5-20251001",
     "voice_id": "",
-    "tts_voice": "en-GB-SoniaNeural",
+    # TTS engine: "edge" (online, free) or "kokoro" (offline, local, ~300 MB download on first run)
+    "tts_engine": "edge",
+    "tts_voice": "en-GB-SoniaNeural",       # used when tts_engine = "edge"
+    "tts_kokoro_voice": "bf_isabella",       # used when tts_engine = "kokoro"
     "ptt_key": "space",
     "max_history_turns": 40,
     "quiet_hours_start": "22:00",
@@ -22,8 +25,32 @@ DEFAULTS: dict[str, Any] = {
     "ui_enabled": False,
     "ui_port": 7070,
     "requires_confirmation": ["create_note", "append_note", "forget_fact"],
-    "wakeword_model": "",        # path to .onnx or openwakeword model name; "" = demo (alexa)
-    "wakeword_threshold": 0.5,
+    # STT (speech-to-text)
+    "stt_model": "base",        # faster-whisper model: tiny/base/small/medium/large-v3
+    "stt_device": "cpu",        # "cpu" or "cuda"
+    "stt_compute_type": "int8", # int8 (fastest CPU), float16 (GPU), float32
+    # Wake word
+    "wakeword_engine": "vosk",       # "vosk" (recommended) or "openwakeword"
+    "wakeword_keyword": "vesper",    # keyword for vosk engine
+    "wakeword_model": "",            # vosk: model name or dir path; openwakeword: .onnx name
+    "wakeword_threshold": 0.5,       # openwakeword only
+    # Proactive TTS
+    "proactive_tts": True,
+    "briefing_enabled": True,
+    "briefing_time": "09:00",
+    "wrap_time": "21:00",
+    "nudge_enabled": True,
+    "nudge_minutes": 15,
+    # App launcher shortcuts: {"name": "cmd"} or {"name": ["cmd1", "cmd2"]}
+    "app_shortcuts": {},
+    # Double-clap one-shot launch (fires once on startup, then disables itself)
+    "clap_enabled": False,
+    "clap_threshold": 0.7,
+    "clap_window_s": 0.8,
+    # VAD tuning
+    "vad_silence_s": 0.6,           # seconds of silence before recording stops
+    "vad_max_s": 8.0,               # hard cap on recording length
+    "vad_silence_threshold": 0.01,  # RMS amplitude below which counts as silence
 }
 
 

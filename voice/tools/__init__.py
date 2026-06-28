@@ -68,3 +68,7 @@ _register("remember_fact",
 _register("forget_fact",
     "Remove a remembered fact. REQUIRES CONFIRMATION. Args: key(str).",
     forget)
+from voice.tools.launch_app import launch_app
+_register("launch_app",
+    "Open an app or set of apps by shortcut name. Use when asked to open, launch, or start an app. Args: name(str).",
+    launch_app)

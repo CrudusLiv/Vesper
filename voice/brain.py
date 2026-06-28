@@ -67,7 +67,16 @@ def _emit(event: dict) -> None:
 def _build_system(conf: dict, tool_descriptions: str) -> str:
     soul = _SOUL.read_text(encoding="utf-8") if _SOUL.exists() else _FALLBACK
     now = datetime.now(_KL).strftime("%A, %d %B %Y, %H:%M KL time")
-    base = f"{soul}{_VOICE_NOTE}\n\nCurrent time: {now}"
+
+    # Tool protocol goes FIRST so it isn't buried under the long personality block.
+    # Haiku and sonnet both follow instructions much more reliably when they appear
+    # near the top of the system prompt.
+    if tool_descriptions:
+        tool_block = _TOOL_PROTOCOL.format(tool_list=tool_descriptions)
+    else:
+        tool_block = ""
+
+    base = f"{tool_block}\n\n{soul}{_VOICE_NOTE}\n\nCurrent time: {now}"
     try:
         from voice.memory import load_context
         ctx = load_context()
@@ -75,9 +84,6 @@ def _build_system(conf: dict, tool_descriptions: str) -> str:
             base += f"\n\n## Your Context\n{ctx}"
     except Exception:
         pass
-    if tool_descriptions:
-        tool_block = _TOOL_PROTOCOL.format(tool_list=tool_descriptions)
-        return base + tool_block
     return base
 
 
@@ -141,8 +147,8 @@ class Brain:
 
         from core import llm  # type: ignore
         max_tool_rounds = 5
-        # First call uses fast_model; if a tool is invoked we promote to main model
-        call_model = self._fast_model
+        # Always use the main model — haiku misses tool calls in long contexts
+        call_model = self._model
 
         for _ in range(max_tool_rounds):
             prompt = _format_prompt(self.history)
@@ -155,12 +161,12 @@ class Brain:
 
             if not response:
                 yield "[couldn't get a response — try again]"
-                self.history.pop()
+                if self.history:
+                    self.history.pop()
                 return
 
             tool_call = _parse_tool_call(response)
             if tool_call:
-                call_model = self._model  # promote to full model for tool rounds
                 name, args = tool_call["name"], tool_call["args"]
                 audit.log("tool", response, tool_name=name)
                 _emit({"type": "tool", "name": name})
@@ -194,7 +200,8 @@ class Brain:
 
         # Ran out of tool rounds
         yield "[tool loop limit reached]"
-        self.history.pop()
+        if self.history:
+            self.history.pop()
 
     def _trim(self) -> None:
         cap = self._max_turns * 2
