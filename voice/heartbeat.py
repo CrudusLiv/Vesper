@@ -77,7 +77,7 @@ def _check_calendar() -> list[str]:
         events = _fetch_events(days=1, max_results=10)
         if not events:
             return []
-        lines = [f"{e['start'][:16]}  {e['summary']}" for e in events[:3]]
+        lines = [f"{e.get('start', '')[:16]}  {e.get('summary', '(no title)')}" for e in events[:3]]
         return [f"Calendar: {'; '.join(lines)}"[:120]]
     except Exception:
         return []
@@ -215,8 +215,8 @@ class Heartbeat:
         if events:
             strs = []
             for e in events[:3]:
-                t = e["start"][11:16] if "T" in e["start"] else "all day"
-                strs.append(f"{e['summary']} at {t}")
+                t = e.get("start", "")[11:16] if "T" in e.get("start", "") else "all day"
+                strs.append(f"{e.get('summary', '(no title)')} at {t}")
             parts.append(f"Today: {', '.join(strs)}.")
         else:
             parts.append("No events today.")
@@ -249,10 +249,10 @@ class Heartbeat:
         parts: list[str] = ["Evening check-in."]
         tomorrow = today + timedelta(days=1)
         events = _fetch_events(days=2, max_results=10)
-        tmr = [e for e in events if e["start"][:10] == str(tomorrow)]
+        tmr = [e for e in events if e.get("start", "")[:10] == str(tomorrow)]
         if tmr:
-            t = tmr[0]["start"][11:16] if "T" in tmr[0]["start"] else "all day"
-            parts.append(f"Tomorrow starts with {tmr[0]['summary']} at {t}.")
+            t = tmr[0].get("start", "")[11:16] if "T" in tmr[0].get("start", "") else "all day"
+            parts.append(f"Tomorrow starts with {tmr[0].get('summary', '(no title)')} at {t}.")
         else:
             parts.append("Nothing scheduled for tomorrow.")
 
@@ -294,7 +294,7 @@ class Heartbeat:
                     self._nudged_events.add(key)
                     mins = int(delta)
                     text = (
-                        f"Heads up — {event['summary']} starts in "
+                        f"Heads up — {event.get('summary', 'an event')} starts in "
                         f"{mins} minute{'s' if mins != 1 else ''}."
                     )
                     self._speak(text)

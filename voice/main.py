@@ -191,13 +191,16 @@ def run() -> None:
                 from voice.stt import transcribe
                 from voice.tts import stop_speaking
 
+                _STOP_WORDS = frozenset({"stop", "cancel", "quiet", "shut up", "nevermind", "never mind", "be quiet"})
+
                 if _wakeword_event is not None:
                     if not _ww_thread.is_alive():
                         print("[wakeword] thread exited — using PTT fallback")
                         _wakeword_event = None
                     else:
-                        # Wait for wake word — idle state is managed by on_done / error paths
-                        _wakeword_event.wait()
+                        # Timeout allows recovery if thread dies after is_alive() check
+                        if not _wakeword_event.wait(timeout=5.0):
+                            continue
                         _wakeword_event.clear()
                         stop_speaking()
                         print("[wake] triggered — listening …", flush=True)
@@ -217,6 +220,11 @@ def run() -> None:
                             continue
                         if not user_text.strip():
                             print("[STT] (nothing transcribed)")
+                            _wakeword_ready.set()
+                            _emit({"type": "state", "value": "idle"})
+                            continue
+                        if user_text.strip().lower().rstrip(".,!") in _STOP_WORDS:
+                            print("[interrupt] stop command — idle")
                             _wakeword_ready.set()
                             _emit({"type": "state", "value": "idle"})
                             continue
@@ -278,6 +286,7 @@ def run() -> None:
                 _emit({"type": "state", "value": "idle"})
 
     except KeyboardInterrupt:
+        brain.save()
         _stop_proactive.set()
         if hb:
             hb.stop()

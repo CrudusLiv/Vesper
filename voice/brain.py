@@ -9,6 +9,7 @@ Tools: text-based ReAct protocol parsed from model output.
 """
 from __future__ import annotations
 
+import json
 import re
 import threading
 from datetime import datetime, timedelta, timezone
@@ -21,6 +22,7 @@ from voice import config as cfg
 _KL = timezone(timedelta(hours=8))
 _ROOT = Path(__file__).resolve().parents[1]
 _SOUL = _ROOT / "Dynamous" / "Memory" / "SOUL.md"
+_HISTORY_PATH = _ROOT / ".claude" / "data" / "brain_session.json"
 
 _FALLBACK = (
     "You are Vesper, CrudusLiv's study partner and voice assistant. "
@@ -132,6 +134,7 @@ class Brain:
 
         self._system: str = _build_system(conf, self._tool_descriptions)
         self.history: list[dict] = []
+        self._load_session()
 
     def turn(self, user_text: str) -> Iterator[str]:
         with self._lock:
@@ -203,7 +206,26 @@ class Brain:
         if self.history:
             self.history.pop()
 
+    def save(self) -> None:
+        try:
+            _HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+            _HISTORY_PATH.write_text(
+                json.dumps(self.history, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+
+    def _load_session(self) -> None:
+        try:
+            if _HISTORY_PATH.exists():
+                data = json.loads(_HISTORY_PATH.read_text(encoding="utf-8"))
+                if isinstance(data, list):
+                    self.history = data
+        except Exception:
+            pass
+
     def _trim(self) -> None:
         cap = self._max_turns * 2
         if len(self.history) > cap:
-            self.history = self.history[2:]
+            self.history = self.history[-cap:]
