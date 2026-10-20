@@ -40,6 +40,18 @@ from voice.agent_tools import vesper_tools
 
 _ROOT = Path(__file__).resolve().parents[1]
 
+_current_source = "text"
+
+
+def get_current_source() -> str:
+    """The input source ('voice' or 'text') of whichever turn is currently
+    executing -- read by voice/safety.py to decide whether a pending tool
+    confirmation can be resolved by speaking a question and listening for a
+    PTT yes/no answer, instead of only the orb UI card. Module-level since
+    this Brain processes one turn at a time (a persistent single session,
+    not concurrent turns)."""
+    return _current_source
+
 _FALLBACK = (
     "You are Vesper, a voice assistant. "
     "Tsundere: cold on the surface, secretly invested. Never admits caring. "
@@ -249,6 +261,8 @@ class Brain:
         self._client = client
 
     def turn(self, user_text: str, source: str = "text") -> Iterator[str]:
+        global _current_source
+        _current_source = source
         with self._lock:
             yield from self._turn(user_text, source)
 

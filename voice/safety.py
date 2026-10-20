@@ -3,12 +3,16 @@
 Tools listed in config.json `requires_confirmation` must be approved before
 brain.py dispatches them. Approval is routed, in order:
   1. kill switch paused        -> auto-deny
-  2. HTTP bridge to ui_server  -> in-orb approve/deny card (voice/confirm.py),
+  2. voice                     -> speak the question, listen for a held-PTT
+                                   yes/no answer (only when the triggering
+                                   turn itself came in via voice -- see
+                                   voice/brain.py::get_current_source)
+  3. HTTP bridge to ui_server  -> in-orb approve/deny card (voice/confirm.py),
                                    reachable whether this call runs in-process
                                    (voice/agent_tools.py, today) or from a
                                    separate subprocess
-  3. frozen .exe               -> tkinter dialog
-  4. console                   -> [y/N] prompt
+  4. frozen .exe               -> tkinter dialog
+  5. console                   -> [y/N] prompt
 Every path times out to DENY after `confirm_timeout_seconds` so a
 heartbeat-initiated action can never hang waiting on an absent human.
 """
@@ -16,6 +20,16 @@ from __future__ import annotations
 
 import json
 import threading
+
+_CONFIRM_YES_PHRASES = {
+    "yes", "yeah", "yep", "yup", "sure", "go ahead", "do it", "confirm", "confirmed",
+}
+_CONFIRM_NO_PHRASES = {
+    "no", "nope", "nah", "cancel", "stop", "dont", "negative",
+}
+
+# One re-ask on an unrecognized answer, then deny -- see _voice_confirm.
+_CONFIRM_MAX_ATTEMPTS = 2
 
 
 def requires_confirmation(tool_name: str) -> bool:
@@ -52,6 +66,10 @@ def confirm_with_reason(tool_name: str, args: dict) -> tuple[bool, str]:
     # through to the tkinter/console paths on any failure: server not
     # running (ui_enabled=False), wrong/missing token, or no client
     # connected to hear the confirm card (server-side has_clients() check).
+    result = _voice_confirm(tool_name, args, timeout_s)
+    if result is not None:
+        return result
+
     result = _http_confirm(tool_name, args, timeout_s)
     if result is not None:
         return result
@@ -60,6 +78,112 @@ def confirm_with_reason(tool_name: str, args: dict) -> tuple[bool, str]:
         return _tkinter_confirm(tool_name, args_str, timeout_s)
 
     return _console_confirm(tool_name, args_str, timeout_s)
+
+
+def _emit_state(value: str) -> None:
+    """Broadcast an orb state change. Fire-and-forget -- matches the pattern
+    in voice/confirm.py; a confirm must not fail because the UI is down."""
+    try:
+        from voice import ui_server
+        ui_server.post_event({"type": "state", "value": value})
+    except Exception:
+        pass
+
+
+def _normalize_answer(text: str) -> str:
+    """Lowercase, drop apostrophes, punctuation to spaces, collapse runs.
+    Apostrophes are dropped rather than spaced so "don't" reaches the
+    no-set as "dont" instead of splitting into "don t"."""
+    lowered = text.lower().replace("'", "").replace("’", "")
+    cleaned = "".join(c if (c.isalnum() or c.isspace()) else " " for c in lowered)
+    return " ".join(cleaned.split())
+
+
+def _classify_answer(text: str) -> str | None:
+    """"yes", "no", or None when the answer is neither. Matched on phrase
+    prefix: Whisper almost never returns a bare "yes", and an exact-set
+    check dropped "yes please" and "yeah, go ahead" into the deny branch."""
+    norm = _normalize_answer(text)
+    if not norm:
+        return None
+    for verdict, phrases in (("yes", _CONFIRM_YES_PHRASES), ("no", _CONFIRM_NO_PHRASES)):
+        if any(norm == phrase or norm.startswith(phrase + " ") for phrase in phrases):
+            return verdict
+    return None
+
+
+def _spoken_question(tool_name: str, args: dict) -> str:
+    """Name the arguments alongside the tool. "Should I create reminder?"
+    asks the user to approve blind -- they have to trust their memory of
+    the turn that triggered it."""
+    spoken_name = tool_name.replace("_", " ")
+    details = ", ".join(str(v).strip() for v in args.values() if str(v).strip())
+    if details:
+        return f"Should I {spoken_name}: {details}? Say yes or no."
+    return f"Should I {spoken_name}? Say yes or no."
+
+
+def _voice_confirm(tool_name: str, args: dict, timeout_s: float) -> tuple[bool, str] | None:
+    """Speak the confirmation and listen for a held-PTT yes/no answer.
+    Returns None (not True/False) when voice isn't a viable channel for
+    THIS turn -- falls through to the HTTP/tkinter/console chain exactly
+    like _http_confirm's None does. Viable only when the utterance that
+    triggered this tool call itself came in via voice (a text-mode or
+    heartbeat-initiated confirm has no one to listen for) and it isn't
+    quiet hours (a synthesized question at 2am would be worse than the
+    click it's replacing).
+
+    An unrecognized answer re-asks once rather than cancelling: a single
+    mishearing otherwise costs the user the whole request, which has to be
+    restated from scratch. A clear "no" still denies on the first pass, and
+    the timeout deadline spans all attempts so the retry can't extend how
+    long the brain thread blocks."""
+    from voice import brain, config as cfg
+    if brain.get_current_source() != "voice" or cfg.is_quiet_hours():
+        return None
+
+    try:
+        import time as _time
+        from voice.audio import is_ptt_down, record_while_held
+        from voice.stt import transcribe
+        from voice.tts import speak, stop_speaking
+    except Exception:
+        return None
+
+    key = cfg.load().get("ptt_key", "`")
+    deadline = _time.monotonic() + timeout_s
+    question = _spoken_question(tool_name, args)
+
+    for attempt in range(_CONFIRM_MAX_ATTEMPTS):
+        speak(question if attempt == 0 else "Sorry -- yes or no?", force=True)
+
+        while not is_ptt_down(key):
+            if _time.monotonic() >= deadline:
+                return False, "timeout"
+            _time.sleep(0.05)
+
+        # Without this the orb ring stays on the brain's "thinking" and the
+        # mini capsule stays hidden (it hid when the question finished
+        # speaking) for the whole time she is recording the answer.
+        _emit_state("listening")
+        try:
+            audio = record_while_held(key=key, on_press=stop_speaking)
+            if audio is None:
+                return False, "timeout"
+            try:
+                answer = transcribe(audio)
+            except Exception:
+                return None  # STT failed -- fall to the UI card, not a silent deny
+        finally:
+            _emit_state("thinking")
+
+        verdict = _classify_answer(answer)
+        if verdict == "yes":
+            return True, "user"
+        if verdict == "no":
+            return False, "cancelled"
+
+    return False, "cancelled"  # out of attempts -- deny on doubt
 
 
 def _http_confirm(tool_name: str, args: dict, timeout_s: float) -> tuple[bool, str] | None:

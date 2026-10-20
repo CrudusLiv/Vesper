@@ -208,3 +208,67 @@ def test_complete_reminder_error_is_reported_not_raised(monkeypatch):
     monkeypatch.setattr(m, "complete_reminder", _boom)
     result = calendar_tools.complete_reminder("Reorganize emails")
     assert "unavailable" in result.lower()
+
+
+# ── Live-refresh broadcast ─────────────────────────────────────────────────
+# The orb's Calendar pane only refetches when the tab is opened
+# (voice/static/orb.html), so a reminder added mid-session never appeared
+# while that tab was already on screen. Mutations now announce themselves.
+
+def _gtasks_write_module():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / ".claude" / "scripts"))
+    from integrations import gtasks_write  # type: ignore
+    return gtasks_write
+
+
+def test_create_reminder_broadcasts_data_changed(monkeypatch):
+    m = _gtasks_write_module()
+    monkeypatch.setattr(
+        m, "create_reminder", lambda title, date, description="": "task123")
+    events: list[dict] = []
+    monkeypatch.setattr("voice.ui_server.post_event", lambda ev: events.append(ev))
+    calendar_tools.create_reminder("Start BDA 205", "2026-09-21")
+    assert {"type": "data_changed", "scope": "calendar"} in events
+
+
+def test_duplicate_reminder_does_not_broadcast(monkeypatch):
+    """Nothing changed server-side, so a refetch would be pure noise."""
+    m = _gtasks_write_module()
+    monkeypatch.setattr(m, "create_reminder", lambda title, date, description="": None)
+    events: list[dict] = []
+    monkeypatch.setattr("voice.ui_server.post_event", lambda ev: events.append(ev))
+    calendar_tools.create_reminder("Start BDA 205", "2026-09-21")
+    assert events == []
+
+
+def test_create_calendar_event_broadcasts_data_changed(monkeypatch):
+    m = _gcal_write_module()
+    monkeypatch.setattr(
+        m, "create_event", lambda title, date, description="": "evt123")
+    events: list[dict] = []
+    monkeypatch.setattr("voice.ui_server.post_event", lambda ev: events.append(ev))
+    calendar_tools.create_calendar_event("Dentist", "2026-08-10")
+    assert {"type": "data_changed", "scope": "calendar"} in events
+
+
+def test_complete_reminder_broadcasts_data_changed(monkeypatch):
+    m = _gtasks_write_module()
+    monkeypatch.setattr(m, "complete_reminder", lambda title: "task123")
+    events: list[dict] = []
+    monkeypatch.setattr("voice.ui_server.post_event", lambda ev: events.append(ev))
+    calendar_tools.complete_reminder("Start BDA 205")
+    assert {"type": "data_changed", "scope": "calendar"} in events
+
+
+def test_broadcast_failure_never_breaks_the_tool(monkeypatch):
+    """UI server down (ui_enabled=False) must not turn a successful write
+    into a spoken error."""
+    m = _gtasks_write_module()
+    monkeypatch.setattr(
+        m, "create_reminder", lambda title, date, description="": "task123")
+
+    def _boom(ev):
+        raise RuntimeError("no server")
+    monkeypatch.setattr("voice.ui_server.post_event", _boom)
+    result = calendar_tools.create_reminder("Start BDA 205", "2026-09-21")
+    assert "Created reminder" in result

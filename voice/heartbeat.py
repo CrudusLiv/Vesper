@@ -499,10 +499,8 @@ class Heartbeat:
         if self._thread and self._thread.is_alive():
             return
         self._stop.clear()
-        self._thread = threading.Thread(
-            target=self._loop, daemon=True, name="vesper-heartbeat"
-        )
-        self._thread.start()
+        from voice import supervisor
+        self._thread = supervisor.supervise("vesper-heartbeat", self._loop)
 
     def stop(self) -> None:
         self._stop.set()
@@ -962,10 +960,9 @@ class Heartbeat:
 
         self._build_watch_done_date = today
 
-        test_result = test_runner.run_test_suite(_ROOT)
+        test_result = test_runner.run_test_suite(_ROOT, log_path=cfg.get_data_dir() / "last_test_run.log")
         if not test_result.get("ok", True):
-            failed = test_result.get("failed", 0)
-            _post(f"Build watch: {failed} test{'s' if failed != 1 else ''} failing locally.", level="URGENT")
+            _post(test_runner.describe_failure(test_result), level="URGENT")
         self._last_test_ok = test_result.get("ok")
 
         repo = conf.get("build_watch_repo", "")

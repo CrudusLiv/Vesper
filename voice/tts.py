@@ -81,7 +81,16 @@ _utterance_lock = threading.Lock()
 def _on_speak_start() -> None:
     """Fired once audio starts physically playing (speaking.set()). Best-
     effort, fire-and-forget -- matches this module's existing pattern for
-    UI side-effects (see _broadcast_viseme)."""
+    UI side-effects (see _broadcast_viseme).
+
+    Also drives the mini conversation-presence capsule directly, in
+    addition to voice/ui_server.py::post_event()'s `state`-broadcast path:
+    proactive/heartbeat-triggered speech (voice/main.py::
+    _start_proactive_speaker, e.g. the power-plug notice) calls speak()
+    directly and never emits a `state` event, so audio playback is the
+    only signal available for that case. Conversational turns already
+    emit `state` events too -- calling this again here is a harmless
+    redundant resync, not a conflict."""
     try:
         from voice import audio_duck
         audio_duck.duck()
@@ -89,7 +98,7 @@ def _on_speak_start() -> None:
         pass
     try:
         from voice import ui_window
-        ui_window.show_mini()
+        ui_window.set_conversation_state("speaking")
     except Exception:
         pass
 
@@ -104,7 +113,7 @@ def _on_speak_end() -> None:
         pass
     try:
         from voice import ui_window
-        ui_window.hide_mini()
+        ui_window.set_conversation_state("idle")
     except Exception:
         pass
 

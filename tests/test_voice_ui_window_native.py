@@ -12,6 +12,12 @@ import pytest
 from voice import ui_window
 
 
+def _reset_mini_timer():
+    if ui_window._mini_hide_timer is not None:
+        ui_window._mini_hide_timer.cancel()
+        ui_window._mini_hide_timer = None
+
+
 @pytest.fixture(autouse=True)
 def _reset_module_state():
     ui_window._window = None
@@ -19,12 +25,16 @@ def _reset_module_state():
     ui_window._main_visible = True
     ui_window._mini_window = None
     ui_window._mini_available = False
+    ui_window._mini_visible = False
+    _reset_mini_timer()
     yield
     ui_window._window = None
     ui_window._available = False
     ui_window._main_visible = True
     ui_window._mini_window = None
     ui_window._mini_available = False
+    ui_window._mini_visible = False
+    _reset_mini_timer()
 
 
 def test_is_available_false_initially():
@@ -99,56 +109,121 @@ def test_show_marks_main_visible_again():
     assert ui_window._main_visible is True
 
 
-def test_show_mini_noop_when_unavailable():
+class _ImmediateTimer:
+    """Stand-in for threading.Timer that fires synchronously on start(),
+    so tests don't sleep 400ms to observe the delayed hide()."""
+    def __init__(self, interval, function):
+        self.interval = interval
+        self.function = function
+        self.daemon = False
+        self.cancelled = False
+
+    def start(self):
+        if not self.cancelled:
+            self.function()
+
+    def cancel(self):
+        self.cancelled = True
+
+
+@pytest.fixture
+def immediate_timer(monkeypatch):
+    import threading
+    monkeypatch.setattr(threading, "Timer", _ImmediateTimer)
+
+
+def test_set_conversation_state_noop_when_unavailable():
     ui_window._mini_available = False
     ui_window._main_visible = False
     ui_window._mini_window = SimpleNamespace(show=lambda: (_ for _ in ()).throw(AssertionError))
-    ui_window.show_mini()  # must not raise / must not call show()
+    ui_window.set_conversation_state("listening")  # must not raise / must not call show()
 
 
-def test_show_mini_noop_when_main_window_visible():
+def test_set_conversation_state_noop_when_main_window_visible():
     calls = []
     ui_window._mini_available = True
     ui_window._main_visible = True
     ui_window._mini_window = SimpleNamespace(show=lambda: calls.append(True))
-    ui_window.show_mini()
+    ui_window.set_conversation_state("listening")
     assert calls == []
 
 
-def test_show_mini_noop_when_disabled_in_config(monkeypatch):
+def test_set_conversation_state_noop_when_disabled_in_config(monkeypatch):
     from voice import config as cfg
     monkeypatch.setattr(cfg, "load", lambda: {"speaking_popup_enabled": False})
     calls = []
     ui_window._mini_available = True
     ui_window._main_visible = False
     ui_window._mini_window = SimpleNamespace(show=lambda: calls.append(True))
-    ui_window.show_mini()
+    ui_window.set_conversation_state("listening")
     assert calls == []
 
 
-def test_show_mini_shows_when_available_and_main_hidden(monkeypatch):
+def test_set_conversation_state_shows_and_resyncs_for_active_state(monkeypatch):
     from voice import config as cfg
     monkeypatch.setattr(cfg, "load", lambda: {"speaking_popup_enabled": True})
-    calls = []
+    show_calls = []
+    js_calls = []
     ui_window._mini_available = True
     ui_window._main_visible = False
-    ui_window._mini_window = SimpleNamespace(show=lambda: calls.append(True))
-    ui_window.show_mini()
-    assert calls == [True]
+    ui_window._mini_window = SimpleNamespace(
+        show=lambda: show_calls.append(True),
+        evaluate_js=lambda js: js_calls.append(js),
+    )
+    ui_window.set_conversation_state("listening")
+    assert show_calls == [True]
+    assert ui_window._mini_visible is True
+    assert len(js_calls) == 1
+    assert "'listening'" in js_calls[0]
+    assert "mini-show" in js_calls[0]
 
 
-def test_hide_mini_noop_when_unavailable():
-    ui_window._mini_available = False
-    ui_window._mini_window = SimpleNamespace(hide=lambda: (_ for _ in ()).throw(AssertionError))
-    ui_window.hide_mini()  # must not raise / must not call hide()
-
-
-def test_hide_mini_calls_hide_when_available():
-    calls = []
+def test_set_conversation_state_resyncs_without_reshowing_when_already_visible(monkeypatch):
+    from voice import config as cfg
+    monkeypatch.setattr(cfg, "load", lambda: {"speaking_popup_enabled": True})
+    show_calls = []
+    js_calls = []
     ui_window._mini_available = True
-    ui_window._mini_window = SimpleNamespace(hide=lambda: calls.append(True))
-    ui_window.hide_mini()
-    assert calls == [True]
+    ui_window._main_visible = False
+    ui_window._mini_visible = True
+    ui_window._mini_window = SimpleNamespace(
+        show=lambda: show_calls.append(True),
+        evaluate_js=lambda js: js_calls.append(js),
+    )
+    ui_window.set_conversation_state("speaking")
+    assert show_calls == []  # already visible -- no redundant show()
+    assert "'speaking'" in js_calls[0]
+
+
+def test_set_conversation_state_hides_for_idle_when_visible(monkeypatch, immediate_timer):
+    from voice import config as cfg
+    monkeypatch.setattr(cfg, "load", lambda: {"speaking_popup_enabled": True})
+    hide_calls = []
+    js_calls = []
+    ui_window._mini_available = True
+    ui_window._main_visible = False
+    ui_window._mini_visible = True
+    ui_window._mini_window = SimpleNamespace(
+        hide=lambda: hide_calls.append(True),
+        evaluate_js=lambda js: js_calls.append(js),
+    )
+    ui_window.set_conversation_state("idle")
+    assert "mini-show" in js_calls[0]
+    assert hide_calls == [True]  # fired by the (monkeypatched immediate) timer
+    assert ui_window._mini_visible is False
+
+
+def test_set_conversation_state_idle_noop_when_not_visible(monkeypatch):
+    from voice import config as cfg
+    monkeypatch.setattr(cfg, "load", lambda: {"speaking_popup_enabled": True})
+    ui_window._mini_available = True
+    ui_window._main_visible = False
+    ui_window._mini_visible = False
+    ui_window._mini_window = SimpleNamespace(
+        hide=lambda: (_ for _ in ()).throw(AssertionError),
+        evaluate_js=lambda js: (_ for _ in ()).throw(AssertionError),
+    )
+    ui_window.set_conversation_state("idle")  # must not raise / must not touch the window
 
 
 def test_mini_position_corners():

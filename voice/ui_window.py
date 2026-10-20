@@ -20,14 +20,16 @@ A second, small always-on-top window (the "mini" popup) is created
 alongside the main one -- pywebview runs one GUI loop per process, so
 every window has to exist before webview.start() is called. It points at
 `/?mini=1`, a stripped-down view of the same orb.html (see that file's
-`body.mini` CSS), and is shown/hidden by voice/tts.py while she's
-speaking -- but only when the main window isn't already visible (tracked
-via _main_visible below), since the full window already shows the same
-speaking state and a second indicator would be redundant.
+`body.mini` CSS and `#mini-capsule`), and is shown/resynced/hidden by
+set_conversation_state() below for every listening/thinking/speaking/idle
+state change -- but only when the main window isn't already visible
+(tracked via _main_visible below), since the full window already shows
+the same state and a second indicator would be redundant.
 """
 from __future__ import annotations
 
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -37,14 +39,35 @@ _main_visible = True  # the main window is shown by default once created
 
 _mini_window = None
 _mini_available = False
+_mini_visible = False
+_mini_hide_timer: threading.Timer | None = None
 
-# The mini window shows a shrunk orb (voice/static/orb.html's body.mini CSS
-# hides all HUD chrome and keeps just the orb canvases), so it's square. The
-# window is kept opaque near-black -- transparent WebView2 windows clip/offset
-# their content inside the WinForms host, so we don't use them.
-_MINI_WIDTH = 190
-_MINI_HEIGHT = 190
+# The mini window shows a compact conversation-presence capsule (CSS, not the
+# Three.js orb -- see voice/static/orb.html's #mini-capsule) docked to a
+# screen edge. The window is sized to exactly the pill, and the pill fills it
+# edge to edge, so there is no leftover window background left to paint:
+# pywebview's default min_size of (200, 100) silently inflated this window
+# past the size we asked for, and that oversized near-black window *was* the
+# black box showing behind the pill. min_size below is what keeps it honest.
+# Transparent WebView2 windows are not an alternative -- they clip/offset
+# their content inside the WinForms host -- so the window's own corners are
+# rounded to match the pill's instead; see _round_mini_window().
+_MINI_WIDTH = 172
+_MINI_HEIGHT = 54
 _MINI_MARGIN = 24
+
+# DWM corner rounding for the mini window (Windows 11+); see
+# _round_mini_window(). DWM picks the radius (~8px) and it can't be set, so
+# .mc-pill's border-radius in orb.html is matched to it rather than the
+# other way round.
+_DWMWA_WINDOW_CORNER_PREFERENCE = 33
+_DWMWCP_ROUND = 2
+
+# States that keep the mini capsule on screen -- everything else (idle,
+# error) slides it away. Mirrors the values voice/main.py and voice/brain.py
+# emit via {"type": "state", "value": ...}.
+_MINI_ACTIVE_STATES = {"listening", "thinking", "speaking"}
+_MINI_SLIDE_MS = 400
 
 
 def is_available() -> bool:
@@ -92,31 +115,65 @@ def start(port: int, token: str) -> None:
     webview_mod.start(private_mode=False, storage_path=str(storage_path))
 
 
-def show_mini() -> None:
-    """Show the mini speaking-popup window -- unless the main orb window is
-    already visible (it shows the same speaking state), or the popup is
-    disabled/unavailable. Config is re-read on every call so toggling
-    speaking_popup_enabled in Settings applies without a restart."""
+def set_conversation_state(value: str) -> None:
+    """Show, resync, or hide the mini conversation-presence capsule for a
+    new state value. Called from two places: voice/ui_server.py::
+    post_event() on every `state` broadcast (listening/thinking/speaking/
+    idle/error) for conversational turns, AND voice/tts.py's
+    _on_speak_start/_on_speak_end directly, since proactive/heartbeat
+    speech (voice/main.py::_start_proactive_speaker) calls speak() without
+    ever emitting a `state` event -- audio playback is the only signal
+    available for that path. The two calls overlap harmlessly for a normal
+    conversational turn (redundant resync, not a conflict).
+
+    No-op unless the mini window exists, the main window is hidden, and
+    speaking_popup_enabled is on (config re-read every call so a live
+    Settings toggle applies without a restart).
+
+    The capsule's visuals are pure CSS keyed off body[data-state] (set
+    synchronously by orb.html's setState(), independent of any render
+    loop) rather than the Three.js orb canvas -- a hidden WebView2 window
+    throttles requestAnimationFrame, which is why the old shrunk-orb mini
+    popup could surface stuck on a stale frame. Setting body[data-state]
+    right before the slide-in class guarantees the very first visible
+    frame is already correct."""
+    global _mini_visible, _mini_hide_timer
     if not _mini_available or _main_visible:
         return
     from voice import config as cfg
     if not cfg.load().get("speaking_popup_enabled", True):
         return
-    try:
-        _mini_window.show()
-    except Exception:
-        pass
 
+    if _mini_hide_timer is not None:
+        _mini_hide_timer.cancel()
+        _mini_hide_timer = None
 
-def hide_mini() -> None:
-    """Hide the mini speaking-popup window. Safe no-op if it was never
-    created or is already hidden."""
-    if not _mini_available:
-        return
+    active = value in _MINI_ACTIVE_STATES
     try:
-        _mini_window.hide()
+        if active:
+            if not _mini_visible:
+                _mini_window.show()
+                _round_mini_window(_mini_window)
+                _mini_visible = True
+            _mini_window.evaluate_js(
+                f"document.body.dataset.state = {value!r};"
+                "requestAnimationFrame(() => document.body.classList.add('mini-show'));"
+            )
+        elif _mini_visible:
+            _mini_window.evaluate_js("document.body.classList.remove('mini-show')")
+
+            def _finish_hide() -> None:
+                global _mini_visible
+                try:
+                    _mini_window.hide()
+                finally:
+                    _mini_visible = False
+
+            _mini_hide_timer = threading.Timer(_MINI_SLIDE_MS / 1000, _finish_hide)
+            _mini_hide_timer.daemon = True
+            _mini_hide_timer.start()
     except Exception:
-        pass
+        logger.exception("[ui_window] set_conversation_state failed")
 
 
 def reload() -> None:
@@ -172,9 +229,38 @@ def _mini_position(width: int, height: int, corner: str) -> tuple[int, int]:
     return x, y
 
 
+def _round_mini_window(window) -> None:
+    """Ask DWM to round the mini window's corners, so the pill's rounded
+    edge isn't squared off by the native window behind it.
+
+    SetWindowRgn does not work here: WebView2 renders through
+    DirectComposition, whose visuals ignore a classic HWND region, so the
+    square corners paint straight back over the clip on the next repaint
+    (any state change or running bar animation). DWM's own corner
+    preference is applied by the compositor itself, so it survives.
+
+    Windows 10 has no such attribute and the call simply fails -- corners
+    stay square there, which is cosmetic only: the window is sized to the
+    pill either way, so no backdrop is exposed.
+
+    Re-applied on every show() because pywebview creates hidden windows by
+    toggling WinForms' Opacity (winforms.py::create_window), which can
+    recreate the handle and drop attributes set earlier."""
+    try:
+        import ctypes
+        hwnd = window.native.Handle.ToInt32()
+        preference = ctypes.c_int(_DWMWCP_ROUND)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd, _DWMWA_WINDOW_CORNER_PREFERENCE,
+            ctypes.byref(preference), ctypes.sizeof(preference),
+        )
+    except Exception:
+        logger.exception("[ui_window] failed to round mini window corners")
+
+
 def _create_mini_window(webview_mod, port: int, token: str):
-    """Create the small always-on-top speaking-popup window, hidden until
-    voice/tts.py calls show_mini()."""
+    """Create the small always-on-top conversation-presence popup window,
+    hidden until set_conversation_state() shows it."""
     from voice import config as cfg
     corner = cfg.load().get("speaking_popup_corner", "middle-right")
     x, y = _mini_position(_MINI_WIDTH, _MINI_HEIGHT, corner)
@@ -182,6 +268,7 @@ def _create_mini_window(webview_mod, port: int, token: str):
     return webview_mod.create_window(
         "Vesper — speaking", url,
         width=_MINI_WIDTH, height=_MINI_HEIGHT, x=x, y=y,
+        min_size=(_MINI_WIDTH, _MINI_HEIGHT),
         frameless=True, on_top=True, hidden=True, easy_drag=False,
-        resizable=False, background_color="#0a0a10",
+        resizable=False, shadow=False, background_color="#100e16",
     )

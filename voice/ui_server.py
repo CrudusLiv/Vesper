@@ -796,11 +796,16 @@ def post_event(event: dict[str, Any]) -> None:
     `killswitch` events also update the tray icon's color/tooltip (see
     voice/tray.py::set_state/set_paused) so the taskbar tray answers
     "is she running/paused" without opening the orb window -- done outside
-    the `_loop and _queue` gate below since the tray has no websocket."""
+    the `_loop and _queue` gate below since the tray has no websocket. A
+    `state` event also drives the mini conversation-presence capsule
+    (voice/ui_window.py::set_conversation_state) -- it shows/resyncs/hides
+    for listening/thinking/speaking/idle so the popup tracks the whole
+    exchange, not just audio playback (see voice/tts.py)."""
     event_type = event.get("type")
     if event_type == "state":
         from voice import tray
         tray.set_state(event.get("value", ""))
+        ui_window.set_conversation_state(event.get("value", ""))
     elif event_type == "killswitch":
         from voice import tray
         tray.set_paused(bool(event.get("paused")))
@@ -871,5 +876,6 @@ def start(port: int = 7070, host: str = "127.0.0.1") -> None:
         import uvicorn
         uvicorn.run(app, host=host, port=port, log_level="error")
 
-    threading.Thread(target=_run, daemon=True, name="vesper-ui").start()
+    from voice import supervisor
+    supervisor.supervise("vesper-ui", _run)
     threading.Event().wait(0.8)

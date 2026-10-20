@@ -15,6 +15,7 @@ PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolv
 
 sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 from core import llm  # noqa: E402
+from vault import knowledge  # noqa: E402
 
 VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 DAILY = VAULT / "daily"
@@ -24,21 +25,42 @@ KL = timezone(timedelta(hours=8))
 
 REFLECT_SYSTEM = """You curate CrudusLiv's long-term memory.
 
-You receive yesterday's daily log and the current MEMORY.md. Output STRICT
-JSON only -- no prose, no markdown fences:
+You receive yesterday's daily log, the current MEMORY.md, and the titles of
+existing concept/research notes. Output STRICT JSON only -- no prose, no
+markdown fences:
 
 {
   "new_decisions": ["one line each -- durable choices made yesterday"],
   "new_lessons":   ["one line each -- what worked, what didn't, what to do differently"],
-  "new_facts":     ["one line each -- non-obvious facts about systems/people/projects"]
+  "new_facts":     ["one line each -- non-obvious facts about systems/people/projects"],
+  "new_concepts":  [{"title": "...", "note": "..."}],
+  "new_research":  [{"title": "...", "note": "..."}],
+  "new_stances":   ["one line each -- an opinion/reaction you (Vesper) actually expressed"]
 }
 
 Rules:
 - Be RUTHLESS. Most chatter is not durable. Empty arrays are correct most days.
 - Don't duplicate items already present in MEMORY.md.
-- Each item <= 100 chars. No headers, no markdown formatting in items.
+- Each decision/lesson/fact item <= 100 chars. No headers, no markdown formatting.
 - Skip small fixes, debugging steps, and in-the-moment decisions that won't matter
-  next month."""
+  next month.
+- new_decisions/new_lessons/new_facts are about VESPER'S OWN BUILD (the voice
+  app, the agent layer, this repo) -- never about CrudusLiv's coursework, life,
+  or outside interests.
+- new_concepts: a discrete idea/term/technique CrudusLiv learned or worked
+  through (coursework, reading, a side project) -- NOT Vesper's own build.
+  If it matches an EXISTING concept title given below, reuse that exact title
+  so it gets appended to instead of duplicated.
+- new_research: a broader topic/thread CrudusLiv is exploring, worth an
+  evolving note rather than a fixed definition. Same reuse-existing-title rule.
+- Each concept/research "note" is 1-3 plain sentences: what was learned or
+  explored, and why it matters. No markdown formatting.
+- new_stances: an opinion, prediction, or reaction YOU (Vesper) actually
+  expressed yesterday -- not a fact about CrudusLiv, not a project decision.
+  Only include it if it's something worth bringing up again later (a real
+  disagreement, a prediction, a recurring complaint) -- most days this is
+  empty. Each item <= 100 chars, plain text, include enough of what it was
+  about that reading it cold weeks later still makes sense."""
 
 
 def yesterday_kl() -> str:
@@ -63,9 +85,14 @@ def reflect() -> dict:
         print("`claude` CLI not available. Reflection skipped.", file=sys.stderr)
         return {}
 
+    existing_concepts = ", ".join(knowledge.existing_titles("concepts")) or "(none yet)"
+    existing_research = ", ".join(knowledge.existing_titles("research")) or "(none yet)"
+
     prompt = (
         f"YESTERDAY'S DAILY LOG ({y_path.name}):\n\n{y_log}\n\n"
         f"---\n\nCURRENT MEMORY.md:\n\n{memory}\n\n"
+        f"---\n\nEXISTING CONCEPT NOTE TITLES: {existing_concepts}\n"
+        f"EXISTING RESEARCH NOTE TITLES: {existing_research}\n\n"
         f"Return JSON per the schema."
     )
     return llm.call_json(prompt, system_prompt=REFLECT_SYSTEM, model="haiku", task="memory_reflect") or {}
@@ -91,7 +118,9 @@ def append_to_memory(items: dict) -> int:
     text = MEMORY.read_text(encoding="utf-8")
     today = today_kl()
     appended = 0
-    for section, key in (("Decisions", "new_decisions"), ("Lessons", "new_lessons")):
+    for section, key in (
+        ("Decisions", "new_decisions"), ("Lessons", "new_lessons"), ("Stances", "new_stances"),
+    ):
         new = items.get(key) or []
         text, n = _insert_into_section(text, section, new, today)
         appended += n
@@ -102,6 +131,30 @@ def append_to_memory(items: dict) -> int:
     if appended:
         MEMORY.write_text(text, encoding="utf-8")
     return appended
+
+
+def curate_knowledge(items: dict) -> int:
+    """Write/append concept and research notes from reflect()'s
+    new_concepts/new_research arrays (see vault/knowledge.py). Returns the
+    number of notes created or appended to."""
+    if not items:
+        return 0
+    today = today_kl()
+    source = yesterday_kl()
+    written = 0
+    for item in items.get("new_concepts") or []:
+        if not isinstance(item, dict):
+            continue
+        title, note = item.get("title"), item.get("note")
+        if title and note and knowledge.upsert_concept(title, note, today, source_date=source):
+            written += 1
+    for item in items.get("new_research") or []:
+        if not isinstance(item, dict):
+            continue
+        title, note = item.get("title"), item.get("note")
+        if title and note and knowledge.upsert_research(title, note, today, source_date=source):
+            written += 1
+    return written
 
 
 ABOUT_SYSTEM = """You curate ABOUT.md — durable facts about CrudusLiv himself
@@ -176,6 +229,8 @@ def main() -> int:
     items = reflect()
     appended = append_to_memory(items)
     print(f"Reflection: {appended} item(s) added to MEMORY.md.")
+    written = curate_knowledge(items)
+    print(f"Reflection: {written} concept/research note(s) written.")
     try:
         curate_about()
     except Exception as exc:

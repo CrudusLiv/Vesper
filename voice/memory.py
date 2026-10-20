@@ -13,7 +13,7 @@ def load_context() -> str:
     if vault is None:
         return ""
     parts = []
-    for fname in ("USER.md", "MEMORY.md"):
+    for fname in ("USER.md", "MEMORY.md", "ABOUT.md"):
         p = vault / fname
         if p.exists():
             text = p.read_text(encoding="utf-8").strip()

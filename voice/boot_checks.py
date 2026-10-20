@@ -117,6 +117,22 @@ def _face() -> tuple[str, str]:
     return "ok", f"{name} ({conf.get('ui_face_mode', 'points')})"
 
 
+def _threads() -> tuple[str, str]:
+    from voice import supervisor
+    snap = supervisor.registry_snapshot()
+    if not snap:
+        return "skip", "no supervised threads registered yet"
+    # a clean exit (stop_event, EOF) isn't "down" -- only a crash that hasn't restarted yet is
+    dead = sorted(name for name, info in snap.items() if not info.get("alive") and info.get("last_error"))
+    if dead:
+        return "fail", f"down: {', '.join(dead)}"
+    restarts = sum(info.get("restarts", 0) for info in snap.values())
+    detail = f"{len(snap)} threads alive"
+    if restarts:
+        detail += f", {restarts} restart(s) total"
+    return "ok", detail
+
+
 PROBES: dict[str, tuple[str, Callable[[], tuple[str, str]]]] = {
     "stt":       ("STT",       _stt),
     "tts":       ("TTS",       _tts),
@@ -127,6 +143,7 @@ PROBES: dict[str, tuple[str, Callable[[], tuple[str, str]]]] = {
     "heartbeat": ("HEARTBEAT", _heartbeat),
     "scripts":   ("SCRIPTS",   _scripts),
     "face":      ("FACE",      _face),
+    "threads":   ("THREADS",   _threads),
 }
 
 

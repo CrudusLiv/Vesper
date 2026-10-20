@@ -51,3 +51,41 @@ def test_one_raising_probe_does_not_500(client, monkeypatch):
     rows = {r["id"]: r for r in resp.json()["checks"]}
     assert rows["llm"]["status"] == "fail"
     assert "kaboom" in rows["llm"]["error"]
+
+
+def test_threads_probe_skips_when_registry_empty(client, monkeypatch):
+    from voice import supervisor
+    monkeypatch.setattr(supervisor, "_registry", {})
+    rows = {r["id"]: r for r in client.get("/cmd/boot-checks").json()["checks"]}
+    assert rows["threads"]["status"] == "skip"
+
+
+def test_threads_probe_ok_when_all_alive(client, monkeypatch):
+    from voice import supervisor
+    monkeypatch.setattr(supervisor, "_registry", {
+        "vesper-clap": {"alive": True, "restarts": 0, "last_error": None, "last_restart_ts": None},
+        "vesper-heartbeat": {"alive": True, "restarts": 2, "last_error": None, "last_restart_ts": None},
+    })
+    rows = {r["id"]: r for r in client.get("/cmd/boot-checks").json()["checks"]}
+    assert rows["threads"]["status"] == "ok"
+    assert "2 restart" in rows["threads"]["detail"]
+
+
+def test_threads_probe_fails_naming_the_dead_thread(client, monkeypatch):
+    from voice import supervisor
+    monkeypatch.setattr(supervisor, "_registry", {
+        "vesper-clap": {"alive": False, "restarts": 1, "last_error": "boom", "last_restart_ts": None},
+        "vesper-heartbeat": {"alive": True, "restarts": 0, "last_error": None, "last_restart_ts": None},
+    })
+    rows = {r["id"]: r for r in client.get("/cmd/boot-checks").json()["checks"]}
+    assert rows["threads"]["status"] == "fail"
+    assert "vesper-clap" in rows["threads"]["detail"]
+
+
+def test_threads_probe_ignores_cleanly_exited_thread(client, monkeypatch):
+    from voice import supervisor
+    monkeypatch.setattr(supervisor, "_registry", {
+        "vesper-conversation": {"alive": False, "restarts": 0, "last_error": None, "last_restart_ts": None},
+    })
+    rows = {r["id"]: r for r in client.get("/cmd/boot-checks").json()["checks"]}
+    assert rows["threads"]["status"] == "ok"

@@ -1179,15 +1179,86 @@ body.silenced #rail-state-sub { color: var(--text-dim); }
     box-shadow var(--dur-soft) var(--ease-soft);
 }
 
-/* ── Mini mode (speaking popup window) ────────────────
-   Reuses the same page + WS connection as the main window -- shows just the
-   orb (the starfield + orb canvases) and hides every other direct child of
-   <body>, so the popup is a compact shrunk-orb indicator. See
-   voice/ui_window.py::_create_mini_window. */
-body.mini > *:not(canvas) { display: none !important; }
+/* ── Mini mode (conversation-presence capsule) ────────────────
+   Reuses the same page + WS connection as the main window, but shows a
+   lightweight CSS capsule instead of the Three.js orb -- hides every other
+   direct child of <body> including the orb/starfield canvases. Driven by
+   body[data-state] (set synchronously by setState(), independent of the
+   render loop) so it paints correctly the instant the window becomes
+   visible -- a hidden WebView2 window throttles requestAnimationFrame,
+   which is why the old shrunk-orb popup could surface stuck on a stale
+   frame. See voice/ui_window.py::set_conversation_state. */
+body.mini > *:not(#mini-capsule) { display: none !important; }
+body:not(.mini) #mini-capsule { display: none !important; }
+
+/* The native window is sized to exactly the pill, so the pill fills the
+   viewport edge to edge -- any margin here would expose bare window
+   background, which is what used to read as a black box around the pill.
+   border-radius below matches DWM's window corner rounding (see
+   voice/ui_window.py::_round_mini_window); a larger radius would leave dark
+   wedges in the corners, since WebView2 paints through DirectComposition
+   and can't be clipped to an arbitrary shape. */
+body.mini { background: #100e16; }
+#mini-capsule { position: fixed; inset: 0; background: transparent; }
+.mc-pill {
+  box-sizing: border-box;
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; height: 100%; padding: 0 16px; border-radius: 8px;
+  background: linear-gradient(135deg, #1c1826, #100e16);
+  border: 1px solid rgba(160,130,230,0.35);
+}
+/* the pill can't slide in -- it *is* the window now -- so its contents are
+   what animates on reveal */
+.mc-pill > * {
+  opacity: 0; transform: translateX(10px);
+  transition: opacity 0.26s ease, transform 0.38s cubic-bezier(.22,.9,.32,1);
+}
+body.mini-show .mc-pill > * { opacity: 1; transform: none; }
+.mc-orb {
+  width: 28px; height: 28px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 35% 30%, #b9a6ff, #6f55c9 55%, #3a2d6b 100%);
+  box-shadow: 0 0 14px 2px rgba(140,110,230,0.55);
+}
+.mc-bars { display: flex; align-items: center; gap: 3px; height: 20px; flex: none; }
+.mc-bars span { width: 3px; border-radius: 2px; background: #c9b8ff; opacity: .85; height: 4px; }
+.mc-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none; margin-left: auto;
+  background: #8f6fe0; box-shadow: 0 0 6px 2px rgba(143,111,224,.7);
+}
+
+/* listening: slow breathing bars, silver-teal accent */
+body[data-state="listening"] .mc-bars span { animation: mcBreathe 1.8s ease-in-out infinite; background: #9fb3ad; }
+body[data-state="listening"] .mc-bars span:nth-child(2) { animation-delay: .3s; }
+body[data-state="listening"] .mc-bars span:nth-child(3) { animation-delay: .6s; }
+body[data-state="listening"] .mc-dot { background: #9fb3ad; box-shadow: 0 0 6px 2px rgba(159,179,173,.6); }
+@keyframes mcBreathe { 0%,100% { height: 5px; opacity: .5; } 50% { height: 11px; opacity: 1; } }
+
+/* thinking: soft orb pulse, muted bronze accent -- bars stay low/still */
+body[data-state="thinking"] .mc-orb { animation: mcOrbPulse 1.6s ease-in-out infinite; }
+body[data-state="thinking"] .mc-bars span { background: #c2a878; opacity: .4; }
+body[data-state="thinking"] .mc-dot { background: #c2a878; box-shadow: 0 0 6px 2px rgba(194,168,120,.6); }
+@keyframes mcOrbPulse {
+  0%,100% { transform: scale(1); box-shadow: 0 0 12px 2px rgba(140,110,230,0.5); }
+  50% { transform: scale(1.12); box-shadow: 0 0 18px 5px rgba(140,110,230,0.75); }
+}
+
+/* speaking: jumpy waveform, muted violet accent (the default colors above) */
+body[data-state="speaking"] .mc-bars span { animation: mcJump 0.85s ease-in-out infinite; }
+body[data-state="speaking"] .mc-bars span:nth-child(2) { animation-delay: .15s; }
+body[data-state="speaking"] .mc-bars span:nth-child(3) { animation-delay: .3s; }
+body[data-state="speaking"] .mc-bars span:nth-child(4) { animation-delay: .45s; }
+@keyframes mcJump { 0%,100% { height: 4px; } 50% { height: 19px; } }
 </style>
 </head>
 <body>
+
+<div id="mini-capsule">
+  <div class="mc-pill">
+    <div class="mc-orb"></div>
+    <div class="mc-bars"><span></span><span></span><span></span><span></span></div>
+    <div class="mc-dot"></div>
+  </div>
+</div>
 
 <canvas id="starfield"></canvas>
 <div id="mode-wash"></div>
@@ -2104,7 +2175,7 @@ function animate(nowMs) {
 
   renderer.render(scene, camera);
 }
-if (VESPER_RENDER_MODE === 'orb') animate(0);
+if (VESPER_RENDER_MODE === 'orb' && !document.body.classList.contains('mini')) animate(0);
 
 // ── Text input bar ─────────────────────────────────────────────────────────
 (function initInput() {
@@ -2467,6 +2538,12 @@ runBootChecklist();
     } else if (ev.type === 'notice' || ev.type === 'notice_read') {
       updateNoticeBadge();
       loadNotices();  // feed rail is always on screen now
+    } else if (ev.type === 'data_changed') {
+      // Panes already refetch when their tab is opened; this covers the
+      // tab that is open when the data moves under it.
+      const active = document.querySelector('.ptab.active');
+      const openTab = active ? active.dataset.tab : null;
+      if (ev.scope === 'calendar' && openTab === 'calendar') loadCalendar();
     }
   };
   const ping = setInterval(() => ws.readyState === 1 && ws.send('ping'), 20000);

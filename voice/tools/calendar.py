@@ -3,6 +3,19 @@ from __future__ import annotations
 import voice  # noqa: F401
 
 
+def _broadcast_change() -> None:
+    """Tell connected orb clients that calendar/reminder data moved.
+    The Calendar pane only refetches when its tab is opened, so a reminder
+    added mid-conversation never showed up while that tab was already on
+    screen. Fire-and-forget: ui_enabled=False is normal, not an error."""
+    try:
+        from voice import ui_server
+        ui_server.post_event({"type": "data_changed", "scope": "calendar"})
+    except Exception:
+        pass
+
+
+
 def upcoming_events(days: int = 7) -> str:
     try:
         from integrations import gcal_int  # type: ignore
@@ -31,6 +44,7 @@ def create_calendar_event(title: str, date: str, description: str = "") -> str:
         return f"Calendar unavailable: {exc}"
     if event_id is None:
         return f"An event titled {title!r} already exists on {date} — didn't create a duplicate."
+    _broadcast_change()
     return f"Created calendar event {title!r} on {date}."
 
 
@@ -47,6 +61,7 @@ def delete_calendar_event(title: str, date: str) -> str:
         return f"Calendar unavailable: {exc}"
     if event_id is None:
         return f"No event titled {title!r} found on {date}."
+    _broadcast_change()
     return f"Deleted calendar event {title!r} on {date}."
 
 
@@ -61,6 +76,7 @@ def create_reminder(title: str, date: str, description: str = "") -> str:
         return f"Reminders unavailable: {exc}"
     if task_id is None:
         return f"A reminder titled {title!r} already exists on {date}."
+    _broadcast_change()
     return f"Created reminder {title!r} on {date}."
 
 
@@ -77,6 +93,7 @@ def complete_reminder(title: str) -> str:
         return f"Reminders unavailable: {exc}"
     if task_id is None:
         return f"No reminder titled {title!r} found."
+    _broadcast_change()
     return f"Marked {title!r} done."
 
 

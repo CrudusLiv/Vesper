@@ -84,3 +84,16 @@ def test_post_event_non_state_event_does_not_add_emotion(monkeypatch):
     monkeypatch.setattr(ui_server, "_queue", Mock())
     ui_server.post_event({"type": "amplitude", "value": 0.1})
     assert seen == [{"type": "amplitude", "value": 0.1}]
+
+
+def test_post_event_state_drives_mini_conversation_capsule(monkeypatch):
+    """A `state` event must reach ui_window.set_conversation_state (which
+    shows/resyncs/hides the mini popup) alongside the existing tray update,
+    not just the WS broadcast -- see voice/ui_window.py."""
+    from voice import ui_server
+    calls = []
+    monkeypatch.setattr(ui_server.ui_window, "set_conversation_state", lambda v: calls.append(v))
+    monkeypatch.setattr(ui_server, "_loop", None)
+    monkeypatch.setattr(ui_server, "_queue", None)
+    ui_server.post_event({"type": "state", "value": "listening"})
+    assert calls == ["listening"]

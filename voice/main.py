@@ -51,29 +51,35 @@ def _apply_killswitch(action: str) -> str:
     return "Back online."
 
 
+def _proactive_speaker_loop(
+    speak_queue: "queue.Queue[str]",
+    stop_event: threading.Event,
+) -> None:
+    """Drains speak_queue and speaks items until stop_event is set."""
+    while not stop_event.is_set():
+        try:
+            text = speak_queue.get(timeout=1.0)
+        except queue.Empty:
+            continue
+        try:
+            from voice import config as cfg, silence
+            if cfg.is_quiet_hours() or silence.is_silenced():
+                continue
+            from voice.tts import speak
+            speak(text)
+        except Exception as _e:
+            print(f"[proactive-tts] error: {_e}", flush=True)
+
+
 def _start_proactive_speaker(
     speak_queue: "queue.Queue[str]",
     stop_event: threading.Event,
 ) -> threading.Thread:
-    """Daemon thread: speaks items heartbeat pushes to speak_queue."""
-    def _loop() -> None:
-        while not stop_event.is_set():
-            try:
-                text = speak_queue.get(timeout=1.0)
-            except queue.Empty:
-                continue
-            try:
-                from voice import config as cfg, silence
-                if cfg.is_quiet_hours() or silence.is_silenced():
-                    continue
-                from voice.tts import speak
-                speak(text)
-            except Exception as _e:
-                print(f"[proactive-tts] error: {_e}", flush=True)
-
-    t = threading.Thread(target=_loop, daemon=True, name="vesper-proactive-speaker")
-    t.start()
-    return t
+    """Supervised daemon thread: speaks items heartbeat pushes to speak_queue."""
+    from voice import supervisor
+    return supervisor.supervise(
+        "vesper-proactive-speaker", _proactive_speaker_loop, speak_queue, stop_event=stop_event,
+    )
 
 
 def _get_version() -> str:
@@ -126,9 +132,8 @@ def _maybe_start_screen_read(conf: dict) -> "threading.Event | None":
         overlay, screen_capture.capture_active_monitor, screen_read.ask_about_images,
     )
     stop_event = threading.Event()
-    threading.Thread(
-        target=hotkeys.run, args=(stop_event,), daemon=True, name="vesper-screen-read",
-    ).start()
+    from voice import supervisor
+    supervisor.supervise("vesper-screen-read", hotkeys.run, stop_event=stop_event)
     print("[screen-read] armed")
     return stop_event
 
@@ -397,16 +402,14 @@ def run() -> None:
             _stop_tts()
 
         _clap_stop = threading.Event()
-        threading.Thread(
-            target=_clap.listen,
-            kwargs=dict(
-                callback=_on_clap,
-                stop_event=_clap_stop,
-                threshold=float(conf.get("clap_threshold", 0.6)),
-                window_s=float(conf.get("clap_window_s", 1.2)),
-            ),
-            daemon=True, name="vesper-clap",
-        ).start()
+        from voice import supervisor
+        supervisor.supervise(
+            "vesper-clap", _clap.listen,
+            callback=_on_clap,
+            stop_event=_clap_stop,
+            threshold=float(conf.get("clap_threshold", 0.6)),
+            window_s=float(conf.get("clap_window_s", 1.2)),
+        )
         print("[clap] double-clap interrupt armed")
 
     _screen_read_stop = _maybe_start_screen_read(conf)
@@ -457,13 +460,10 @@ def run() -> None:
             _screen_read_stop.set()
         print("\nGoodbye.")
 
-    conv_thread = threading.Thread(
-        target=_conversation_loop,
-        args=(brain, conf, use_voice, use_text, speak_queue),
-        daemon=True,
-        name="vesper-conversation",
+    from voice import supervisor
+    conv_thread = supervisor.supervise(
+        "vesper-conversation", _conversation_loop, brain, conf, use_voice, use_text, speak_queue,
     )
-    conv_thread.start()
 
     if conf.get("ui_enabled", False):
         import signal

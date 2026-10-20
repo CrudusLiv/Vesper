@@ -2,9 +2,14 @@
 """run_intake: walk, manifest diff, note writes, MOC, orphans."""
 from __future__ import annotations
 
+from datetime import date, timedelta
 from pathlib import Path
 
 from voice import university_intake as ui
+
+# Deadlines in the past are dropped, so tests use a date relative to today.
+_DUE = date.today() + timedelta(days=30)
+_DUE_TEXT = _DUE.strftime("%d/%m/%Y")
 
 CONFIG = {
     "university_intake_extensions": [".txt", ".md", ".pdf"],
@@ -18,7 +23,7 @@ CONFIG = {
 def _tree(root: Path):
     base = root / "University" / "Uni Assignments" / "Degree" / "Sem 2" / "BIT216"
     base.mkdir(parents=True)
-    (base / "brief.txt").write_text("Assignment brief. Submission due 15/10/2026.", encoding="utf-8")
+    (base / "brief.txt").write_text(f"Assignment brief. Submission due {_DUE_TEXT}.", encoding="utf-8")
     tut = root / "University" / "Uni Tutorial" / "Degree" / "Sem 1" / "FEC100"
     tut.mkdir(parents=True)
     (tut / "lab1.txt").write_text("Tutorial one body.", encoding="utf-8")
@@ -39,7 +44,7 @@ def test_fresh_ingest(tmp_path):
     ]
     assert res.skipped >= 1           # denied Program.txt
     assert res.unparsed >= 1          # loose.txt under root
-    assert ("2026-10-15", "BIT216 — brief") in res.deadlines
+    assert (_DUE.isoformat(), "BIT216 — brief") in res.deadlines
     note = vault / "coursework" / "bit216" / "brief.md"
     assert note.exists()
     assert "[[bit216]]" in note.read_text(encoding="utf-8")
@@ -340,7 +345,7 @@ def test_deadlines_capped_at_20_per_run(tmp_path):
     base = _course(root); vault.mkdir()
     for i in range(25):
         (base / f"asg{i:02d}.txt").write_text(
-            "Submission due 15/10/2026 via Turnitin.", encoding="utf-8")
+            f"Submission due {_DUE_TEXT} via Turnitin.", encoding="utf-8")
     manifest = {"version": 1, "files": {}}
     res = ui.run_intake(root, vault, manifest=manifest, config=CONFIG)
     assert len(res.deadlines) == 20
