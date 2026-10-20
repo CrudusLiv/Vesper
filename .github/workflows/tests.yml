@@ -19,7 +19,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[core]" pytest PyGithub google-api-python-client google-auth-oauthlib google-auth-httplib2 requests psutil winotify pypdf python-docx python-pptx jinja2 itsdangerous
+          python -m pip install -e ".[core]" pytest PyGithub google-api-python-client google-auth-oauthlib google-auth-httplib2 requests psutil winotify pypdf python-docx python-pptx jinja2 itsdangerous sqlite-vec
 
       - name: Run tests
         run: python -m pytest -q -rfE tests/
