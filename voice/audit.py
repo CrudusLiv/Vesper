@@ -11,7 +11,7 @@ from pathlib import Path
 
 _MAX_CONTENT = 500
 _MAX_BYTES = 10 * 1024 * 1024  # 10 MB cap per file
-_KEEP_LINES = 1000              # lines retained after trimming
+_KEEP_LINES = 5000              # lines retained after trimming (reflection reads yesterday's signals from here)
 _ROTATE_EVERY = 50              # check size every N writes
 _write_count = 0
 

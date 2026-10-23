@@ -19,7 +19,7 @@ DAILY_DIR = VAULT / "daily"
 import sys as _sys
 _sys.path.insert(0, str(PROJECT_DIR / ".claude" / "scripts"))
 
-MAX_CONTEXT_CHARS = 16000
+MAX_CONTEXT_CHARS = 20000
 MAX_TRANSCRIPT_CHARS = 80000
 
 DISTILL_PROMPT = """You are reviewing a Claude Code session transcript before context is dropped.
@@ -50,21 +50,22 @@ def safe_read(path: Path) -> str:
         return ""
 
 
-def recent_daily_logs(n: int = 3) -> str:
-    if not DAILY_DIR.exists():
-        return ""
-    today = datetime.now()
-    blocks: list[str] = []
-    for i in range(n):
-        d = today - timedelta(days=i)
-        path = DAILY_DIR / f"{d.strftime('%Y-%m-%d')}.md"
-        if path.exists():
-            blocks.append(f"### {path.name}\n\n{path.read_text(encoding='utf-8')}")
-    return "\n\n".join(blocks)
+MEMORY_BUDGET_CHARS = 6000
+DAILY_DAYS = 3
+DAILY_CHARS_EACH = 1500
+
+
+def recent_daily_logs(n: int = DAILY_DAYS) -> str:
+    from vault import context
+    return context.recent_daily(DAILY_DIR, n, DAILY_CHARS_EACH)
 
 
 def build_session_context() -> str:
-    """Pack SOUL + USER + MEMORY + DEADLINES + PROJECTS + last 3 daily logs into one context block."""
+    """Pack SOUL + USER + MEMORY + DEADLINES + PROJECTS + recent daily logs into
+    one context block. Each part has its own budget (MEMORY drops its oldest
+    entries, daily logs keep their tails) so the sum stays under
+    MAX_CONTEXT_CHARS without chopping the end -- the newest material."""
+    from vault import context
     parts: list[str] = []
     for label, fname in (
         ("SOUL", "SOUL.md"),
@@ -74,11 +75,13 @@ def build_session_context() -> str:
         ("PROJECTS", "PROJECTS.md"),
     ):
         body = safe_read(VAULT / fname)
+        if label == "MEMORY":
+            body = context.trim_memory(body, MEMORY_BUDGET_CHARS)
         if body:
             parts.append(f"## {label}\n\n{body}")
-    daily = recent_daily_logs(3)
+    daily = recent_daily_logs()
     if daily:
-        parts.append(f"## Recent daily logs (last 3 days)\n\n{daily}")
+        parts.append(f"## Recent daily logs (newest first)\n\n{daily}")
     text = "\n\n---\n\n".join(parts)
     if len(text) > MAX_CONTEXT_CHARS:
         text = text[:MAX_CONTEXT_CHARS] + "\n\n[truncated]"

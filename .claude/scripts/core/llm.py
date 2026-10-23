@@ -110,7 +110,26 @@ def _call_claude(
         "usage": data.get("usage") or {},
         "total_cost_usd": data.get("total_cost_usd"),
     })
+    _record_usage(model, data)
     return (data.get("result") or "").strip()
+
+
+def _record_usage(model: str, data: dict) -> None:
+    """Feed background calls (reflection, distillation) into the voice app's
+    usage.jsonl so spend isn't invisible. Best-effort: the voice package or
+    its data dir may be unavailable to a standalone script."""
+    try:
+        root = str(Path(__file__).resolve().parents[3])
+        if root not in sys.path:
+            sys.path.append(root)
+        from voice import usage
+        u = data.get("usage") or {}
+        in_tok = sum(int(u.get(k, 0) or 0) for k in (
+            "input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+        usage.record("claude_cli", model, in_tok, int(u.get("output_tokens", 0) or 0),
+                     cost_usd=data.get("total_cost_usd"))
+    except Exception:
+        pass
 
 
 _LAST_META: dict = {}

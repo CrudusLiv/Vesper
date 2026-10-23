@@ -23,7 +23,7 @@ PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolv
 VAULT = PROJECT_DIR / "Dynamous" / "Memory"
 
 # What to index. Anything outside these is ignored.
-INCLUDE_FILES = ["SOUL.md", "USER.md", "MEMORY.md", "HEARTBEAT.md"]
+INCLUDE_FILES = ["SOUL.md", "USER.md", "MEMORY.md", "MEMORY-archive.md", "HEARTBEAT.md"]
 INCLUDE_DIRS = [
     "projects", "research", "goals", "daily", "drafts/sent", "coursework",
     "concepts", "notes",

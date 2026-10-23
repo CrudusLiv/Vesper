@@ -107,7 +107,7 @@ DEFAULTS: dict[str, Any] = {
     "speaking_popup_enabled": True,  # only relevant when ui_enabled is on -- shows a mini waveform-capsule popup while she speaks and the main orb window is closed
     "speaking_popup_corner": "middle-right",  # top-left | top-right | middle-left | middle-right | bottom-left | bottom-right
     # Safety
-    "requires_confirmation": ["create_note", "append_note", "forget_fact", "create_calendar_event"],
+    "requires_confirmation": ["remember_fact", "create_note", "append_note", "forget_fact", "create_calendar_event"],
     "confirm_timeout_seconds": 30,
     "killswitch_voice_phrases": ["stand down", "pause yourself", "resume duties"],
     # Streaming replies (sentence-by-sentence TTS pipeline)
@@ -131,6 +131,9 @@ DEFAULTS: dict[str, Any] = {
     "wrap_time": "21:00",
     "nudge_enabled": True,
     "nudge_minutes": 15,
+    # Quiet hours normally mute everything, but an early-morning event's
+    # heads-up must still fire; nudges run from this time until quiet ends.
+    "nudge_quiet_floor": "07:00",
     # How often the nudge check itself runs -- must stay comfortably below
     # nudge_minutes, or an event's heads-up window can close between polls
     # and never get caught. If you tighten nudge_minutes a lot, tighten

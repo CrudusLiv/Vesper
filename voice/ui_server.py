@@ -645,6 +645,27 @@ class _NoticeDismiss(BaseModel):
     delete: bool = False  # remove the row entirely instead of marking read
 
 
+def _log_notice_outcome(entry: dict, action: str) -> None:
+    """Record what the user did with an alert (and how long it sat), so the
+    daily reflection can see which kinds of alerts get acted on or ignored.
+    Best-effort -- never blocks dismissing."""
+    try:
+        from datetime import datetime as _dt
+        from voice import audit
+        age = ""
+        try:
+            posted = _dt.fromisoformat(entry.get("ts", ""))
+            age = f" after {max(0, int((_dt.now(posted.tzinfo) - posted).total_seconds() // 60))}m"
+        except (TypeError, ValueError):
+            pass
+        audit.log(
+            "outcome", f"notice {action}{age} [{entry.get('level', 'INFO')}]: {str(entry.get('text', ''))[:150]}",
+            outcome=action, meta={"id": entry.get("id")},
+        )
+    except Exception:
+        pass
+
+
 @app.post("/cmd/notices/dismiss", dependencies=[Depends(_require_token)])
 async def notices_dismiss(body: _NoticeDismiss) -> JSONResponse:
     import json as _json
@@ -668,6 +689,9 @@ async def notices_dismiss(body: _NoticeDismiss) -> JSONResponse:
 
     dismissed = 0
     if body.delete:
+        for e in entries:
+            if _match(e):
+                _log_notice_outcome(e, "deleted")
         kept = [e for e in entries if not _match(e)]
         dismissed = len(entries) - len(kept)
         entries = kept
@@ -676,6 +700,7 @@ async def notices_dismiss(body: _NoticeDismiss) -> JSONResponse:
             if _match(e):
                 if not e.get("read"):
                     dismissed += 1
+                    _log_notice_outcome(e, "read")
                 e["read"] = True
     p.write_text(
         "\n".join(_json.dumps(e, ensure_ascii=False) for e in entries)

@@ -98,12 +98,14 @@ def append_line(line: str) -> None:
         f.write(f"\n{entry}" if created else entry)
 
 
-def append_block(label: str, content: str) -> None:
+def append_block(label: str, content: str, day: str | None = None) -> None:
     """Append a ## [HH:MM] <label> header + content block.
-    Used by session-flush hooks. Preserves existing daily note format."""
+    Used by session-flush hooks. Preserves existing daily note format.
+    `day` (YYYY-MM-DD) targets another day's note, for rollups that catch up
+    on a day the app was off."""
     daily_dir = _daily_dir()
     daily_dir.mkdir(parents=True, exist_ok=True)
-    today = _today()
+    today = day or _today()
     target = daily_dir / f"{today}.md"
     created = not target.exists()
     if created:

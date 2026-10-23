@@ -67,8 +67,10 @@ def test_turn_yields_text_and_updates_history(brain, monkeypatch):
     chunks = list(brain.turn("hi", source="text"))
 
     assert "".join(chunks).strip() == "Hello there."
-    assert brain.history[-2] == {"role": "user", "content": "hi"}
-    assert brain.history[-1] == {"role": "assistant", "content": "Hello there."}
+    assert [(t["role"], t["content"]) for t in brain.history[-2:]] == [
+        ("user", "hi"), ("assistant", "Hello there."),
+    ]
+    assert all(isinstance(t["ts"], float) for t in brain.history[-2:])
 
 
 def test_turn_emits_tool_events_without_appending_to_history(brain, monkeypatch):
@@ -135,7 +137,7 @@ def test_turn_mid_stream_exception_keeps_partial_reply(brain, monkeypatch):
 
     assert "Partial answer here" in joined
     assert "[couldn't get a response — try again]" not in chunks
-    assert brain.history[-1] == {"role": "assistant", "content": "Partial answer here"}
+    assert (brain.history[-1]["role"], brain.history[-1]["content"]) == ("assistant", "Partial answer here")
 
 
 def test_stream_turn_events_translates_text_and_tool_calls(brain, monkeypatch):

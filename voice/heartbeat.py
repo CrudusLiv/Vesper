@@ -37,6 +37,13 @@ from finance import tracker as finance_tracker  # noqa: E402  # type: ignore
 from core import llm as core_llm  # noqa: E402  # type: ignore
 
 
+# Bound at import: tests swap the module's `datetime` for a fixed-clock fake.
+_datetime_cls = datetime
+
+# How long after an event's start a missed heads-up is still worth saying.
+_NUDGE_LATE_MINUTES = 10
+
+
 def _format_duration(total_minutes: int) -> str:
     """Render a minute count as spoken hours+minutes past 60 (e.g. '1 hour 5 minutes')."""
     if total_minutes < 60:
@@ -152,14 +159,19 @@ def _count_unread() -> int:
         return 0
 
 
-def _fetch_events(days: int = 1, max_results: int = 10, days_back: int = 0) -> list[dict]:
-    """Fetch calendar events; returns [] on any error."""
+def _fetch_events(days: int = 1, max_results: int = 10, days_back: int = 0,
+                  strict: bool = False) -> list[dict]:
+    """Fetch calendar events; returns [] on any error unless `strict`, which
+    re-raises so a briefing can say "couldn't reach the calendar" instead of
+    claiming an empty day."""
     try:
         import sys
         sys.path.insert(0, str(_ROOT / ".claude" / "scripts"))
         from integrations import gcal_int  # type: ignore
         return gcal_int.upcoming(days=days, max_results=max_results, days_back=days_back) or []
     except Exception:
+        if strict:
+            raise
         return []
 
 
@@ -304,6 +316,7 @@ class Heartbeat:
         ("reminder_nags", "_check_reminder_nags", 15, None),
         ("google_auth", "_check_google_auth", 30, None),
         ("university_intake", "_check_university_intake", 30, None),
+        ("reflection_health", "_check_reflection_health", 60, None),
     ]
 
     # Each task's own opt-out flag, for the status panel's enabled/disabled
@@ -325,6 +338,7 @@ class Heartbeat:
         "reminder_nags": "reminder_nag_enabled",
         "google_auth": "google_auth_check_enabled",
         "university_intake": "university_intake_enabled",
+        "reflection_health": "reflection_health_enabled",
     }
 
     # Tasks that actually fire once/day at a configured time-of-day, rather
@@ -426,6 +440,10 @@ class Heartbeat:
         # re-fire it. Cleared per-label once the account reconnects.
         self._google_auth_notified: dict[str, str] = dict(state.get("google_auth_notified", {}))
 
+        # Day the "daily reflection is failing/stale" notice last fired, so it
+        # nags at most once a day and not again after a restart.
+        self._reflect_health_notified: date | None = _parse_date(state.get("reflect_health_notified"))
+
     @staticmethod
     def _state_path() -> Path:
         from voice import config as cfg
@@ -455,6 +473,7 @@ class Heartbeat:
             "last_test_ok": self._last_test_ok,
             "last_workflow_conclusion": self._last_workflow_conclusion,
             "google_auth_notified": self._google_auth_notified,
+            "reflect_health_notified": str(self._reflect_health_notified) if self._reflect_health_notified else None,
         }
         try:
             p = self._state_path()
@@ -536,6 +555,7 @@ class Heartbeat:
         except Exception as _e:
             print(f"[heartbeat] activity check error: {_e}", flush=True)
         if self._is_quiet():
+            self._nudge_in_quiet_hours()
             return
         try:
             self._check_idle_return(poll_gap_s)
@@ -549,6 +569,21 @@ class Heartbeat:
         # _SCHEDULE self-gates on its own interval, so this is cheap when
         # nothing is due yet (see _run_scheduled's docstring).
         self._run_scheduled()
+
+    def _nudge_in_quiet_hours(self) -> None:
+        """Quiet hours run until 09:00, so an 08:00 lecture's heads-up used to
+        be swallowed. From nudge_quiet_floor (default 07:00) until quiet
+        hours end, run only the nudge check -- everything else stays silent."""
+        from voice import config as cfg
+        conf = cfg.load()
+        fh, fm = (int(x) for x in str(conf.get("nudge_quiet_floor", "07:00")).split(":"))
+        now = datetime.now(cfg.get_timezone())
+        if (now.hour, now.minute) < (fh, fm):
+            return
+        try:
+            self._run_scheduled(only=("nudges",))
+        except Exception as _e:
+            print(f"[heartbeat] quiet-hours nudge error: {_e}", flush=True)
 
     def _check_idle_return(self, poll_gap_s: float = 0.0) -> None:
         """Away/return state machine, run every fast poll.
@@ -820,6 +855,38 @@ class Heartbeat:
         if changed:
             self._save_state()
 
+    def _check_reflection_health(self) -> None:
+        """The 08:00 reflection runs as a separate scheduled task, so when it
+        fails (CLI missing, timeout, machine off for days) nothing in this
+        process would ever know. It leaves reflect_status.json behind; post
+        one URGENT notice a day while that file says it failed or is stale.
+        Silent until the task has run at least once."""
+        from voice import config as cfg
+        conf = cfg.load()
+        if not conf.get("reflection_health_enabled", True):
+            return
+        try:
+            status = json.loads(
+                (_ROOT / ".claude" / "data" / "state" / "reflect_status.json").read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return
+
+        today = datetime.now(cfg.get_timezone()).date()
+        last = _parse_date(status.get("last_reflected_date"))
+        # Yesterday's reflection lands at 08:00 today; one extra day of slack.
+        stale = last is None or (today - last).days > 2
+        if status.get("ok") is not False and not stale:
+            return
+        if self._reflect_health_notified == today:
+            return
+        if status.get("ok") is False:
+            reason = status.get("error") or "it failed"
+        else:
+            reason = f"last success was {last}"
+        _post(f"Daily memory reflection isn't working ({reason}). Check the vesper-reflect task.", level="URGENT")
+        self._reflect_health_notified = today
+        self._save_state()
+
     def _check_urgent_email(self) -> None:
         """Speak only when a genuinely new urgent-flagged email appears
         (id-based dedup). Replaces the old _tick()-driven 'N new message(s)'
@@ -996,37 +1063,65 @@ class Heartbeat:
         today = now.date()
         if self._vault_rollup_done_date == today:
             return
+
+        # The app was off at last night's rollup time: the 23:30 gate below
+        # would never fire for that day, so its voice highlights, digest and
+        # finance summary were lost. Roll yesterday up now, into yesterday's
+        # note. Only after a previous run is on record, so a fresh install
+        # doesn't write a stub.
+        yesterday = today - timedelta(days=1)
+        done = self._vault_rollup_done_date
+        if done is not None and done < yesterday:
+            self._vault_rollup_done_date = yesterday
+            self._save_state()
+            self._write_rollup(yesterday, now - timedelta(days=1))
+            return
+
         rh, rm = (int(x) for x in conf.get("vault_rollup_time", "23:30").split(":"))
         if now.hour < rh or (now.hour == rh and now.minute < rm):
             return
 
         self._vault_rollup_done_date = today
         self._save_state()
+        self._write_rollup(today, now)
 
+    def _write_rollup(self, day: date, when: datetime) -> None:
+        """Append `day`'s voice/digest/finance sections to that day's note."""
         sections: list[tuple[str, str]] = []
-        voice_block = self._distill_voice_history()
+        voice_block = self._distill_voice_history(day)
         if voice_block:
             sections.append(("Voice conversation", voice_block))
-        digest_block = self._heartbeat_digest_text(today)
+        digest_block = self._heartbeat_digest_text(day)
         if digest_block:
             sections.append(("Heartbeat digest", digest_block))
-        finance_block = self._finance_rollup_text(now)
+        finance_block = self._finance_rollup_text(when)
         if finance_block:
             sections.append(("Finance", finance_block))
 
+        extra = {} if day == datetime.now(when.tzinfo).date() else {"day": day.isoformat()}
         for label, content in sections:
             try:
-                vault_daily.append_block(label, content)
+                vault_daily.append_block(label, content, **extra)
             except OSError as _e:
                 print(f"[heartbeat] vault rollup write failed ({label}): {_e}", flush=True)
 
-    def _distill_voice_history(self) -> str:
-        """Durable-items distillation of today's voice conversation, same
-        shape as the coding-session hooks. "" if there's no brain wired up,
-        no conversation happened, or nothing durable came of it."""
+    def _distill_voice_history(self, day: date | None = None) -> str:
+        """Durable-items distillation of `day`'s voice conversation (default
+        today), same shape as the coding-session hooks. "" if there's no
+        brain wired up, no conversation happened that day, or nothing durable
+        came of it. brain.history spans several days (it is only trimmed by
+        length), so each turn's ts picks out the day; a turn with no ts is
+        kept rather than silently dropped."""
         if self._brain is None:
             return ""
-        history = list(getattr(self._brain, "history", []) or [])
+        from voice import config as cfg
+        tz = cfg.get_timezone()
+        day = day or datetime.now(tz).date()
+        history = [
+            turn for turn in (getattr(self._brain, "history", []) or [])
+            if not isinstance(turn.get("ts"), (int, float))
+            or _datetime_cls.fromtimestamp(turn["ts"], tz).date() == day
+        ]
         if not history:
             return ""
         transcript = "\n".join(
@@ -1289,7 +1384,7 @@ class Heartbeat:
             "tasks": tasks,
         }
 
-    def _run_scheduled(self) -> None:
+    def _run_scheduled(self, only: tuple[str, ...] | None = None) -> None:
         """Run each _SCHEDULE task independently once its own interval has
         elapsed (config-overridable for gcal_sync/github_digest, else a
         fixed default -- see _SCHEDULE). Called every fast poll; tasks not
@@ -1299,6 +1394,8 @@ class Heartbeat:
         conf = cfg.load()
         now = time.monotonic()
         for name, method_name, default_min, cfg_key in self._SCHEDULE:
+            if only is not None and name not in only:
+                continue
             interval_min = conf.get(cfg_key, default_min) if cfg_key else default_min
             interval_s = interval_min * 60
             last = self._last_run.get(name)
@@ -1353,7 +1450,11 @@ class Heartbeat:
         # The 24h fetch window straddles midnight, so tomorrow's all-day
         # events land in it — bucket by actual start date or the briefing
         # calls tomorrow's birthday "today".
-        events = _fetch_events(days=1, max_results=5)
+        try:
+            events = _fetch_events(days=1, max_results=5, strict=True)
+            calendar_ok = True
+        except Exception:
+            events, calendar_ok = [], False
         today_strs: list[str] = []
         tomorrow_strs: list[str] = []
         for e in events:
@@ -1374,8 +1475,10 @@ class Heartbeat:
                 tomorrow_strs.append(label)
         if today_strs:
             parts.append(f"Today: {', '.join(today_strs[:3])}.")
-        else:
+        elif calendar_ok:
             parts.append("No events today.")
+        else:
+            parts.append("Couldn't reach your calendar, so I can't say what's on today.")
         if tomorrow_strs:
             parts.append(f"Tomorrow: {', '.join(tomorrow_strs[:3])}.")
 
@@ -1407,7 +1510,11 @@ class Heartbeat:
 
         parts: list[str] = ["Evening check-in."]
         tomorrow = today + timedelta(days=1)
-        events = _fetch_events(days=2, max_results=10)
+        try:
+            events = _fetch_events(days=2, max_results=10, strict=True)
+            calendar_ok = True
+        except Exception:
+            events, calendar_ok = [], False
         tmr = [e for e in events if e.get("start", "")[:10] == str(tomorrow)]
         reminders_tmr = [r for r in _fetch_reminders(days=2) if (r.get("due") or "")[:10] == str(tomorrow)]
         if tmr:
@@ -1426,8 +1533,10 @@ class Heartbeat:
                 f"Nothing on the calendar tomorrow, but {len(reminders_tmr)} "
                 f"reminder{'s' if len(reminders_tmr) != 1 else ''}: {titles}."
             )
-        else:
+        elif calendar_ok:
             parts.append("Nothing scheduled for tomorrow.")
+        else:
+            parts.append("Couldn't reach your calendar, so I can't say what's on tomorrow.")
 
         deadlines = _fetch_deadlines()
         if deadlines:
@@ -1471,6 +1580,18 @@ class Heartbeat:
                     text = (
                         f"Heads up — {event.get('summary', 'an event')} starts in "
                         f"{_format_duration(mins)}."
+                    )
+                    self._speak(text)
+                    _post(text, level="URGENT")
+                elif -_NUDGE_LATE_MINUTES < delta <= 0:
+                    # The heads-up window passed while the machine was asleep
+                    # or the app was down; a late "already started" still
+                    # beats silence.
+                    self._nudged_events.add(key)
+                    self._save_state()
+                    text = (
+                        f"{event.get('summary', 'An event')} already started "
+                        f"{_format_duration(int(-delta))} ago."
                     )
                     self._speak(text)
                     _post(text, level="URGENT")

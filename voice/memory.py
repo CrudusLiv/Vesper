@@ -8,17 +8,28 @@ import voice  # noqa: F401
 from voice import config as cfg
 
 
+MEMORY_BUDGET_CHARS = 9000
+RECENT_DAYS = 2
+RECENT_DAY_CHARS = 2500
+
+
 def load_context() -> str:
     vault = cfg.get_vault_dir()
     if vault is None:
         return ""
+    from vault import context  # type: ignore
     parts = []
     for fname in ("USER.md", "MEMORY.md", "ABOUT.md"):
         p = vault / fname
         if p.exists():
             text = p.read_text(encoding="utf-8").strip()
+            if fname == "MEMORY.md":
+                text = context.trim_memory(text, MEMORY_BUDGET_CHARS)
             if text:
                 parts.append(text)
+    recent = context.recent_daily(vault / "daily", RECENT_DAYS, RECENT_DAY_CHARS)
+    if recent:
+        parts.append(f"## Recent days (your own log, newest first)\n\n{recent}")
     return "\n\n---\n\n".join(parts)
 
 
