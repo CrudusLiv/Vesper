@@ -91,7 +91,7 @@ DEFAULTS: dict[str, Any] = {
     "ui_port": 7070,
     "ui_host": "127.0.0.1",         # bind address for the FastAPI/uvicorn server; set "0.0.0.0" to reach it from other devices (e.g. over Tailscale)
     "city": "",                     # for weather widget; empty = disabled
-    "ui_render_mode": "orb",        # orb | face
+    "ui_render_mode": "orb",        # orb | face | math
     "ui_face_png_path": "",         # filename under voice/static/face/; empty = vesper.png
     "ui_face_mode": "points",       # points (cloud) | overlay (art + silhouette aura)
     "ui_face_point_count": 40000,   # points sampled from the PNG in `points` mode

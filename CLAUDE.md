@@ -126,7 +126,7 @@ Place `google_credentials.json` at `.claude/data/google_credentials.json`. The t
 
 User settings (quiet hours, feature toggles, heartbeat interval, activity awareness) live in `voice/config.json`, merged over `DEFAULTS` in `voice/config.py` by `config.load()` (an installed `%APPDATA%\Vesper\config.json` wins over the repo copy). Every proactive capability has an independent `*_enabled` flag each heartbeat task checks at the top. Activity awareness adds `activity_awareness_enabled` (opt-in) + `silence_when_running` (list of exe names). There is no `tray_settings.json`.
 
-`ui_render_mode` is `orb` or `face`. The VRM avatar mode was removed — it only
+`ui_render_mode` is `orb`, `face` or `math` (`voice/static/math/scene.js` — a dependency-free 2D canvas figure drawn purely from math, driven by the `vesper:state`/`vesper:amplitude`/`vesper:viseme` events). The VRM avatar mode was removed — it only
 ever had a placeholder model. The face asset is a pre-processed PNG (background
 matted offline, committed as `voice/static/face/vesper.png`); the runtime only
 loads the PNG.

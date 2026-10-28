@@ -34,6 +34,11 @@ def test_index_honors_face_mode(client, conf):
     assert 'const VESPER_RENDER_MODE = "face";' in client.get("/").text
 
 
+def test_index_honors_math_mode(client, conf):
+    conf(ui_render_mode="math")
+    assert 'const VESPER_RENDER_MODE = "math";' in client.get("/").text
+
+
 def test_index_rejects_unknown_mode(client, conf):
     conf(ui_render_mode="bogus")
     assert 'const VESPER_RENDER_MODE = "orb";' in client.get("/").text

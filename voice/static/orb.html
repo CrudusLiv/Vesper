@@ -1586,6 +1586,7 @@ body[data-state="speaking"] .mc-bars span:nth-child(4) { animation-delay: .45s; 
 }
 </script>
 <script type="module" src="/static/face/scene.js"></script>
+<script type="module" src="/static/math/scene.js"></script>
 <script>
 // ── Session token (security gate) ───────────────────────────────────────────
 // Embedded server-side into this page's HTML on every load (see index() in
@@ -2062,6 +2063,7 @@ const curColorHi = new THREE.Color(MODE_COLORS.default.coreHi);
 function setState(s) {
   if (!STATES[s]) return;
   state = s;
+  window.dispatchEvent(new CustomEvent('vesper:state', { detail: s }));
   document.body.dataset.state = s;  // lets pure-CSS HUD accents (waveforms, equalizers) react per state
   const rs = document.getElementById('rail-state');
   if (rs) { rs.textContent = s.toUpperCase(); rs.className = 'rail-val ' + s; }
@@ -2521,6 +2523,7 @@ runBootChecklist();
       showToolActivity(ev);
     } else if (ev.type === 'amplitude') {
       volTarget = Math.min((ev.value || 0) * 10, 1.0);
+      window.dispatchEvent(new CustomEvent('vesper:amplitude', { detail: ev.value || 0 }));
     } else if (ev.type === 'viseme') {
       window.dispatchEvent(new CustomEvent('vesper:viseme', { detail: ev }));
     } else if (ev.type === 'emotion') {
@@ -4140,7 +4143,7 @@ async function loadSettingsPanel() {
     let modeCtrl = null;
     const dependentWraps = [];
     [
-      { key: 'ui_render_mode', label: 'Render mode', type: 'select', opts: ['orb', 'face'] },
+      { key: 'ui_render_mode', label: 'Render mode', type: 'select', opts: ['orb', 'face', 'math'] },
       { key: 'ui_face_mode', label: 'Face style', type: 'select', opts: ['points', 'overlay'], showIf: 'face' },
       { key: 'ui_face_point_count', label: 'Face point count', type: 'number', showIf: 'face' },
       { key: 'ui_face_png_path', label: 'Face PNG filename (blank = vesper.png)', type: 'text', showIf: 'face' },
