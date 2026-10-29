@@ -121,7 +121,7 @@ async def index() -> HTMLResponse:
     from voice import config as cfg
     conf = cfg.load()
     mode = conf.get("ui_render_mode", "orb")
-    if mode not in ("orb", "face", "math"):
+    if mode not in ("orb", "face"):
         mode = "orb"
     face_name = cfg.get_face_png_name(conf)
     if mode == "face" and not (_STATIC / "face" / face_name).exists():
